@@ -2,6 +2,32 @@
 
 Data: 2026-10-09 · Autor: agent Arena.ai
 Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
+
+## STATUS REALIZACJI (aktualizowane na bieżąco)
+
+| Etap | Status | Release | Uwagi |
+|---|---|---|---|
+| 0. Repo + wersjonowanie | ✅ GOTOWY | 4.0.0 | commit `8e4776e`: struktura `firmware/docs/`, CHANGELOG.md, build_gate.ps1, usunięty zip/.pre-v253 |
+| 1. OTA GitHub + release'y | ✅ KOD GOTOWY — czeka na build u użytkownika | 4.1.0 | commit `cb16f00`: moduł `ota_github.*`, /update (TG), update (FB), ota (WS); do dokończenia: pierwszy release z `firmware.bin` + karta OTA w panelu (przy Etapie 4) |
+| 2. Bezpieczeństwo Firebase | 🔴 NIE ROZPOCZĘTY | — | **UWAGA PILNA:** `FIREBASE_SECRET` jest w kodzie, a zip był publiczny — **rotuj sekret w Firebase Console zanim ktokolwiek go pobierze** (patrz niżej) |
+| 3. Spool V2 + telemetria | ⬜ | — | |
+| 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | ⬜ | — | CORS bazowy już jest (DefaultHeaders `*`); brakuje `Allow-Private-Network` i OPTIONS |
+| 5. Log krytyczny + Telegram | ⬜ | — | |
+| 6. Astronomia + RTC | ⬜ | — | |
+| 7. Panel LVGL | ⬜ opcjonalny | — | |
+
+### ⚠️ PILNE (poza kolejnością) — sekrety w publicznym zipie
+
+W `firmware/src/Ryby_LED_fi_S3.cpp` są na stałe wpisane:
+- `FIREBASE_SECRET "RhKVp49q..."` — **Database Secret: pełny RW na całej bazie
+  RTDB, nigdy nie wygasa**. Zip z tym kodem wisiał w publicznym repo — każdy mógł
+  go pobrać. **Natychmiastowa rotacja w Firebase Console** (Project Settings →
+  Service accounts → Database secrets) unieważni stary sekret; firmware po
+  rotacji straci łączność Firebase do czasu wpisania nowego sekretu
+  (docelowo Etap 2 przenosi sekrety do NVS + UserAuth).
+- `CMD_TOKEN "Akwarium2026!"` i hasło espota `AkwPanel2026!` — również do
+  zmiany przy okazji.
+
 Konwencja: każdy etap ma **cel**, **zakres** (co zmieniamy), **kryterium
 zaliczenia** (Definition of Done) i **ryzyka**. Etapy P0 można robić od razu,
 bez zmian w logice świecenia (zero ryzyka dla akwarium).
