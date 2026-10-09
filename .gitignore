@@ -1,0 +1,14 @@
+# PlatformIO
+.pio/
+.vscode/
+*.pyc
+
+# Build artifacts lokalne (release artefakty zyja w GitHub Releases, nie w repo)
+*.bin
+*.elf
+*.map
+
+# Kopie robocze
+*.bak
+*.orig
+*~
