@@ -14,6 +14,17 @@
  *     Logika sterowania LED, adaptacji, harmonogramu, MIN LUX, ramp i Ramp
  *     Arbiter: NIETKNIETA. Firebase transport, Telegram poll i logi: NIETKNIETE.
  *
+ * [4.1.0 FIX-ORDER, 2026-10-09] Poprawki kompilacji po reorganizacji kodu w V262:
+ *     deklaracje wyprzedzajace dla symboli zdefiniowanych nizej w pliku
+ *     (Komentarze/rampaAdaptacyjnaAktywna/rampaMinLuxPriorytet przed Ramp Arbiter;
+ *     fbParseConfigSnapshot/enqueueFirebaseConfigSnapshot przed sekcja fbAsync),
+ *     przywrocony typ PumpSlot tablicy pumpSlots, prototyp wykonajKomendeFirebase
+ *     zgodny z definicja (cmd, firebaseTs, firebaseKey), literowka
+ *     fbAsyncTimeoutCount -> g_fbAsyncTimeoutCount, include ota_github.h
+ *     przeniesiony na poczatek pliku (byl za punktem uzycia).
+ *     ota_github.cpp: API IDF 5.5 (esp_ota_get_state_partition,
+ *     ESP_OTA_IMG_PENDING_VERIFY). Bez zmian logiki sterowania.
+ *
  * [v4.0.0 REPO-RESTRUCTURE, 2026-10-09] Semver baseline (v261 = 4.0.0+build.261).
  *     Naglowek skrocony do ostatnich 10 wersji — pelna historia (do v33b)
  *     przeniesiona 1:1 do CHANGELOG.md w katalogu glownym repo.
@@ -252,7 +263,7 @@ void fbInitialize();
 void sendStatusToFirebase();
 void checkFirebaseCommands();
 void checkFirebaseConfig();
-static bool wykonajKomendeFirebase(const String& cmd);
+static bool wykonajKomendeFirebase(const String& cmd, uint64_t firebaseTs, const char* firebaseKey);
 static bool fbParseU64Field(const String& body, int valueIndex, uint64_t& out);
 void loop();
 void trybAuto(const char* caller);
@@ -423,6 +434,7 @@ void* psramAllocSafe(size_t size);
 #include <memory>     // [v106] shared_ptr dla chunked response (log endpoints)
 #include <algorithm>  // [v106] std::min w callbackach beginResponse
 #include "NetDiag.h"  // [NETDIAG] test routera/łącza - patrz komentarz w pliku
+#include "ota_github.h"   // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
 
 
 /*************************************************************
@@ -1379,7 +1391,7 @@ static bool g_fbConfigApplyRetryPending = false;
 static uint32_t g_fbConfigApplyRetryAtMs = 0;
 static uint64_t g_fbConfigQueuedTs = 0; // single config snapshot dedup high-water mark
 
- pumpSlots[PUMP_MAX_SLOTS] = {
+PumpSlot pumpSlots[PUMP_MAX_SLOTS] = {
   { 8*60, 11*60 },   // 08:00-11:00
   {15*60, 18*60 },   // 15:00-18:00
   {    0,     0 },
@@ -1456,6 +1468,12 @@ static uint16_t rampDownStartValue[5] = {0, 0, 0, 0, 0};  // [OK] FIX #2: Warto�
 
 // [OK] FIX A: Globalny flag aktywnej rampy harmonogramu - widoczny z loop() dla applyMinLuxMode guard
 bool rampScheduleActive = false;
+
+// [4.1.0 FIX-ORDER] Definicje tych flag sa nizej (ok. linii 1660/1820/1828);
+// Ramp Arbiter (v252) zostal przeniesiony ponad nie - wymagane deklaracje wyprzedzajace.
+extern bool Komentarze;
+extern bool rampaAdaptacyjnaAktywna;
+extern bool rampaMinLuxPriorytet;
 
 // ── v252 RAMP ARBITER ───────────────────────────────────────────────────────
 // Jeden właściciel zasobu PWM. Flagi legacy pozostają jako stan kompatybilności,
@@ -6974,7 +6992,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
 
 #include "terminal_html.h"
-#include "ota_github.h"   // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
 
 
 // [OK] FIX BUG-V: Globalna flaga opóźnionego restartu (dostępna z loop() i handlera HTTP)
@@ -7042,12 +7059,17 @@ static bool fbAsyncEnsureReady() {
   return fbAppReady && fbApp.ready();
 }
 
+// [4.1.0 FIX-ORDER] Definicje tych funkcji sa nizej (ok. linii 12138/12197/12308);
+// sekcja fbAsync zostala przeniesiona ponad nie - wymagane deklaracje wyprzedzajace.
+static bool fbParseConfigSnapshot(const String& body, FirebaseConfigSnapshot& out);
+static bool enqueueFirebaseConfigSnapshot(const FirebaseConfigSnapshot& snap);
+
 static void fbAsyncFail(const char* reason) {
   const FbAsyncOp op = g_fbAsyncOp;
   const uint32_t elapsed = g_fbAsyncOpStartedMs ? (millis() - g_fbAsyncOpStartedMs) : 0;
   logPrintf("lvl=ERR tag=FB-ASYNC op=%s reason=%s ms=%lu\n",
             fbAsyncOpName(op), reason ? reason : "error", (unsigned long)elapsed);
-  fbAsyncTimeoutCount++;
+  g_fbAsyncTimeoutCount++;
   fbAppReady = false;
   fbSSLClient.stop();
   NET_FAIL(_fbFailStreak);

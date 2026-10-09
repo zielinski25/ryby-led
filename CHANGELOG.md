@@ -24,6 +24,15 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
   do addr2line) w `zielinski25/ryby-led`.
 - Dlaczego: dotąd jedyne OTA = espota z hasłem (wymaga laptopa w LAN); parytet
   z Centralą Pieca i zdalne aktualizacje bez espota.
+- FIX-ORDER (kompilacja po reorganizacji V262): deklaracje wyprzedzające dla
+  symboli zdefiniowanych niżej w pliku (`Komentarze`, `rampaAdaptacyjnaAktywna`,
+  `rampaMinLuxPriorytet` przed Ramp Arbiter; `fbParseConfigSnapshot`,
+  `enqueueFirebaseConfigSnapshot` przed sekcją fbAsync), przywrócony typ
+  `PumpSlot` tablicy `pumpSlots`, prototyp `wykonajKomendeFirebase(cmd, ts, key)`
+  zgodny z definicją, literówka `fbAsyncTimeoutCount` → `g_fbAsyncTimeoutCount`,
+  include `ota_github.h` przeniesiony na początek pliku; w `ota_github.cpp`
+  API IDF 5.5 (`esp_ota_get_state_partition`, `ESP_OTA_IMG_PENDING_VERIFY`).
+  Bez zmian logiki sterowania.
 - Logika sterowania i algorytmy: NIETKNIETE (LED/adaptacja/harmonogram/
   MIN LUX/rampy/Ramp Arbiter bez zmian; transport Firebase/Telegram/logi bez
   zmian — moduł w 100% samodzielny).

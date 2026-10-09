@@ -17,7 +17,7 @@
 #include <HTTPClient.h>      // [4.1.0] osobny TU — celowo NIE w Ryby_LED_fi_S3.cpp
 #include <HTTPUpdate.h>      //        (tam usunięty w v105-FC; tu niezależny od Firebase)
 #include <Update.h>
-#include <esp_ota_ops.h>     // esp_ota_get_state_image / mark_app_valid_cancel_rollback
+#include <esp_ota_ops.h>     // esp_ota_get_state_partition / mark_app_valid_cancel_rollback (IDF 5.5)
 #include <esp_task_wdt.h>    // rejestracja/karmienie TWDT własnego taska
 #include <ESPAsyncWebServer.h>
 
@@ -294,8 +294,8 @@ void otaGithubConfirmPartition() {
   const esp_partition_t* running = esp_ota_get_running_partition();
   if (!running) return;
   esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
-  if (esp_ota_get_state_image(running, &state) != ESP_OK) return;
-  if (state == ESP_OTA_IMG_PENDING_VALIDATION) {
+  if (esp_ota_get_state_partition(running, &state) != ESP_OK) return;
+  if (state == ESP_OTA_IMG_PENDING_VERIFY) {
     if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) {
       logPrintln("lvl=INFO tag=OTA-GH msg=\"Partycja OTA potwierdzona (cancel rollback)\"");
     } else {
