@@ -1,6 +1,19 @@
 /*************************************************************
  *  CHANGELOG
  *
+ * [v4.1.0 OTA-GITHUB, 2026-10-09] Etap 1 planu upgrade: OTA przez GitHub Releases.
+ *     Co: nowy, samodzielny modul src/ota_github.h/.cpp (port 1:1 sprawdzonego
+ *     mechanizmu z Centrali Pieca): GET /api/ota-status, POST /api/ota-start,
+ *     komenda /update w Telegramie, komendy update/ota w Firebase
+ *     (/aquarium/commands) i konsoli WS (ota / ota status). Task OTA na Core 0,
+ *     stos 16KB w DRAM, karmienie TWDT, anty-rollback (potwierdzenie partycji
+ *     w setup), porownanie semver (downgrade tylko z force=1), restart przez
+ *     istniejacy mechanizm restartRequestedAt.
+ *     Dlaczego: dotad jedyne OTA = espota z haslem z laptopa (brak zdalnych
+ *     aktualizacji); parytet z Centrala Pieca (karta OTA + /update).
+ *     Logika sterowania LED, adaptacji, harmonogramu, MIN LUX, ramp i Ramp
+ *     Arbiter: NIETKNIETA. Firebase transport, Telegram poll i logi: NIETKNIETE.
+ *
  * [v4.0.0 REPO-RESTRUCTURE, 2026-10-09] Semver baseline (v261 = 4.0.0+build.261).
  *     Naglowek skrocony do ostatnich 10 wersji — pelna historia (do v33b)
  *     przeniesiona 1:1 do CHANGELOG.md w katalogu glownym repo.
@@ -111,7 +124,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.0.0+build.261"
+#define RYBY_FW_VERSION "v4.1.0+build.262"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -851,7 +864,9 @@ enum TgDeferCmd : uint8_t {
   // ── v34 ──
   TG_POLL,          // wewnętrzny: wykonaj getUpdates (timer w tasku)
   // ── v227 (test WDT-DAILYSUM, tymczasowe) ──
-  TG_TEST_DAILY_SUMMARY  // wymuś jednorazowe logDailySummary() bez czekania na północ
+  TG_TEST_DAILY_SUMMARY, // wymuś jednorazowe logDailySummary() bez czekania na północ
+  // ── 4.1.0 OTA-GITHUB (Etap 1 planu upgrade) ──
+  TG_OTA_UPDATE    // sprawdź release na GitHub i zaktualizuj firmware (komenda /update)
 };
 volatile TgDeferCmd tgDeferredCmd = TG_NONE;
 unsigned long tgMenuReturnAt = 0;   // gdy >0: powróć do menu po upływie czasu
@@ -3795,6 +3810,9 @@ void pollTelegramCommands() {
         } else if (cmd.startsWith("/testdaily")) {
           // [v227] TEST-ONLY (plan flash-freeze, Partia 4) - do usunięcia po testach
           tgDeferredCmd = TG_TEST_DAILY_SUMMARY;
+        } else if (cmd.startsWith("/update")) {
+          // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
+          tgDeferredCmd = TG_OTA_UPDATE;
         } else {
           tgDeferredCmd = TG_MENU;  // nieznana komenda -> pokaż menu
         }
@@ -6825,6 +6843,18 @@ void handleWsCmd(const String& rawCmd, AsyncWebSocketClient* client) {
     reply("🔄 Restartuję...");
     // BUG#6 FIX: delay()+restart w AsyncWS callback blokuje AsyncTCP task
     restartRequestedAt = millis();
+  } else if (cmd == "ota" || cmd == "update" || cmd == "ota start") {
+    // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — start OTA z konsoli terminala.
+    // otaGithubRequest() jest nieblokujące (task OTA na Core 0), bezpieczne w
+    // callbacku WS (żadnego delay() — patrz BUG#6 powyżej).
+    String _otaErr;
+    if (otaGithubRequest(false, _otaErr)) {
+      reply("⬇️ OTA: sprawdzam release na GitHub... status: komenda 'ota status'");
+    } else {
+      reply("[ERR] OTA: " + _otaErr);
+    }
+  } else if (cmd == "ota status") {
+    reply("OTA: " + otaGithubStatusJson());
   } else if (cmd == "ip") {
     reply("IP: " + WiFi.localIP().toString());
   } else if (cmd == "sunset") {
@@ -6944,6 +6974,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
 
 #include "terminal_html.h"
+#include "ota_github.h"   // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
 
 
 // [OK] FIX BUG-V: Globalna flaga opóźnionego restartu (dostępna z loop() i handlera HTTP)
@@ -8590,6 +8621,25 @@ void tgTaskFn(void* /*pvParams*/) {
         sendTelegramMessage("🧪 Wymuszam test logDailySummary() przy najbliższej iteracji loop() - sprawdź logi (tag=SUMMARY, tag=ENERGIA).", false);
         break;
 
+      case TG_OTA_UPDATE: {
+        // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade: OTA przez GitHub Releases.
+        // otaGithubRequest() jest nieblokujące — tylko startuje task OTA na
+        // Core 0 (otaGithubTaskFn). Sam flash/restart obsłuży ten task; tu
+        // jedynie potwierdzamy użytkownikowi start i odsyłamy do statusu.
+        logPrintf("lvl=INFO tag=CMD-RUN cmd=OTA_UPDATE faza=start\n");
+        String _otaErr;
+        bool _otaOk = otaGithubRequest(false, _otaErr);
+        if (_otaOk) {
+          sendTelegramMessage("⬇️ <b>Sprawdzam aktualizację</b> (GitHub Releases)...\n"
+                              "Status: <code>GET /api/ota-status</code>. Po udanym flashu ESP sam się zrestartuje.", false);
+        } else {
+          sendTelegramMessage(String("[ERR] Nie można wystartować OTA: ") + _otaErr, false);
+        }
+        logPrintf("lvl=INFO tag=CMD-RUN cmd=OTA_UPDATE faza=done ok=%d err=%s czas=%lums\n",
+                  (int)_otaOk, _otaErr.c_str(), millis()-_cmdT);
+        break;
+      }
+
       default:
         logPrintf("lvl=WARN tag=CMD-RUN msg=\"NIEZNANA komenda, ignoruje\" komenda=%d\n", (int)cmd);
         break;
@@ -9059,6 +9109,12 @@ static String coredumpCrashMessage(uint32_t boot, uint32_t seq, size_t size) {
 
 void setup() {
   logPrintln("lvl=INFO tag=FW version=" RYBY_FW_VERSION);
+
+  // [4.1.0 OTA-GITHUB] Anty-rollback: jeśli poprzedni boot zakonczyl sie
+  // aktualizacja OTA, potwierdz nowa partycje (bez tego kolejny restart
+  // cofnalby firmware na stara partycje). Wersja biezaca do porownan semver.
+  otaGithubConfirmPartition();
+  otaGithubSetCurrentVersion(FW_VERSION);
 
   // =====================================================
   //  SERIAL + START
@@ -11152,6 +11208,13 @@ webserialServer.on("/api/quick/restart", HTTP_POST, [](AsyncWebServerRequest *re
   // restart wykona loop() przy następnym obrocie
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// [4.1.0 OTA-GITHUB] Etap 1 planu upgrade: GET /api/ota-status + POST
+// /api/ota-start — OTA przez GitHub Releases (port 1:1 z Centrali Pieca).
+// Wyzwalacze: panel WWW, komenda /update (Telegram), "update" (Firebase).
+// ═══════════════════════════════════════════════════════════════════════════
+otaGithubRegisterEndpoints();
+
 
 
 
@@ -12090,6 +12153,17 @@ static bool wykonajKomendeFirebase(const String& cmd, uint64_t firebaseTs = 0, c
   if (cmd == "led_test" || cmd == "led_100") return enqueueAppCommand(AppCommandType::LED_TEST, true, nullptr, "firebase", firebaseTs, firebaseKey);
   if (cmd == "led_off")     return enqueueAppCommand(AppCommandType::LED_OFF, false, nullptr, "firebase", firebaseTs, firebaseKey);
   if (cmd == "restart")     return enqueueAppCommand(AppCommandType::RESTART, true, nullptr, "firebase", firebaseTs, firebaseKey);
+  // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — zdalne OTA przez GitHub Releases,
+  // wzór: komenda "update"/"update_centrala" Centrali Pieca (v3.32.0 FB-OTA).
+  // otaGithubRequest() jest nieblokujące (startuje task OTA na Core 0), więc
+  // jest bezpieczne w tym kontekście (Core 0, tgTaskFn).
+  if (cmd == "update" || cmd == "update_firmware" || cmd == "ota") {
+    String _otaErr;
+    bool _otaOk = otaGithubRequest(false, _otaErr);
+    if (Komentarze) logPrintf("lvl=INFO tag=OTA-GH msg=\"Zadanie OTA z Firebase\" ok=%d err=%s\n",
+                              (int)_otaOk, _otaErr.c_str());
+    return true;   // komenda rozpoznana niezależnie od wyniku startu
+  }
   if (cmd.startsWith("pwm ")) {
     uint16_t arr[5] = {0,0,0,0,0};
     String r = cmd.substring(4);

@@ -8,6 +8,31 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.1.0+build.262] OTA-GITHUB — 2026-10-09
+
+- Co: Etap 1 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`): **OTA przez
+  GitHub Releases** — nowy, samodzielny moduł `firmware/src/ota_github.h/.cpp`
+  (port 1:1 sprawdzonego mechanizmu z Centrali Pieca). Endpointy
+  `GET /api/ota-status` i `POST /api/ota-start[?force=1]`; wyzwalacze: panel,
+  komenda `/update` (Telegram), `update`/`update_firmware`/`ota` (Firebase
+  `/aquarium/commands`), konsola WS (`ota`, `ota status`). Task OTA na Core 0
+  (reguła architektury), stos 16 KB w DRAM, karmienie TWDT podczas flash,
+  anty-rollback (`esp_ota_mark_app_valid_cancel_rollback` w setup),
+  porównanie semver (downgrade tylko z `force=1`), restart przez istniejący
+  mechanizm `restartRequestedAt` (czysty restart z PRE_RESET_UPDATE + flush
+  logów). Release: tag semver + asset `firmware.bin` (+ zalecany `firmware.elf`
+  do addr2line) w `zielinski25/ryby-led`.
+- Dlaczego: dotąd jedyne OTA = espota z hasłem (wymaga laptopa w LAN); parytet
+  z Centralą Pieca i zdalne aktualizacje bez espota.
+- Logika sterowania i algorytmy: NIETKNIETE (LED/adaptacja/harmonogram/
+  MIN LUX/rampy/Ramp Arbiter bez zmian; transport Firebase/Telegram/logi bez
+  zmian — moduł w 100% samodzielny).
+- Weryfikacja: kompilacja pełna po stronie użytkownika (sandbox agenta nie ma
+  dostępu do CDN assetów GitHub — toolchain); składnia modułu zweryfikowana
+  parserem. Przed flashem: `firmware/scripts/build_gate.ps1`.
+
+---
+
 ## [4.0.0+build.261] REPO-RESTRUCTURE — 2026-10-09
 
 - Co: Etap 0 planu upgrade (docs/02_PLAN_UPGRADE_ryby_led.md): repozytorium
