@@ -1,6 +1,15 @@
 /*************************************************************
  *  CHANGELOG
  *
+ * [v4.1.1 SECRETS, 2026-10-09] Etap 2 (czesc 1): bezpieczenstwo sekretow.
+ *     Co: FIREBASE_HOST/FIREBASE_SECRET/CMD_TOKEN przeniesione z kodu do
+ *     src/secrets.h (w .gitignore, poza repo); w repo tylko secrets.example.h
+ *     z szablonem. Osłona __has_include + #error z instrukcja przy braku pliku.
+ *     Dlaczego: stare sekrety wyciekly w publicznym zipie zrodel — po wgraniu
+ *     firmware z nowym sekretem stary DATABASE SECRET do odwolania w Firebase
+ *     Console, a CMD_TOKEN do zmiany (pole token w panelu HTML).
+ *     Logika sterowania: NIETKNIETA (zmiana wylacznie organizacyjna).
+ *
  * [v4.1.0 OTA-GITHUB, 2026-10-09] Etap 1 planu upgrade: OTA przez GitHub Releases.
  *     Co: nowy, samodzielny modul src/ota_github.h/.cpp (port 1:1 sprawdzonego
  *     mechanizmu z Centrali Pieca): GET /api/ota-status, POST /api/ota-start,
@@ -135,7 +144,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.1.0+build.262"
+#define RYBY_FW_VERSION "v4.1.1+build.263"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -341,9 +350,24 @@ static bool sendTelegramCoredumpPlik(const String& path, uint32_t boot, uint32_t
 #define ENABLE_PSRAM
 #include <FirebaseClient.h>
 // ─── FIREBASE-v1 ─────────────────────────────────────────────────────────────
-#define FIREBASE_HOST   "akwarium-367be-default-rtdb.europe-west1.firebasedatabase.app"
-#define FIREBASE_SECRET "RhKVp49qYKKpnBl4qdu49x3uNKoIpR3kDMQUmVxt"   // wklej z Firebase Console -> Project Settings -> Service accounts -> Database secrets
-#define CMD_TOKEN       "Akwarium2026!"           // ten sam token wpisz w panelu HTML
+// [4.1.1 SECRETS, Etap 2] Sekrety przeniesione do secrets.h (poza repozytorium).
+// Stare definicje FIREBASE_SECRET/CMD_TOKEN wyciekły w publicznym zipie źródeł —
+// patrz docs/02_PLAN_UPGRADE (Etap 2) i secrets.example.h. Po wgraniu firmware'u
+// z nowym sekretem ODWOŁAJ stary secret w Firebase Console.
+#if __has_include("secrets.h")
+#include "secrets.h"   // FIREBASE_HOST / FIREBASE_SECRET / CMD_TOKEN
+#else
+#error "Brak src/secrets.h — skopiuj secrets.example.h jako secrets.h i wypelnij wartosci (sekrety nie sa juz w zrodlach)."
+#endif
+#ifndef FIREBASE_HOST
+#error "secrets.h musi definiowac FIREBASE_HOST"
+#endif
+#ifndef FIREBASE_SECRET
+#error "secrets.h musi definiowac FIREBASE_SECRET"
+#endif
+#ifndef CMD_TOKEN
+#error "secrets.h musi definiowac CMD_TOKEN"
+#endif
 // ─────────────────────────────────────────────────────────────────────────────
 #include <WiFiClientSecure.h>
 // [v33] arduino_secrets.h usunięty - Arduino IoT Cloud usunięty

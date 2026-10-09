@@ -12,3 +12,6 @@
 *.bak
 *.orig
 *~
+
+# SEKRETY (Etap 2: bezpieczeństwo) — tylko lokalnie, nigdy w repo
+firmware/src/secrets.h

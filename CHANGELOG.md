@@ -8,6 +8,23 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.1.1+build.263] SECRETS — 2026-10-09
+
+- Co: Etap 2 planu upgrade (część 1): sekrety poza kodem. `FIREBASE_HOST`,
+  `FIREBASE_SECRET` i `CMD_TOKEN` przeniesione z `Ryby_LED_fi_S3.cpp` do
+  `src/secrets.h` (dodany do `.gitignore` — nigdy w repo); w repozytorium tylko
+  szablon `secrets.example.h`. Osłona `__has_include` + `#error` z instrukcją,
+  gdy pliku brak. Wersja `v4.1.1+build.263`.
+- Dlaczego: stare wartości sekretów wyciekły w publicznie udostępnionym zipie
+  źródeł. Kolejność rotacji: (1) nowy Database Secret w Firebase Console (stary
+  jeszcze działa — urządzenie nie traci łączności), (2) wpis do `secrets.h`,
+  (3) build + flash, (4) dopiero po starcie nowego firmware'u odwołanie starego
+  sekretu w konsoli + zmiana `CMD_TOKEN` (wpisać nowy w panelu HTML).
+- Logika sterowania: NIETKNIETA (zmiana wyłącznie organizacyjna).
+- Część 2 Etapu 2 (NVS + UserAuth zamiast Legacy Database Secret): później.
+
+---
+
 ## [4.1.0+build.262] OTA-GITHUB — 2026-10-09
 
 - Co: Etap 1 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`): **OTA przez

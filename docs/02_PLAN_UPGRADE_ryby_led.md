@@ -8,8 +8,8 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 | Etap | Status | Release | Uwagi |
 |---|---|---|---|
 | 0. Repo + wersjonowanie | ✅ GOTOWY | 4.0.0 | commit `8e4776e`: struktura `firmware/docs/`, CHANGELOG.md, build_gate.ps1, usunięty zip/.pre-v253 |
-| 1. OTA GitHub + release'y | ✅ KOD GOTOWY — czeka na build u użytkownika | 4.1.0 | commit `cb16f00`: moduł `ota_github.*`, /update (TG), update (FB), ota (WS); do dokończenia: pierwszy release z `firmware.bin` + karta OTA w panelu (przy Etapie 4) |
-| 2. Bezpieczeństwo Firebase | 🔴 NIE ROZPOCZĘTY | — | **UWAGA PILNA:** `FIREBASE_SECRET` jest w kodzie, a zip był publiczny — **rotuj sekret w Firebase Console zanim ktokolwiek go pobierze** (patrz niżej) |
+| 1. OTA GitHub + release'y | ✅ KOD ZBUDOWANY + RELEASE v4.1.0 OPUBLIKOWANY | 4.1.0 | commity `cb16f00` + `037cd7a` (FIX-ORDER); build po stronie użytkownika OK, release v4.1.0 z `firmware.bin`+`.elf` publiczny; czeka: flash USB w domu + test OTA |
+| 2. Bezpieczeństwo Firebase | 🟡 W TOKU (część 1/2 gotowa) | 4.1.1 | sekrety przeniesione do `src/secrets.h` (poza repo, `.gitignore`); do zrobienia po stronie użytkownika: nowy Database Secret w Firebase Console → wpisać do `secrets.h` → build → flash → **odwołanie starego sekretu**; potem zmiana CMD_TOKEN + hasła espota; część 2 (NVS+UserAuth) później |
 | 3. Spool V2 + telemetria | ⬜ | — | |
 | 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | ⬜ | — | CORS bazowy już jest (DefaultHeaders `*`); brakuje `Allow-Private-Network` i OPTIONS |
 | 5. Log krytyczny + Telegram | ⬜ | — | |
