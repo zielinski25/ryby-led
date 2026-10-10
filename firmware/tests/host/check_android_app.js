@@ -97,6 +97,7 @@ const appVer = (GRADLE_APP.match(/versionName = "([^"]+)"/) || [])[1];
 const verFile = read(path.join(ROOT, "version.txt")).trim();
 check(appVer === verFile, "versionName aplikacji = version.txt (" + appVer + " = " + verFile + ")");
 check(/versionCode = 4272/.test(GRADLE_APP), "versionCode = 4272 (4.7.2)");
+check(/material-icons-extended/.test(GRADLE_APP), "zależność material-icons-extended (ikony Lightbulb/WaterDrop/Bolt)");
 check(/applicationId = "com\.rybyled\.panel"/.test(GRADLE_APP), "applicationId com.rybyled.panel");
 check(/minSdk = 26/.test(GRADLE_APP) && /targetSdk = 35/.test(GRADLE_APP), "minSdk 26, targetSdk 35");
 check(/versionCode = 4272/.test(GRADLE_APP) && FW.includes("4.7.2"), "wersja aplikacji zgodna z firmware 4.7.2");
@@ -134,6 +135,13 @@ const IMPORT_OF = {
   SliderDefaults: "androidx.compose.material3.SliderDefaults",
   ButtonDefaults: "androidx.compose.material3.ButtonDefaults",
   Icons: "androidx.compose.material.icons.Icons",
+  RoundedCornerShape: "androidx.compose.foundation.shape.RoundedCornerShape",
+  Brush: "androidx.compose.ui.graphics.Brush",
+  statusBarsPadding: "androidx.compose.foundation.layout.statusBarsPadding",
+  BorderStroke: "androidx.compose.foundation.BorderStroke",
+  OutlinedTextFieldDefaults: "androidx.compose.material3.OutlinedTextFieldDefaults",
+  NavigationBarItemDefaults: "androidx.compose.material3.NavigationBarItemDefaults",
+  SwitchDefaults: "androidx.compose.material3.SwitchDefaults",
 };
 const uiCode = UI.replace(/^import .*$/gm, "");
 for (const [sym, imp] of Object.entries(IMPORT_OF)) {
@@ -143,6 +151,35 @@ for (const [sym, imp] of Object.entries(IMPORT_OF)) {
 }
 check([LOGIC, STATUS, RTDB, VM, UI, PREFS].every((t) =>
   (t.match(/\{/g) || []).length === (t.match(/\}/g) || []).length), "klamry {} zbalansowane we wszystkich plikach Kotlin");
+
+// ───── 6c) kontrast WCAG AA z palety Pal (Theme.kt): tekst ≥ 4,5:1, elementy UI ≥ 3:1 ─────
+const THEME = read(path.join(JAVA, "ui", "Theme.kt"));
+const palBlock = (THEME.match(/object Pal \{([\s\S]*?)\n\}/) || [])[1] || "";
+const pal = {};
+for (const m of palBlock.matchAll(/val (\w+) = Color\(0xFF([0-9A-Fa-f]{6})\)\s*$/gm)) pal[m[1]] = m[2];
+function lum(hex) {
+  const c = [0, 2, 4].map((i) => parseInt(hex.substr(i, 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function ratio(a, b) {
+  const la = lum(a), lb = lum(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+// Pary tekst/tło używane w aplikacji (nazwy z Pal). Pal.Border/BorderStrong to obramowania dekoracyjne (nie tekst).
+const TEXT_PAIRS = [
+  ["Text", "Surface"], ["TextDim", "Surface"], ["TextDim2", "Surface"], ["TileTitle", "TileA"],
+  ["Text", "TileA"], ["Cyan", "Surface"], ["Live", "Surface"], ["Warn", "Surface"], ["Err", "Surface"],
+  ["Cyan", "Bg"], ["Accent", "Bg"], ["OnCyan", "Cyan"], ["OnCyan", "Err"], ["TextDim", "Surface2"],
+  ["Text", "Surface3"], ["Stale", "Surface"],
+];
+check(Object.keys(pal).length >= 20, "Pal: odczytano " + Object.keys(pal).length + " kolorów z Theme.kt");
+for (const [fg, bg] of TEXT_PAIRS) {
+  if (!pal[fg] || !pal[bg]) { check(false, "brak koloru w Pal: " + fg + " / " + bg); continue; }
+  const r = ratio(pal[fg], pal[bg]);
+  check(r >= 4.5, "kontrast " + fg + " na " + bg + " = " + r.toFixed(2) + ":1 (≥ 4,5)");
+}
+check(/TextDim2 = Color\(0xFF7D98AD\)/.test(THEME), "TextDim2 poprawiony względem Pieca (5A7A99 ma 3,97:1)");
 
 // ───── 7) nawigacja: 5 zakładek jak w HTML ─────
 const tabs = (UI.match(/TAB_LABELS = listOf\(([\s\S]*?)\)/) || [])[1] || "";

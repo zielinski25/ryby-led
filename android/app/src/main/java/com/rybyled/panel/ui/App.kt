@@ -1,5 +1,6 @@
 package com.rybyled.panel.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,11 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -32,18 +31,19 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,43 +55,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rybyled.panel.core.Logic
+import com.rybyled.panel.core.RybyStatus
 import kotlin.math.roundToInt
 
-/* Ekrany aplikacji Ryby LED — 5 zakładek jak w panel/ryby-mobile.html, wygląd ciemny i spokojny. */
-
-private val Bg = Color(0xFF09131B)
-private val PanelColor = Color(0xFF111E29)
-private val PanelRaised = Color(0xFF162834)
-private val Stroke = Color(0xFF1F3240)
-private val Muted = Color(0xFF8DA2B5)
-private val Accent = Color(0xFF38BDF8)
-private val Good = Color(0xFF34D399)
-private val Warn = Color(0xFFFBBF24)
-private val Bad = Color(0xFFF87171)
-private val Ink = Color(0xFFE8F0F7)
-
-private val RybyColors = darkColorScheme(
-    primary = Accent,
-    onPrimary = Color(0xFF00212E),
-    primaryContainer = Color(0xFF0E3A4F),
-    onPrimaryContainer = Color(0xFFBDEBFF),
-    background = Bg,
-    onBackground = Ink,
-    surface = PanelColor,
-    onSurface = Ink,
-    surfaceVariant = PanelRaised,
-    onSurfaceVariant = Muted,
-    outline = Stroke,
-    error = Bad,
-    onError = Color(0xFF3B0A0A),
-    secondaryContainer = PanelRaised
-)
+/* Ekrany Ryby LED — 5 zakładek jak w panel/ryby-mobile.html, wygląd według systemu z Pieca (ui/Theme.kt). */
 
 private val TAB_LABELS = listOf("Główna", "Światło", "Pompa", "Energia", "Ustawienia")
 private val TAB_TITLES = listOf("Przegląd", "Oświetlenie", "Pompa", "Energia", "Ustawienia")
@@ -105,36 +78,27 @@ private val TAB_ICONS = listOf(
 
 @Composable
 fun RybyApp(vm: AppViewModel = viewModel()) {
-    MaterialTheme(colorScheme = RybyColors) {
+    RybyTheme {
         var tab by rememberSaveable { mutableIntStateOf(0) }
         Scaffold(
-            containerColor = Bg,
-            bottomBar = {
-                NavigationBar(containerColor = PanelColor) {
-                    TAB_LABELS.forEachIndexed { i, label ->
-                        NavigationBarItem(
-                            selected = tab == i,
-                            onClick = { tab = i },
-                            icon = { Icon(TAB_ICONS[i], contentDescription = label) },
-                            label = { Text(label, maxLines = 1, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-            }
+            containerColor = Pal.Bg,
+            bottomBar = { BottomNav(tab) { tab = it } }
         ) { pad ->
-            Column(Modifier.padding(pad).fillMaxSize().padding(horizontal = 16.dp)) {
-                Header(TAB_TITLES[tab], vm.conn)
-                val err = vm.error
-                val msg = vm.notice
-                if (err != null) Banner(err, Bad, null)
-                if (msg != null) Banner(msg, Accent, { vm.clearNotice() })
+            Column(Modifier.padding(pad).fillMaxSize()) {
+                TopBar(TAB_TITLES[tab], vm.conn)
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Dimens.pagePad)
+                        .padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.gap)
                 ) {
+                    val err = vm.error
+                    val msg = vm.notice
+                    if (err != null) Banner(err, Pal.Err)
+                    if (msg != null) Banner(msg, Pal.Cyan) { vm.clearNotice() }
                     when (tab) {
                         0 -> MainTab(vm)
                         1 -> LightTab(vm)
@@ -142,9 +106,74 @@ fun RybyApp(vm: AppViewModel = viewModel()) {
                         3 -> EnergyTab(vm)
                         else -> SettingsTab(vm)
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
             }
+        }
+    }
+}
+
+// ── Pasek i nawigacja ──
+
+@Composable
+private fun TopBar(title: String, conn: Logic.Conn) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Pal.Top, Pal.Top2)))
+            .statusBarsPadding()
+            .padding(horizontal = Dimens.pagePad, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text("RYBY LED", style = Txt.brand)
+            Text(title, style = Txt.title)
+        }
+        StatusChip(conn)
+    }
+}
+
+@Composable
+private fun StatusChip(conn: Logic.Conn) {
+    val (text, color) = when (conn) {
+        Logic.Conn.ONLINE -> "● LIVE" to Pal.Live
+        Logic.Conn.STALE -> "● OPÓŹNIONE" to Pal.Warn
+        Logic.Conn.NONE -> "○ BRAK DANYCH" to Pal.TextDim
+    }
+    Pill(text, color)
+}
+
+@Composable
+private fun Pill(text: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Dimens.radiusPill))
+            .background(color.copy(alpha = 0.13f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(Dimens.radiusPill))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(text, style = Txt.chip, color = color)
+    }
+}
+
+@Composable
+private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
+    NavigationBar(containerColor = Pal.Nav) {
+        TAB_LABELS.forEachIndexed { i, label ->
+            NavigationBarItem(
+                selected = selected == i,
+                onClick = { onSelect(i) },
+                icon = { Icon(TAB_ICONS[i], contentDescription = label) },
+                label = { Text(label, style = Txt.nav, maxLines = 1) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Pal.Cyan,
+                    selectedTextColor = Pal.Cyan,
+                    indicatorColor = Pal.Cyan.copy(alpha = 0.14f),
+                    unselectedIconColor = Pal.TextDim2,
+                    unselectedTextColor = Pal.TextDim2
+                )
+            )
         }
     }
 }
@@ -155,40 +184,32 @@ fun RybyApp(vm: AppViewModel = viewModel()) {
 private fun MainTab(vm: AppViewModel) {
     val st = vm.status
     if (st == null) {
-        Panel { Text("Czekam na pierwszy odczyt z bazy…", color = Muted) }
+        Panel { Text("Czekam na pierwszy odczyt z bazy…", style = Txt.note) }
         return
     }
-    Panel {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text("Płytka 1", style = MaterialTheme.typography.labelMedium, color = Muted)
-                Text(Logic.fmtTemp(st.temps.getOrNull(0)), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
-            }
-            Badge(if (st.mode == "MANUAL") "MANUAL" else "AUTO", Accent)
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Tile("Płytka 2", Logic.fmtTemp(st.temps.getOrNull(1)), Modifier.weight(1f))
-            Tile("Płytka 3", Logic.fmtTemp(st.temps.getOrNull(2)), Modifier.weight(1f))
-        }
+    Hero(st, stale = vm.conn == Logic.Conn.STALE)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+        Tile("Płytka 2", Logic.fmtTemp(st.temps.getOrNull(1)), Modifier.weight(1f))
+        Tile("Płytka 3", Logic.fmtTemp(st.temps.getOrNull(2)), Modifier.weight(1f))
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+        Tile("Lux pokój", Logic.fmtLux(st.luxRoom), Modifier.weight(1f))
+        Tile("Lux nad wodą", Logic.fmtLux(st.luxNadWoda), Modifier.weight(1f))
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+        Tile("Moc LED", st.pct?.let { "${it.roundToInt()} %" } ?: "—", Modifier.weight(1f))
+        Tile("Pobór teraz", Logic.fmtWatts(st.powerNowW), Modifier.weight(1f))
     }
     Panel(title = "Sterowanie") {
         SwitchRow("Zasilanie", st.power) { on -> vm.sendPlain(if (on) "power_on" else "power_off") }
-        HorizontalDivider(color = Stroke)
+        HorizontalDivider(color = Pal.Border)
         SwitchRow("Pompa", st.pumpOn) { on -> vm.sendPlain(if (on) "pump_on" else "pump_off") }
-        HorizontalDivider(color = Stroke)
-        Text("Tryb pracy", style = MaterialTheme.typography.bodyMedium, color = Muted)
+        HorizontalDivider(color = Pal.Border)
+        Text("Tryb pracy", style = Txt.note)
         val sel = if (st.mode == "MANUAL") 1 else 0
         Segmented(listOf("Automatyczny", "Ręczny"), sel) { i ->
             if (i != sel) vm.sendPlain(if (i == 0) "mode_auto" else "mode_manual")
         }
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Tile("Lux pokój", Logic.fmtLux(st.luxRoom), Modifier.weight(1f))
-        Tile("Lux nad wodą", Logic.fmtLux(st.luxNadWoda), Modifier.weight(1f))
-    }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Tile("Moc LED", st.pct?.let { "${it.roundToInt()} %" } ?: "—", Modifier.weight(1f))
-        Tile("Pobór teraz", Logic.fmtWatts(st.powerNowW), Modifier.weight(1f))
     }
     Panel(title = "Stan sterownika") {
         KV("Min LUX", when {
@@ -198,6 +219,27 @@ private fun MainTab(vm: AppViewModel) {
         })
         KV("Czas pracy", Logic.fmtUptime(st.uptimeS))
         KV("Sygnał Wi-Fi", st.wifiRssi?.let { "${it.roundToInt()} dBm" } ?: "—")
+    }
+}
+
+@Composable
+private fun Hero(st: RybyStatus, stale: Boolean) {
+    val edge = if (stale) Pal.Warn.copy(alpha = 0.45f) else Pal.Cyan.copy(alpha = 0.22f)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Dimens.radiusTile))
+            .background(Brush.linearGradient(listOf(Pal.HeroA, Pal.HeroB)))
+            .border(1.dp, edge, RoundedCornerShape(Dimens.radiusTile))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("TEMPERATURA · PŁYTKA 1", style = Txt.heroLabel)
+        Text(Logic.fmtTemp(st.temps.getOrNull(0)), style = Txt.heroTemp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill(if (st.power) "ZASILANIE WŁ." else "ZASILANIE WYŁ.", if (st.power) Pal.Live else Pal.TextDim)
+            Pill(if (st.mode == "MANUAL") "TRYB RĘCZNY" else "TRYB AUTO", Pal.Cyan)
+        }
     }
 }
 
@@ -216,8 +258,8 @@ private fun LightTab(vm: AppViewModel) {
     Panel(title = "Kanały PWM · 0–1023") {
         pwm.forEachIndexed { i, v ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Kanał ${i + 1}", style = MaterialTheme.typography.bodyLarge)
-                Text("${v.roundToInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Accent)
+                Text("Kanał ${i + 1}", style = Txt.body)
+                Text("${v.roundToInt()}", style = Txt.bodyBold, color = Pal.Cyan)
             }
             Slider(
                 value = v,
@@ -227,38 +269,32 @@ private fun LightTab(vm: AppViewModel) {
                 },
                 valueRange = 0f..Logic.PWM_MAX.toFloat(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Accent,
-                    activeTrackColor = Accent,
-                    inactiveTrackColor = Stroke
+                    thumbColor = Pal.Cyan,
+                    activeTrackColor = Pal.Cyan,
+                    inactiveTrackColor = Pal.Surface3
                 )
             )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionButton("Zastosuj", Modifier.weight(1f)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+            PrimaryButton("Zastosuj", Modifier.weight(1f)) {
                 vm.sendPwm(pwm.map { it.toDouble() })
                 dirty = false
             }
-            OutlinedButton(
-                onClick = {
-                    if (st != null) pwm = st.pwm.map { it.toFloat() }
-                    dirty = false
-                },
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-            ) { Text("Wczytaj z ESP") }
+            SecondaryButton("Wczytaj z ESP", Modifier.weight(1f)) {
+                if (st != null) pwm = st.pwm.map { it.toFloat() }
+                dirty = false
+            }
         }
     }
     Panel(title = "Szybkie ustawienia") {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionButton("LED 100 %", Modifier.weight(1f)) { vm.sendPlain("led_100") }
-            OutlinedButton(
-                onClick = { vm.sendPlain("led_off") },
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-            ) { Text("LED wyłączony") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+            PrimaryButton("LED 100 %", Modifier.weight(1f)) { vm.sendPlain("led_100") }
+            SecondaryButton("LED wyłączony", Modifier.weight(1f)) { vm.sendPlain("led_off") }
         }
     }
     Panel(title = "Zapis") {
-        Text("Zapisuje obecne suwaki jako wartości domyślne na sterowniku.", color = Muted, style = MaterialTheme.typography.bodyMedium)
-        ActionButton("Zapisz jako domyślne", Modifier.fillMaxWidth()) { askAutosave = true }
+        Text("Zapisuje obecne suwaki jako wartości domyślne na sterowniku.", style = Txt.note)
+        PrimaryButton("Zapisz jako domyślne", Modifier.fillMaxWidth()) { askAutosave = true }
     }
     if (askAutosave) {
         ConfirmDialog(
@@ -280,14 +316,13 @@ private fun PumpTab(vm: AppViewModel) {
         SwitchRow("Pompa obiegowa", st?.pumpOn == true) { on -> vm.sendPlain(if (on) "pump_on" else "pump_off") }
         Text(
             "Stan z ostatniego odczytu. Zmiana trafia do sterownika w ciągu kilkunastu sekund.",
-            color = Muted,
-            style = MaterialTheme.typography.bodyMedium
+            style = Txt.note
         )
     }
-    Panel(title = "Przedziały pracy (tylko odczyt)") {
-        val slots = st?.pumpSlots.orEmpty()
+    Panel(title = "Przedziały pracy · tylko odczyt") {
+        val slots = st?.pumpSlots ?: emptyList()
         if (slots.isEmpty()) {
-            Text("Brak przedziałów", color = Muted)
+            Text("Brak przedziałów", style = Txt.note)
         } else {
             slots.forEachIndexed { i, s ->
                 KV("Przedział ${i + 1}", "${Logic.fmtHHMM(s.start)} – ${Logic.fmtHHMM(s.end)}")
@@ -300,20 +335,29 @@ private fun PumpTab(vm: AppViewModel) {
 private fun EnergyTab(vm: AppViewModel) {
     val st = vm.status
     if (st == null) {
-        Panel { Text("Czekam na pierwszy odczyt z bazy…", color = Muted) }
+        Panel { Text("Czekam na pierwszy odczyt z bazy…", style = Txt.note) }
         return
     }
-    Panel(title = "Dziś") {
-        Text(Logic.fmtWh(st.energy.today), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.SemiBold)
-        Text("Koszt: ${Logic.fmtPln(Logic.costPln(st.energy.today, st.kwhPrice))}", color = Muted)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Dimens.radiusTile))
+            .background(Brush.linearGradient(listOf(Pal.HeroA, Pal.HeroB)))
+            .border(1.dp, Pal.Cyan.copy(alpha = 0.22f), RoundedCornerShape(Dimens.radiusTile))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("ENERGIA DZIŚ", style = Txt.heroLabel)
+        Text(Logic.fmtWh(st.energy.today), style = Txt.heroTemp)
+        Text("Koszt: ${Logic.fmtPln(Logic.costPln(st.energy.today, st.kwhPrice))}", style = Txt.note)
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
         Tile("Tydzień", Logic.fmtWh(st.energy.week), Modifier.weight(1f))
         Tile("Miesiąc", Logic.fmtWh(st.energy.month), Modifier.weight(1f))
     }
     Panel(title = "Ostatnie dni") {
         val days = st.dayHistory.takeLast(7)
-        if (days.isEmpty()) Text("Brak historii", color = Muted) else BarChart(days)
+        if (days.isEmpty()) Text("Brak historii", style = Txt.note) else BarChart(days)
     }
     Panel(title = "Czas świecenia LED") {
         KV("Dziś", Logic.fmtMinutes(st.ledMin.today))
@@ -334,16 +378,13 @@ private fun SettingsTab(vm: AppViewModel) {
     var askRestart by remember { mutableStateOf(false) }
 
     Panel(title = "Połączenie z bazą") {
-        Text(
-            "Sekrety zapisują się tylko na tym telefonie, nie w kodzie aplikacji.",
-            color = Muted,
-            style = MaterialTheme.typography.bodyMedium
-        )
+        Text("Sekrety zapisują się tylko na tym telefonie, nie w kodzie aplikacji.", style = Txt.note)
         OutlinedTextField(
             value = dbUrl,
             onValueChange = { dbUrl = it },
             label = { Text("Adres bazy (HTTPS)") },
             singleLine = true,
+            colors = fieldColors(),
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
@@ -352,6 +393,7 @@ private fun SettingsTab(vm: AppViewModel) {
             label = { Text("Database Secret") },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
+            colors = fieldColors(),
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
@@ -360,27 +402,21 @@ private fun SettingsTab(vm: AppViewModel) {
             label = { Text("CMD_TOKEN") },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
+            colors = fieldColors(),
             modifier = Modifier.fillMaxWidth()
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionButton("Zapisz", Modifier.weight(1f)) { vm.saveSettings(dbUrl, secret, token) }
-            ActionButton("Sprawdź połączenie", Modifier.weight(1f)) { vm.testConnection(dbUrl, secret, token) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+            PrimaryButton("Zapisz", Modifier.weight(1f)) { vm.saveSettings(dbUrl, secret, token) }
+            PrimaryButton("Sprawdź połączenie", Modifier.weight(1f)) { vm.testConnection(dbUrl, secret, token) }
         }
-        OutlinedButton(
-            onClick = {
-                vm.forgetSecrets()
-                secret = ""
-                token = ""
-            },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-        ) { Text("Wyczyść sekrety z tego telefonu") }
+        SecondaryButton("Wyczyść sekrety z tego telefonu", Modifier.fillMaxWidth()) {
+            vm.forgetSecrets()
+            secret = ""
+            token = ""
+        }
     }
     Panel(title = "Sterownik") {
-        Button(
-            onClick = { askRestart = true },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Bad, contentColor = Color(0xFF3B0A0A))
-        ) { Text("Restart ESP") }
+        DangerButton("Restart ESP", Modifier.fillMaxWidth()) { askRestart = true }
     }
     if (askRestart) {
         ConfirmDialog(
@@ -398,117 +434,63 @@ private fun SettingsTab(vm: AppViewModel) {
 // ── Elementy wspólne ──
 
 @Composable
-private fun Header(title: String, conn: Logic.Conn) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column {
-            Text("RYBY LED", style = MaterialTheme.typography.labelMedium, color = Accent, fontWeight = FontWeight.Bold)
-            Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-        }
-        StatusChip(conn)
-    }
-}
-
-@Composable
-private fun StatusChip(conn: Logic.Conn) {
-    val (label, color) = when (conn) {
-        Logic.Conn.ONLINE -> "Online" to Good
-        Logic.Conn.STALE -> "Opóźnione" to Warn
-        Logic.Conn.NONE -> "Brak danych" to Muted
-    }
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.14f))
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(7.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = color)
-    }
-}
-
-@Composable
-private fun Banner(text: String, color: Color, onDismiss: (() -> Unit)?) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 10.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(color.copy(alpha = 0.14f))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text, color = color, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        if (onDismiss != null) TextButton(onClick = onDismiss) { Text("OK", color = color) }
-    }
-}
-
-@Composable
 private fun Panel(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(PanelColor)
-            .border(1.dp, Stroke, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(Dimens.radiusCard))
+            .background(Pal.Surface)
+            .border(1.dp, Pal.Border, RoundedCornerShape(Dimens.radiusCard))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (title != null) {
-            Text(title.uppercase(), style = MaterialTheme.typography.labelMedium, color = Muted, fontWeight = FontWeight.SemiBold)
-        }
+        if (title != null) Text(title.uppercase(), style = Txt.section)
         content()
     }
 }
 
 @Composable
-private fun Tile(label: String, value: String, modifier: Modifier = Modifier) {
+private fun Tile(label: String, value: String, modifier: Modifier = Modifier, tone: Color = Pal.Border) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(PanelRaised)
+            .clip(RoundedCornerShape(Dimens.radiusTile))
+            .background(Brush.linearGradient(listOf(Pal.TileA, Pal.TileB)))
+            .border(1.dp, tone, RoundedCornerShape(Dimens.radiusTile))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Muted)
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun Badge(text: String, color: Color) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.16f))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, color = color, fontWeight = FontWeight.SemiBold)
+        Text(label, style = Txt.tileTitle)
+        Text(value, style = Txt.tileValue)
     }
 }
 
 @Composable
 private fun KV(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = Muted)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
+        Text(label, style = Txt.body, color = Pal.TextDim)
+        Text(value, style = Txt.body)
     }
 }
 
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.controlH),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        Switch(checked = checked, onCheckedChange = onChange)
+        Text(label, style = Txt.bodyBold)
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Pal.OnCyan,
+                checkedTrackColor = Pal.Cyan,
+                uncheckedThumbColor = Pal.TextDim,
+                uncheckedTrackColor = Pal.Surface3,
+                uncheckedBorderColor = Pal.BorderStrong
+            )
+        )
     }
 }
 
@@ -517,8 +499,8 @@ private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> U
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Bg)
+            .clip(RoundedCornerShape(Dimens.radiusBanner))
+            .background(Pal.Bg)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
@@ -527,17 +509,17 @@ private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> U
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(if (isSel) Accent.copy(alpha = 0.18f) else Color.Transparent)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSel) Pal.Cyan else Color.Transparent)
                     .clickable { onSelect(i) }
+                    .heightIn(min = Dimens.controlH)
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSel) Accent else Muted,
-                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal
+                    style = Txt.btn,
+                    color = if (isSel) Pal.OnCyan else Pal.TextDim
                 )
             }
         }
@@ -552,33 +534,89 @@ private fun BarChart(values: List<Double>) {
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        values.forEach { v ->
+        values.forEachIndexed { i, v ->
             val frac = if (max > 0.0) (v / max).toFloat().coerceIn(0.04f, 1f) else 0.04f
+            val isToday = i == values.lastIndex
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(frac)
                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                    .background(Accent)
+                    .background(if (isToday) Pal.Cyan else Pal.Cyan.copy(alpha = 0.35f))
             )
         }
     }
 }
 
 @Composable
-private fun ActionButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = modifier.heightIn(min = 48.dp)) {
-        Text(label, fontWeight = FontWeight.SemiBold)
+private fun Banner(text: String, color: Color, onDismiss: (() -> Unit)? = null) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Dimens.radiusBanner))
+            .background(color.copy(alpha = 0.10f))
+            .border(1.dp, color.copy(alpha = 0.38f), RoundedCornerShape(Dimens.radiusBanner))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text, style = Txt.note, color = color, modifier = Modifier.weight(1f))
+        if (onDismiss != null) TextButton(onClick = onDismiss) { Text("OK", color = color) }
     }
 }
+
+@Composable
+private fun PrimaryButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = Dimens.controlH),
+        colors = ButtonDefaults.buttonColors(containerColor = Pal.Cyan, contentColor = Pal.OnCyan)
+    ) {
+        Text(label, style = Txt.btn)
+    }
+}
+
+@Composable
+private fun SecondaryButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = Dimens.controlH),
+        border = BorderStroke(1.dp, Pal.BorderStrong),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Pal.Text)
+    ) {
+        Text(label, style = Txt.btn)
+    }
+}
+
+@Composable
+private fun DangerButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = Dimens.controlH),
+        colors = ButtonDefaults.buttonColors(containerColor = Pal.Err, contentColor = Pal.OnCyan)
+    ) {
+        Text(label, style = Txt.btn)
+    }
+}
+
+@Composable
+private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Pal.Text,
+    unfocusedTextColor = Pal.Text,
+    focusedBorderColor = Pal.Cyan,
+    unfocusedBorderColor = Pal.BorderStrong,
+    focusedLabelColor = Pal.Cyan,
+    unfocusedLabelColor = Pal.TextDim,
+    cursorColor = Pal.Cyan
+)
 
 @Composable
 private fun ConfirmDialog(title: String, text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(text) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Tak") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Anuluj") } }
+        containerColor = Pal.Surface2,
+        title = { Text(title, style = Txt.bodyBold) },
+        text = { Text(text, style = Txt.note) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("Tak", color = Pal.Cyan) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Anuluj", color = Pal.TextDim) } }
     )
 }
