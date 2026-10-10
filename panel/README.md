@@ -42,17 +42,17 @@ Zakładka **Wykresy** → karta „Historia tygodniowa (co 30 min)”: cztery wy
 `GET /api/history/long` (kubełki 30 min, ok. 3 tygodnie na ESP). Tylko w LAN; zdalnie pokazuje
 się komunikat „niedostępne przez Firebase”. Przycisk „⬇ CSV” pobiera surowy plik z ESP.
 
-## Aplikacja mobilna (`panel/mobile/`, 4.7.2)
-Osobny widok na telefon, zbudowany jak panel, ale tylko **zdalnie przez Firebase** (bez LAN).
-Pliki: `index.html` (UI, 5 zakładek: Główna, Światło, Pompa, Energia, Ustawienia),
-`app-logic.js` (logika bez DOM, testowana), `manifest.webmanifest` + `sw.js` + `icon.svg` (instalacja jako PWA).
+## Aplikacja mobilna (`ryby-mobile.html`, 4.7.2)
+Jeden samodzielny plik HTML (jak Piec): UI, logika i style są w środku. Zdalnie przez Firebase, bez LAN.
+Zakładki: Główna, Światło, Pompa, Energia, Ustawienia.
 
 - Sekrety jak w panelu: `akw_db_secret` i `akw_cmd_token` w `localStorage` tej przeglądarki (ten sam klucz,
   więc po wpisaniu w panelu nie trzeba wpisywać drugi raz). Nic nie jest w kodzie.
+- Logika (bez DOM) jest między markerami `LOGIC-BEGIN` / `LOGIC-END`. Testy: `firmware/tests/host/check_mobile_app.js`
+  (krok 13 w `run_tests.sh`) czytają ją z tego pliku.
 - Komendy: `POST /aquarium/commands.json` `{cmd, token, ts}`; `ts` rosnący. ESP odbiera je co ok. 14 s.
 - Status: `GET /aquarium/status.json` co 5 s. ESP zapisuje status co ok. 60 s; po 150 s bez zmiany `updatedAt`
   ekran pokazuje „OPÓŹNIONE”.
-- Hostowanie: musi być HTTPS (instalacja PWA, service worker). Mixed content nie dotyczy, bo aplikacja nie
-  łączy się z IP ESP. Gdzie hostować, to decyzja właściciela (np. GitHub Pages, Firebase Hosting).
-- Test UI: `firmware/tests/host/check_mobile_app.js` (krok 13 w `run_tests.sh`) + test E2E w headless Chromium
-  przeciw atrapie RTDB (poza repo, bo wymaga puppeteera).
+- Hostowanie: dowolny HTTPS albo lokalnie. Aplikacja nie łączy się z IP ESP, więc mixed content jej nie dotyczy.
+- Brak service workera (plik ma być samodzielny): bez trybu offline; po zmianie pliku odśwież stronę.
+- Test E2E w headless Chromium przeciw atrapie RTDB jest poza repo (wymaga puppeteera).

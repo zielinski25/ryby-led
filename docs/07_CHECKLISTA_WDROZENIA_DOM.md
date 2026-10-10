@@ -71,16 +71,16 @@ Procedura: `docs/06_ETAP6_ASTRO_RTC.md`, sekcja 5. Najważniejsze:
 
 ## Aplikacja na telefon (4.7.2) — procedura
 
-Plik: `panel/mobile/index.html` (zdalnie przez Firebase; wymaga HTTPS do instalacji).
+Plik: `panel/ryby-mobile.html` — jeden samodzielny plik HTML (jak Piec), zdalnie przez Firebase.
 
 - [ ] Otwórz adres aplikacji na telefonie (LTE, bez WiFi domowego). Ustawienia → wpisz Database Secret i CMD_TOKEN → „Sprawdź połączenie”.
 - [ ] Główna: pill ONLINE, temperatury i lux zgodne z panelem WWW.
 - [ ] Włącz / Wyłącz / AUTO / MANUAL: toast „Wysłano …”, zmiana w ESP w ciągu ok. 14 s (log `tag=FB-QUEUE`).
 - [ ] Światło: suwaki → „Wyślij PWM”; „Zapisz jako tryb AUTO” pyta o potwierdzenie.
 - [ ] Ustawienia → „Usuń dane z tej przeglądarki” czyści sekrety (testuj na osobnej przeglądarce).
-- [ ] Dodaj do ekranu głównego (PWA). Przy zmianie wersji przeładuj aplikację (service worker pobiera nową powłokę).
+- [ ] Dodaj do ekranu głównego (Chrome: ⋮ → Dodaj do ekranu głównego). Plik nie ma service workera, więc po aktualizacji pliku odśwież stronę.
 
-Hosting: wybór miejsca publikacji `panel/mobile/` to decyzja właściciela; repo nie zawiera sekretów, więc publiczny hosting jest technicznie możliwy.
+Hosting: plik można otworzyć z dowolnego HTTPS (np. GitHub Pages) albo lokalnie; wybór to decyzja właściciela. Repo nie zawiera sekretów.
 
 ## Test panelu (Etap 4) — procedura
 

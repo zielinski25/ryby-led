@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// check_mobile_app.js — aplikacja mobilna panel/mobile (4.7.2+build.272). Bez zależności, bez przeglądarki.
+// check_mobile_app.js — aplikacja mobilna panel/ryby-mobile.html (4.7.2+build.272). Bez zależności, bez przeglądarki.
 //
 // Sprawdza:
-//  1) logikę app-logic.js (komendy, ts, PWM, normalizacja statusu, stan połączenia, formatowanie);
+//  1) logikę (blok LOGIC-BEGIN/END w pliku, bez DOM): komendy, ts, PWM, status, stan połączenia, formatowanie;
 //  2) kontrakt z firmware: każda komenda z aplikacji istnieje w dispatcherze firmware;
 //  3) kontrakt statusu: pola czytane przez aplikację są zapisywane przez firmware;
 //  4) bezpieczeństwo UI: brak innerHTML/eval, brak sekretów w kodzie, PWA-pliki na miejscu.
@@ -14,10 +14,16 @@ const path = require("path");
 const assert = require("assert");
 
 const ROOT = path.resolve(__dirname, "..", "..", "..");
-const APP = path.join(ROOT, "panel", "mobile");
+const APP_FILE = path.join(ROOT, "panel", "ryby-mobile.html");
 const FW = fs.readFileSync(path.join(ROOT, "firmware", "src", "Ryby_LED_fi_S3.cpp"), "utf8");
-const HTML = fs.readFileSync(path.join(APP, "index.html"), "utf8");
-const L = require(path.join(APP, "app-logic.js"));
+const HTML = fs.readFileSync(APP_FILE, "utf8");
+
+// Logika leży w tym samym pliku między markerami; wykonujemy ją w izolowanym sandboxie vm.
+const logicMatch = HTML.match(/\/\* LOGIC-BEGIN[\s\S]*?\*\/\n([\s\S]*?)\n\/\* LOGIC-END \*\//);
+if (!logicMatch) { console.log("FAIL: brak bloku LOGIC-BEGIN/END w " + APP_FILE); process.exit(1); }
+const sandbox = {};
+require("vm").runInNewContext(logicMatch[1], sandbox);
+const L = sandbox.RybyLogic;
 
 let pass = 0, fail = 0;
 function check(cond, label) {
@@ -26,7 +32,9 @@ function check(cond, label) {
 }
 function eq(actual, expected, label) {
   let ok = false;
-  try { assert.deepStrictEqual(actual, expected); ok = true; } catch (_) { ok = false; }
+  // JSON-normalizacja: obiekty z kontekstu vm mają inny prototyp (cross-realm)
+  const a = JSON.parse(JSON.stringify(actual === undefined ? null : actual));
+  try { assert.deepStrictEqual(a, expected); ok = true; } catch (_) { ok = false; }
   check(ok, label + (ok ? "" : " (jest " + JSON.stringify(actual) + ", oczekiwano " + JSON.stringify(expected) + ")"));
 }
 function throwsMsg(fn, re, label) {
@@ -147,19 +155,14 @@ for (const f of statusFields) {
 }
 
 // ───── 7) bezpieczeństwo i PWA ─────
-const appLogic = fs.readFileSync(path.join(APP, "app-logic.js"), "utf8");
-check(!/\beval\s*\(|new Function\s*\(/.test(HTML + appLogic), "brak eval / new Function");
+check(!/\beval\s*\(|new Function\s*\(/.test(HTML), "brak eval / new Function");
 check(!/\.innerHTML\s*=/.test(HTML), "brak innerHTML (dane z bazy tylko przez textContent)");
-check(!/AkwPanel|RhKVp49q|Akwarium2026|8709162940:AA/.test(HTML + appLogic), "brak znanych sekretów w aplikacji");
+// Znane wyciekłe wartości NIE są tu wpisywane (publiczne repo). Pilnuje ich check_secrets.py (krok 0).
+check(!/<script\s+src=/.test(HTML), "jeden plik: brak zewnętrznych skryptów");
+check(!/<link[^>]+href="(?!data:)[^"]+\.(css|js|webmanifest)"/.test(HTML), "jeden plik: brak zewnętrznych zasobów");
 check(/name="viewport"[^>]*width=device-width/.test(HTML), "meta viewport (telefon)");
-check(/rel="manifest" href="manifest\.webmanifest"/.test(HTML), "link do manifestu PWA");
-check(/serviceWorker\.register\("sw\.js"\)/.test(HTML), "rejestracja service workera");
-for (const f of ["manifest.webmanifest", "icon.svg", "sw.js", "app-logic.js", "index.html"]) {
-  check(fs.existsSync(path.join(APP, f)), "plik aplikacji istnieje: " + f);
-}
-const manifest = JSON.parse(fs.readFileSync(path.join(APP, "manifest.webmanifest"), "utf8"));
-check(manifest.display === "standalone" && manifest.start_url, "manifest: standalone + start_url");
 check(/min-height:\s*4[4-9]px|min-height:\s*5\dpx/.test(HTML), "przyciski dotykowe ≥44 px");
+check(!/fetch\([^)]*https?:\/\/(?!127\.0\.0\.1)/.test(HTML) || /DEFAULT_DB_URL/.test(HTML), "adres bazy tylko z ustawień / stałej DB");
 
 console.log("\nmobile app: " + pass + " PASS, " + fail + " FAIL");
 process.exit(fail === 0 ? 0 : 1);

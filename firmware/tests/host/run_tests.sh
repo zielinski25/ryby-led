@@ -24,7 +24,7 @@
 #
 #  0) check_secrets.py: brak sekretów zaszytych w repo (4.7.1, Etap 2).
 # 12) check_panel_cmd.js: komendy zdalne panelu trafiają do kolejki firmware (4.7.1).
-# 13) check_mobile_app.js: aplikacja mobilna panel/mobile (logika, komendy, pola statusu, PWA).
+# 13) check_mobile_app.js: aplikacja mobilna panel/ryby-mobile.html (logika, komendy, pola statusu, jeden plik).
 #
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
@@ -111,7 +111,7 @@ echo
 echo "== [12/13] komendy zdalne panelu v14 → kolejka /aquarium/commands (4.7.1, Node) =="
 node "$HERE/check_panel_cmd.js"
 echo
-echo "== [13/13] aplikacja mobilna panel/mobile: logika, kontrakt z firmware, PWA (4.7.2, Node) =="
+echo "== [13/13] aplikacja mobilna panel/ryby-mobile.html: logika, kontrakt z firmware (4.7.2, Node) =="
 node "$HERE/check_mobile_app.js"
 echo
 echo "OK: wszystkie kontrole hostowe zaliczone."
