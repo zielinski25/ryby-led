@@ -8,6 +8,26 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.4.0+build.266] CRIT-LOG — 2026-10-10
+
+- Co: Etap 5 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`, szczegóły w
+  `docs/04_ETAP5_LOG_KRYTYCZNY.md`): **log krytyczny + menu Telegram**.
+  - Nowy moduł `critlog` (`firmware/src/critlog.h/.cpp`): osobny plik
+    `/log_krytyczny.txt` na LittleFS, nie rusza go rotacja `log_a`/`log_b`.
+    Limit 256 KB, archiwum `_old`, łącznie ≤512 KB.
+  - Zdarzenia krytyczne: start po PANIC/WDT/BROWNOUT (`BOOT`), utrata czujnika
+    światła po 5 próbach (`TSL`), czujnik wody DS18B20 FAIL przy starcie (`DS-DIAG`),
+    błędy OTA (`OTA-GH`).
+  - Endpointy: `GET /api/log-critical-status`, `GET /api/log-critical-download[?old=1]`.
+  - Telegram: komenda `/log_krytyczny` (alias `/krytyczny`) wysyła plik jako dokument;
+    menu: przyciski **🔁 Aktualizacja OTA** i **🚨 Log krytyczny**; `/ota` jako alias `/update`.
+  - Panel `akwarium-firebase-panel-v14.html`: karta „Log krytyczny” w zakładce Logi
+    (rozmiar, pobieranie, archiwum), tylko w LAN.
+- Testy: `test_critlog.cpp` (424 asercje, ASan+UBSan), `check_integration_e5.sh`
+  (syntax-only bloku z `Ryby_LED_fi_S3.cpp` i helpera z `ota_github.cpp`),
+  testy jsdom panelu. **Nie testowano na ESP32** — patrz `docs/04`, sekcja 6.
+- Atrapa LittleFS (`stubs/LittleFS.h`): tryb `"a"` dopisuje (wcześniej nadpisywał).
+
 ## [4.3.0+build.265] PANEL-CORS — 2026-10-10
 
 - Co: Etap 4 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`): panel WWW obsługuje

@@ -32,3 +32,7 @@ Badge w nagłówku pokazuje, którą drogą panel rozmawia z ESP:
 ## Wymagania po stronie ESP
 CORS + `Access-Control-Allow-Private-Network` + obsługa OPTIONS (firmware 4.3.0+).
 Bez tego Chrome/Edge blokuje żądania z innego originu do adresu LAN.
+
+## Log krytyczny (v14, Etap 5)
+Zakładka **Logi** → karta „Log krytyczny”: rozmiar pliku, pobieranie i archiwum. Działa tylko w LAN
+(zdalnie pokazuje się komunikat, a z Telegrama jest komenda `/log_krytyczny`).

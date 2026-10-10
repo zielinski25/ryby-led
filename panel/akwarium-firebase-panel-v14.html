@@ -898,7 +898,24 @@ input[type="time"].cfg-input{color-scheme:dark}
 
 <!-- ═══ PAGE: LOGI ═══ -->
 <div class="page" id="p-logi">
-  <div class="page-disabled">
+  <!-- [v14/E5] LOG KRYTYCZNY — widoczny w sieci lokalnej (overlay poniżej znika przy LAN) -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-power">🚨</div>Log krytyczny</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="row" style="padding-top:0">
+        <div><div class="row-label">Stan pliku</div><div class="row-desc" id="crit-state">—</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 0">
+        <a id="crit-dl" class="save-btn" style="text-decoration:none;margin-top:0" href="#">⬇ Pobierz log krytyczny</a>
+        <a id="crit-dl-old" class="save-btn" style="text-decoration:none;margin-top:0;display:none;background:var(--navy)" href="#">⬇ Archiwum</a>
+      </div>
+      <div class="row-desc" style="font-size:.7rem">Zdarzenia: restart po PANIC/WDT/brownout, utrata czujników, błędy OTA. Z Telegrama: komenda /log_krytyczny.</div>
+    </div>
+  </div>
+  <div class="page-disabled" id="logi-dis">
     <div class="dis-icon">📋</div>
     <h3>Logi niedostępne przez Firebase</h3>
     <p>Logi przechowywane są na karcie LittleFS ESP32 i dostępne wyłącznie przez lokalny panel (port 8080). Telegram może też wysyłać logi na żądanie.</p>
@@ -1700,6 +1717,29 @@ function showTab(name,el){
   if(el) el.classList.add("active");
   PAGES.forEach(function(p){ var pg=gid("p-"+p); if(pg) pg.classList.remove("active"); });
   var t=gid("p-"+name); if(t) t.classList.add("active");
+  if(name==="logi") critLogRefresh();
+}
+
+// ── [v14/E5] LOG KRYTYCZNY (LAN: /api/log-critical-status, /api/log-critical-download) ──
+async function critLogRefresh(){
+  var st = gid("crit-state");
+  if(!(await espProbeLan())){
+    if(st) st.textContent = "tylko w sieci lokalnej — z Telegrama: /log_krytyczny";
+    var dis0 = gid("logi-dis"); if(dis0) dis0.style.display = "";
+    return;
+  }
+  var dis = gid("logi-dis"); if(dis) dis.style.display = "none";
+  try {
+    var s = await espLocalFetch("/api/log-critical-status", {}, 3000);
+    if(st) st.textContent = s.exists
+      ? (Math.round(s.size / 1024 * 10) / 10) + " KB z " + Math.round(s.max / 1024) + " KB" + (s.old ? " · jest archiwum" : "")
+      : "brak zdarzeń krytycznych";
+    var base = espLocalBase();
+    var dl = gid("crit-dl"); if(dl) dl.href = base + "/api/log-critical-download";
+    var dlo = gid("crit-dl-old"); if(dlo){ dlo.href = base + "/api/log-critical-download?old=1"; dlo.style.display = s.old ? "" : "none"; }
+  } catch(e){
+    if(st) st.textContent = "błąd odczytu: " + e.message;
+  }
 }
 
 // ── CARD TOGGLE ─────────────────────────────────────
@@ -2117,6 +2157,7 @@ window.addEventListener("load", function(){
   loadStatus();
   setInterval(loadStatus, 10000);
   setInterval(espProbeLan, 30000);
+  setTimeout(critLogRefresh, 4000);
 });
 </script>
 </body>

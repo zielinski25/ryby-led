@@ -20,6 +20,14 @@
 #include <esp_ota_ops.h>     // esp_ota_get_state_partition / mark_app_valid_cancel_rollback (IDF 5.5)
 #include <esp_task_wdt.h>    // rejestracja/karmienie TWDT własnego taska
 #include <ESPAsyncWebServer.h>
+#include "critlog.h"         // [4.4.0 CRIT-LOG] Etap 5 — błędy OTA do log_krytyczny.txt
+
+// [4.4.0 CRIT-LOG] Zdarzenie krytyczne OTA (uptime — NTP może być jeszcze niezsynchronizowany)
+static void otaCritLine(const char* msg) {
+  char buf[256];
+  snprintf(buf, sizeof(buf), "%lu lvl=CRIT tag=OTA-GH msg=\"%s\"", (unsigned long)(millis() / 1000UL), msg);
+  critlog::append(buf);
+}
 
 // ── styk z resztą firmware (symbole z Ryby_LED_fi_S3.cpp) ──────────────────
 extern AsyncWebServer webserialServer;   // port 8080
@@ -207,6 +215,7 @@ static void otaGithubTaskFn(void* pvParams) {
       String b = String("Blad OTA (") + httpUpdate.getLastErrorString().c_str() + ")";
       otaSetLastError(b.c_str());
       logPrintln("lvl=ERR tag=OTA-GH msg=\"" + b + "\"");
+      otaCritLine(b.c_str());
       break;
     }
     case HTTP_UPDATE_NO_UPDATES:
@@ -263,6 +272,7 @@ bool otaGithubRequest(bool force, String &errOut) {
     s_otaRunning = false;
     errOut = "Nie udalo sie stworzyc taska OTA (brak pamieci)";
     logPrintln("lvl=ERR tag=OTA-GH msg=\"Task OTA nie wystartowal - brak pamieci\"");
+    otaCritLine("Task OTA nie wystartowal - brak pamieci");
     return false;
   }
   errOut = "";
@@ -300,6 +310,7 @@ void otaGithubConfirmPartition() {
       logPrintln("lvl=INFO tag=OTA-GH msg=\"Partycja OTA potwierdzona (cancel rollback)\"");
     } else {
       logPrintln("lvl=ERR tag=OTA-GH msg=\"esp_ota_mark_app_valid_cancel_rollback nie powiodl sie\"");
+      otaCritLine("esp_ota_mark_app_valid_cancel_rollback nie powiodl sie (ryzyko rollbacku)");
     }
   }
 }

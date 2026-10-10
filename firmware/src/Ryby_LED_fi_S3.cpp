@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.3.0+build.265"
+#define RYBY_FW_VERSION "v4.4.0+build.266"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -472,6 +472,7 @@ void* psramAllocSafe(size_t size);
 #include "NetDiag.h"  // [NETDIAG] test routera/łącza - patrz komentarz w pliku
 #include "ota_github.h"   // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
 #include "telemetry_spool.h"  // [4.2.0 SPOOL] Etap 3 — trwała telemetria (Spool V2)
+#include "critlog.h"            // [4.4.0 CRIT-LOG] Etap 5 — log_krytyczny.txt
 
 
 /*************************************************************
@@ -916,7 +917,9 @@ enum TgDeferCmd : uint8_t {
   // ── v227 (test WDT-DAILYSUM, tymczasowe) ──
   TG_TEST_DAILY_SUMMARY, // wymuś jednorazowe logDailySummary() bez czekania na północ
   // ── 4.1.0 OTA-GITHUB (Etap 1 planu upgrade) ──
-  TG_OTA_UPDATE    // sprawdź release na GitHub i zaktualizuj firmware (komenda /update)
+  TG_OTA_UPDATE,   // sprawdź release na GitHub i zaktualizuj firmware (komenda /update)
+  // ── 4.4.0 CRIT-LOG (Etap 5 planu upgrade) ──
+  TG_LOG_CRITICAL  // wyślij log_krytyczny.txt jako dokument (komenda /log_krytyczny)
 };
 volatile TgDeferCmd tgDeferredCmd = TG_NONE;
 unsigned long tgMenuReturnAt = 0;   // gdy >0: powróć do menu po upływie czasu
@@ -3672,7 +3675,7 @@ bool sendTelegramInlineMenu() {
 
   // FIX-v44: snprintf zamiast ~15 konkatenacji String + - brak tymczasowych obiektów
   static char* _pl = nullptr;
-  const size_t PL_CAP = 1200;
+  const size_t PL_CAP = 1500;   // [4.4.0] +2 wiersze przycisków
   if (!_pl) _pl = (char*)psramAllocSafe(PL_CAP);
   if (!_pl) { logPrintln("lvl=ERR tag=TG msg=\"inlineMenu blad: brak pamieci (_pl)\""); return false; }
   snprintf(_pl, PL_CAP,
@@ -3692,6 +3695,8 @@ bool sendTelegramInlineMenu() {
     ",{\"text\":\"⏰ Harmonogram\",\"callback_data\":\"schedule\"}],"
     "[{\"text\":\"%s\",\"callback_data\":\"notiftog\"}"
     ",{\"text\":\"🗑️ Wyczyść logi\",\"callback_data\":\"clrlogs\"}],"
+    "[{\"text\":\"🔁 Aktualizacja OTA\",\"callback_data\":\"ota\"}"
+    ",{\"text\":\"🚨 Log krytyczny\",\"callback_data\":\"critlog\"}],"
     "[{\"text\":\"🔄 Restart ESP\",\"callback_data\":\"restart\"}]"
     "]}}",
     tgChatId.c_str(), safeHeader.c_str(),
@@ -3825,6 +3830,8 @@ void pollTelegramCommands() {
         else if (cbData == "ledtog")     { tgDeferredCmd = TG_LED_TOGGLE; }
         else if (cbData == "trybtog")    { tgDeferredCmd = TG_TRYB_TOGGLE; }
         else if (cbData == "clrlogs")    { tgDeferredCmd = TG_CLR_CONFIRM; }
+        else if (cbData == "critlog")    { tgDeferredCmd = TG_LOG_CRITICAL; }   // [4.4.0] 
+        else if (cbData == "ota")        { tgDeferredCmd = TG_OTA_UPDATE; }     // [4.4.0] 
         else if (cbData == "clryes")     { tgDeferredCmd = TG_CLR_DO; }
         else if (cbData == "clrno")      { sendTelegramMessage("[ERR] Anulowano czyszczenie logów.", false); }
         else if (cbData == "restart")    { tgDeferredCmd = TG_RESTART_CONFIRM; }
@@ -3866,7 +3873,10 @@ void pollTelegramCommands() {
         } else if (cmd.startsWith("/testdaily")) {
           // [v227] TEST-ONLY (plan flash-freeze, Partia 4) - do usunięcia po testach
           tgDeferredCmd = TG_TEST_DAILY_SUMMARY;
-        } else if (cmd.startsWith("/update")) {
+        } else if (cmd.startsWith("/log_krytyczny") || cmd.startsWith("/krytyczny")) {
+          // [4.4.0 CRIT-LOG] Etap 5 — log krytyczny jako dokument
+          tgDeferredCmd = TG_LOG_CRITICAL;
+        } else if (cmd.startsWith("/update") || cmd.startsWith("/ota")) {
           // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
           tgDeferredCmd = TG_OTA_UPDATE;
         } else {
@@ -3888,6 +3898,124 @@ void pollTelegramCommands() {
   if (tgLastMenuMsgId < 0 && tgDeferredCmd == TG_NONE) {
     tgDeferredCmd = TG_MENU;
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// [4.4.0 CRIT-LOG] Etap 5 planu upgrade — log krytyczny (wzór: log_krytyczny.txt Centrali)
+// logCritical: zwykły log (RAM/log_b) + trwały plik critlog (przeżywa rotację i restart).
+// Wołać WYŁĄCZNIE z miejsc krytycznych: start po PANIC/WDT/BROWNOUT, utrata czujników,
+// błąd OTA. Nie spamować — każde miejsce ma własny próg (np. 5 nieudanych prób).
+// ─────────────────────────────────────────────────────────────
+void logCritical(const char* tag, const char* msg) {
+  char ts[32];
+  struct tm ti;
+  if (getLocalTimePL(&ti)) strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &ti);
+  else snprintf(ts, sizeof(ts), "uptime=%lus", (unsigned long)(millis() / 1000UL));
+  String line = String(ts) + " lvl=CRIT tag=" + tag + " msg=\"" + msg + "\"";
+  logPrintln(line);
+  critlog::append(line.c_str());
+}
+
+// Wysyła log_krytyczny.txt do czatu Telegram jako dokument (multipart, strumieniowo, 4 KB).
+// Osobne połączenie TLS z Connection: close (jak sendTelegramDocument).
+bool sendTelegramCriticalDocument() {
+  if (!tgEnabled || tgBotToken.length() < 10 || tgChatId.length() < 3) return false;
+  if (!littlefsReady || !LittleFS.exists(critlog::FILE_CUR)) {
+    return sendTelegramMessage("✅ <b>Log krytyczny</b>: brak zdarzeń krytycznych.", false);
+  }
+  File f = LittleFS.open(critlog::FILE_CUR, "r");
+  if (!f) return sendTelegramMessage("[ERR] Nie moge otworzyc log_krytyczny.txt", false);
+  const size_t fsz = f.size();
+  if (fsz == 0) {
+    f.close();
+    return sendTelegramMessage("✅ <b>Log krytyczny</b>: plik pusty.", false);
+  }
+  if (!tgEnsureConnected()) {
+    f.close();
+    return sendTelegramMessage("[ERR] Brak polaczenia z Telegram - sprobuj ponownie.", false);
+  }
+
+  const String boundary = "ESP32CRITBnd";
+  String caption = String("🚨 log_krytyczny (") + String(fsz / 1024.0f, 1) + " KB) - " + logTime();
+  String partHead =
+    "--" + boundary + "\r\n"
+    "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n" + tgChatId + "\r\n"
+    "--" + boundary + "\r\n"
+    "Content-Disposition: form-data; name=\"caption\"\r\n\r\n" + caption + "\r\n"
+    "--" + boundary + "\r\n"
+    "Content-Disposition: form-data; name=\"document\"; filename=\"log_krytyczny.txt\"\r\n"
+    "Content-Type: text/plain\r\n\r\n";
+  String partTail = "\r\n--" + boundary + "--\r\n";
+  const size_t totalLen = partHead.length() + fsz + partTail.length();
+
+  {
+    int sock = tgClient.fd();
+    if (sock >= 0) {
+      struct timeval tv;
+      tv.tv_sec = 8;
+      tv.tv_usec = 0;
+      setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+      setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    }
+  }
+
+  tgClient.printf(
+    "POST /bot%s/sendDocument HTTP/1.1\r\n"
+    "Host: api.telegram.org\r\n"
+    "Content-Type: multipart/form-data; boundary=%s\r\n"
+    "Content-Length: %u\r\n"
+    "Connection: close\r\n\r\n",
+    tgBotToken.c_str(), boundary.c_str(), (unsigned)totalLen);
+  tgClient.print(partHead);
+
+  uint8_t* chBuf = (uint8_t*)ps_malloc(4096);
+  if (!chBuf) chBuf = (uint8_t*)malloc(4096);
+  if (!chBuf) {
+    f.close();
+    tgClient.stop();
+    tgClientReady = false;
+    logPrintln("lvl=ERR tag=TG-CRIT msg=\"brak pamieci na bufor 4KB\"");
+    return false;
+  }
+  size_t sent = 0;
+  while (sent < fsz) {
+    size_t want = (fsz - sent > 4096) ? 4096 : (fsz - sent);
+    size_t n = f.read(chBuf, want);
+    if (n == 0) break;
+    size_t written = 0;
+    while (written < n) {
+      size_t w = tgClient.write(chBuf + written, n - written);
+      if (w == 0) break;
+      written += w;
+    }
+    if (written == 0) break;
+    sent += written;
+    esp_task_wdt_reset();
+  }
+  free(chBuf);
+  f.close();
+  tgClient.print(partTail);
+
+  String resp;
+  unsigned long t0 = millis();
+  while (millis() - t0 < 15000UL) {
+    while (tgClient.available()) {
+      char c = (char)tgClient.read();
+      if (resp.length() < 2048) resp += c;
+    }
+    if (!tgClient.connected()) break;
+    esp_task_wdt_reset();
+    delay(10);
+  }
+  tgClient.stop();
+  tgClientReady = false;
+
+  bool ok = (sent == fsz) && (resp.indexOf("\"ok\":true") >= 0);
+  if (!ok) {
+    logPrintf("lvl=ERR tag=TG-CRIT msg=\"sendDocument blad\" sent=%u of=%u\n",
+              (unsigned)sent, (unsigned)fsz);
+  }
+  return ok;
 }
 
 void logDailySummary() {
@@ -8103,6 +8231,7 @@ void tgTaskFn(void* /*pvParams*/) {
         tslFailCount++;
         if (tslFailCount == 5) {
           logPrintln("lvl=ERR tag=TSL msg=\"Czujniki niedostepne po 5 probach, retry co 10 min. Sprawdz okablowanie I2C\"");
+          logCritical("TSL", "czujniki swiatla niedostepne po 5 probach (I2C) - sprawdz okablowanie");
         }
       }
       // ************************************************FIX-v70-A (WDT crash loop)
@@ -8917,6 +9046,15 @@ void tgTaskFn(void* /*pvParams*/) {
         sendTelegramMessage("🧪 Wymuszam test logDailySummary() przy najbliższej iteracji loop() - sprawdź logi (tag=SUMMARY, tag=ENERGIA).", false);
         break;
 
+      case TG_LOG_CRITICAL:
+        // [4.4.0 CRIT-LOG] Etap 5 — wysyłka log_krytyczny.txt (pusty → komunikat)
+        logPrintf("lvl=INFO tag=CMD-RUN cmd=LOG_CRIT faza=start fH=%lu\n", (unsigned long)ESP.getFreeHeap());
+        tgDeleteAllHistory();
+        sendTelegramCriticalDocument();
+        menuReturnInTask = millis() + 30000UL;
+        logPrintf("lvl=INFO tag=CMD-RUN cmd=LOG_CRIT faza=done czas=%lums\n", millis()-_cmdT);
+        break;
+
       case TG_OTA_UPDATE: {
         // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade: OTA przez GitHub Releases.
         // otaGithubRequest() jest nieblokujące — tylko startuje task OTA na
@@ -9719,6 +9857,25 @@ void setup() {
     littlefsReady = true;
   }
   tsBoot();   // [4.2.0 SPOOL] TelemetryRing + sessionNonce + sprzątanie *.part
+
+  // [4.4.0 CRIT-LOG] Etap 5 — trwały log krytyczny + zdarzenia startu.
+  critlog::init(littlefsReady);
+  switch (bootResetReason) {
+    case ESP_RST_PANIC:
+      logCritical("BOOT", "restart po PANIC/CRASH - sprawdz coredump w logach");
+      break;
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:
+      logCritical("BOOT", "restart po WDT (zawieszenie firmware)");
+      break;
+    case ESP_RST_BROWNOUT:
+      logCritical("BOOT", "BROWNOUT - sprawdz zasilanie 5V/LED");
+      break;
+    default:
+      break;
+  }
+  if (ds3BootFail) logCritical("DS-DIAG", "czujnik wody DS18B20 FAIL przy starcie");
   if (littlefsReady) {
     // [v152] FIX-FS-CAPACITY: odczytaj PRAWDZIWY rozmiar wolumenu zamiast polegać
     // na zaszytej na sztywno wartości 10420224 B (błędnej od v113 - zmiana partycji coredump o 65536 B).
@@ -11064,6 +11221,27 @@ webserialServer.on("/api/telemetry/status", HTTP_GET, [](AsyncWebServerRequest *
 // ═══════════════════════════════════════════════════════════
 //  API: /api/fs-list - lista plików LittleFS z rozmiarami
 // ═══════════════════════════════════════════════════════════
+// [4.4.0 CRIT-LOG] Etap 5 — log krytyczny: status i pobieranie (panel WWW, LAN).
+// /api/log-critical-download?old=1 → archiwum poprzedniej rotacji.
+webserialServer.on("/api/log-critical-status", HTTP_GET, [](AsyncWebServerRequest *request) {
+  bool exists = littlefsReady && LittleFS.exists(critlog::FILE_CUR);
+  String j = String("{\"exists\":") + (exists ? "true" : "false");
+  j += ",\"size\":" + String((unsigned long)critlog::currentSize());
+  j += ",\"max\":" + String((unsigned long)critlog::MAX_BYTES);
+  j += ",\"old\":" + String(critlog::hasOld() ? "true" : "false") + "}";
+  request->send(200, "application/json", j);
+});
+
+webserialServer.on("/api/log-critical-download", HTTP_GET, [](AsyncWebServerRequest *request) {
+  bool old = request->hasParam("old") && request->getParam("old")->value() == "1";
+  const char* path = old ? critlog::FILE_OLD : critlog::FILE_CUR;
+  if (!littlefsReady || !LittleFS.exists(path)) {
+    request->send(404, "application/json", "{\"error\":\"brak pliku\"}");
+    return;
+  }
+  request->send(LittleFS, path, "text/plain", true);
+});
+
 webserialServer.on("/api/fs-list", HTTP_GET, [](AsyncWebServerRequest *request) {
   if (!littlefsReady) {
     request->send(500, "application/json", "{\"error\":\"LittleFS nie gotowy\"}");

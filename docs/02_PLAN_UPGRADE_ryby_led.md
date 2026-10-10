@@ -12,7 +12,7 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 | 2. Bezpieczeństwo Firebase | 🟡 W TOKU (część 1/2 gotowa) | 4.1.1 | sekrety przeniesione do `src/secrets.h` (poza repo, `.gitignore`); do zrobienia po stronie użytkownika: nowy Database Secret w Firebase Console → wpisać do `secrets.h` → build → flash → **odwołanie starego sekretu**; potem zmiana CMD_TOKEN + hasła espota; część 2 (NVS+UserAuth) później |
 | 3. Spool V2 + telemetria | 🟡 KOD + TESTY HOSTOWE GOTOWE | 4.2.0 | ring PSRAM + Spool V2 (CRC, commit) + sessionNonce + replay FIFO + `/api/telemetry/status`; 200 testów hostowych OK; DoD na płytce (zanik zasilania w trakcie wysyłki) do wykonania — procedura: `docs/03_ETAP3_SPOOL_V2.md`; brak jeszcze `/api/history/long` i panelu |
 | 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | 🟡 | 4.3.0+build.265 | KOD GOTOWY: CORS-PNA + OPTIONS, panel v14 (LAN/zdalnie, OTA, skan Wi-Fi). Test z telefonu na LTE do wykonania w domu |
-| 5. Log krytyczny + Telegram | ⬜ | — | |
+| 5. Log krytyczny + Telegram | 🟡 | 4.4.0+build.266 | KOD GOTOWY: critlog (+testy), /log_krytyczny, menu OTA/log, karta w panelu. Test na płytce wg `docs/04`, sekcja 6 |
 | 6. Astronomia + RTC | ⬜ | — | |
 | 7. Panel LVGL | ⬜ opcjonalny | — | |
 

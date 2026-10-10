@@ -10,6 +10,8 @@
 #     /api/telemetry/status z Ryby_LED_fi_S3.cpp i kompiluje je z atrapami
 #     globali Ryby + API FirebaseClient (sygnatury z v2.2.13).
 #
+#  3) check_integration_e5.sh: blok CRIT-LOG (Etap 5, 4.4.0) i helper OTA.
+#
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
 # ═══════════════════════════════════════════════════════════════════
@@ -19,7 +21,7 @@ SRC="${SRC:-$HERE/../../src}"
 BIN="${TMPDIR:-/tmp}/tspool-test-bin"
 export TSPOOL_FS_ROOT="${TSPOOL_FS_ROOT:-${TMPDIR:-/tmp}/tspool-fakefs}"
 
-echo "== [1/2] testy logiki Spool V2 (ASan + UBSan) =="
+echo "== [1/3] testy logiki Spool V2 (ASan + UBSan) =="
 g++ -std=gnu++17 -g -O1 -Wall -Wextra \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -I"$HERE/stubs" -I"$SRC" \
@@ -28,7 +30,19 @@ g++ -std=gnu++17 -g -O1 -Wall -Wextra \
 "$BIN"
 
 echo
-echo "== [2/2] kompilacja bloku integracyjnego z Ryby_LED_fi_S3.cpp =="
+echo "== [2/3] testy modułu critlog — log krytyczny (4.4.0, ASan + UBSan) =="
+g++ -std=gnu++17 -g -O1 -Wall -Wextra \
+    -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+    -I"$HERE/stubs" -I"$SRC" \
+    "$HERE/test_critlog.cpp" "$SRC/critlog.cpp" \
+    -o "${BIN}-critlog"
+TSPOOL_FS_ROOT="${TSPOOL_FS_ROOT}-critlog" "${BIN}-critlog"
+
+echo
+echo "== [3/3] kompilacja bloku integracyjnego z Ryby_LED_fi_S3.cpp =="
 bash "$HERE/check_integration.sh"
+echo
+echo "== [3b/3] kompilacja bloku CRIT-LOG (Etap 5) + helper OTA =="
+bash "$HERE/check_integration_e5.sh"
 echo
 echo "OK: wszystkie kontrole hostowe zaliczone."

@@ -89,7 +89,7 @@ public:
       f.p->valid = (f.p->dp != nullptr);
       return f;
     }
-    f.p->fp = fopen(full.c_str(), mode[0] == 'r' ? "rb" : "wb");
+    f.p->fp = fopen(full.c_str(), mode[0] == 'r' ? "rb" : (mode[0] == 'a' ? "ab" : "wb"));
     f.p->valid = (f.p->fp != nullptr);
     return f;
   }
