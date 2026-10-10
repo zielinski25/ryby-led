@@ -1,6 +1,18 @@
 /*************************************************************
  *  CHANGELOG
  *
+ * [v4.2.0 SPOOL, 2026-10-10] Etap 3 planu upgrade: trwala telemetria (Spool V2).
+ *     Co: TelemetryRing (SPSC, PSRAM 13.8 KB) + Persistent Spool V2 na LittleFS
+ *     (/spool: header 64 B + N x (48 B probka + CRC32) + footer 64 B = commit),
+ *     sessionNonce (esp_random) na kazdy start, replay FIFO przez PATCH
+ *     /aquarium/telemetry/v1 jako FbAsyncOp::SET_TELEMETRY (klucze nonce_seq =
+ *     idempotentne). Endpoint GET /api/telemetry/status. Modul: telemetry_spool.h/.cpp.
+ *     Dlaczego: dane akwarium maja przezywac restart i brak sieci; uszkodzone
+ *     rekordy odrzucane przez CRC, niepelne strony nie ida na siec.
+ *     Logika sterowania: NIETKNIETA (Ramp Arbiter, MIN LUX, PWM).
+ *     Ograniczenia: probki z RAM (<= 30 min) przepadaja przy zaniku zasilania.
+ *     Testy hostowe: firmware/tests/host (run_tests.sh).
+ *
  * [v4.1.1 SECRETS, 2026-10-09] Etap 2 (czesc 1): bezpieczenstwo sekretow.
  *     Co: FIREBASE_HOST/FIREBASE_SECRET/CMD_TOKEN przeniesione z kodu do
  *     src/secrets.h (w .gitignore, poza repo); w repo tylko secrets.example.h
@@ -144,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.1.1+build.263"
+#define RYBY_FW_VERSION "v4.2.0+build.264"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -459,6 +471,7 @@ void* psramAllocSafe(size_t size);
 #include <algorithm>  // [v106] std::min w callbackach beginResponse
 #include "NetDiag.h"  // [NETDIAG] test routera/łącza - patrz komentarz w pliku
 #include "ota_github.h"   // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
+#include "telemetry_spool.h"  // [4.2.0 SPOOL] Etap 3 — trwała telemetria (Spool V2)
 
 
 /*************************************************************
@@ -839,7 +852,7 @@ AsyncResult         g_fbCfgResult;    // config
 // [v253] NATIVE ASYNC FIREBASE STATE MACHINE
 // Jeden request Firebase naraz. fbApp.loop() jest pompowane z tgTask, ale
 // nigdy nie czekamy tutaj w while na zakończenie TLS/HTTP.
-enum class FbAsyncOp : uint8_t { NONE, GET_COMMANDS, DELETE_COMMAND, GET_CONFIG, SET_STATUS };
+enum class FbAsyncOp : uint8_t { NONE, GET_COMMANDS, DELETE_COMMAND, GET_CONFIG, SET_STATUS, SET_TELEMETRY };
 static FbAsyncOp g_fbAsyncOp = FbAsyncOp::NONE;
 static uint32_t g_fbAsyncOpStartedMs = 0;
 static uint32_t g_fbAsyncOpTimeoutMs = 0;
@@ -866,6 +879,7 @@ static inline const char* fbAsyncOpName(FbAsyncOp op) {
     case FbAsyncOp::DELETE_COMMAND: return "CMD_DEL";
     case FbAsyncOp::GET_CONFIG: return "CFG_GET";
     case FbAsyncOp::SET_STATUS: return "STATUS_SET";
+    case FbAsyncOp::SET_TELEMETRY: return "TELEM_SET";
     default: return "NONE";
   }
 }
@@ -7357,6 +7371,237 @@ static void fbAsyncHandleStatusResult() {
   fbAsyncResetOperation();
 }
 
+// ═══════════════════════════════════════════════════════════
+//  [v4.2.0 SPOOL] Etap 3 planu upgrade — trwała telemetria (Spool V2)
+//  Moduł: telemetry_spool.h/.cpp (CRC, strony z commit-footerem, replay).
+//  Producent: saveHistoryPoint() (co 5 min, Core 0) → TelemetryRing (PSRAM).
+//  Spill:     tsSpillTick() (tgTaskFn, Core 0) → strona na LittleFS /spool.
+//  Replay:    FbAsyncOp::SET_TELEMETRY w schedulerze FB (najniższy priorytet).
+//  Wszystko na Core 0 → SPSC bez wyścigów; klucze RTDB = sessionNonce_seq
+//  → replay idempotentny. Ramp Arbiter / MIN LUX — nietknięte.
+// ═══════════════════════════════════════════════════════════
+static tspool::Ring g_tsRing;
+static bool         g_tsReady = false;
+static uint64_t     g_tsSessionNonce = 0;
+static uint32_t     g_tsSampleSeq = 0;
+static uint64_t     g_tsNextPageSeq = 1;
+static uint32_t     g_tsLastSpillMs = 0;
+static uint32_t     g_tsOfflineSinceMs = 0;      // 0 = online
+static uint32_t     g_tsNextReplayAttemptMs = 0;
+static uint32_t     g_tsPagesOnFs = 0;           // cache: aktualizowany po spill/replay/boot
+static size_t       g_tsBytesOnFs = 0;
+static char*        g_tsJson = nullptr;          // bufor batcha (PSRAM)
+static tspool::ReplayCursor g_tsReplay{};
+static bool         g_tsReplayOpen = false;
+static uint32_t     g_tsPendingTaken = 0;
+static uint32_t     g_tsPendingSent = 0;
+static AsyncResult  g_fbTelemResult;
+// Liczniki diagnostyczne: pisane na Core 0, czytane przez /api/telemetry/status
+// (odczyt bez locka — dopuszczalne dla diagnostyki, wartości są monotoniczne).
+static uint32_t g_tsProduced = 0, g_tsDropped = 0, g_tsSpilledRecords = 0, g_tsPagesCreated = 0;
+static uint32_t g_tsSpillFailures = 0, g_tsReplayedRecords = 0, g_tsPagesDeleted = 0;
+static uint32_t g_tsReplayFailures = 0, g_tsCorruptRecords = 0, g_tsBadPagesRemoved = 0;
+static uint32_t g_tsQuotaDrops = 0, g_tsPartDiscarded = 0;
+
+static uint16_t tsClampU16(float v) {
+  if (!(v >= 0.0f)) return 0U;            // też NaN
+  if (v > 65534.0f) v = 65534.0f;
+  return (uint16_t)lroundf(v);
+}
+
+// Start Spool V2: alokacja ringu i bufora batcha w PSRAM, nowy sessionNonce,
+// sprzątanie *.part po zaniku zasilania, numeracja stron od max+1.
+static void tsBoot() {
+  if (!littlefsReady) {
+    logPrintln("lvl=WARN tag=TSPOOL msg=\"LittleFS niegotowy - trwala telemetria wylaczona\"");
+    return;
+  }
+  if (!g_tsRing.init()) {
+    logPrintf("lvl=ERR tag=TSPOOL msg=\"ring_alloc_fail bytes=%u (PSRAM?)\"\n", (unsigned)g_tsRing.bytes());
+    return;
+  }
+  g_tsJson = static_cast<char*>(ps_malloc(tspool::JSON_BUFFER_BYTES));
+  if (!g_tsJson) {
+    logPrintln("lvl=ERR tag=TSPOOL msg=\"json_alloc_fail (PSRAM?)\"");
+    return;
+  }
+  g_tsSessionNonce = tspool::makeSessionNonce();
+  g_tsSampleSeq = 0U;
+  g_tsPartDiscarded = tspool::discardPartialPages();
+  g_tsNextPageSeq = tspool::maxPageSeqOnFs() + 1ULL;
+  tspool::spoolFsStats(g_tsPagesOnFs, g_tsBytesOnFs);
+  g_tsReady = true;
+  logPrintf("lvl=INFO tag=TSPOOL akcja=ready session=%08lX%08lX ring=%u ringBytes=%u pages=%u partDiscarded=%u\n",
+            (unsigned long)(g_tsSessionNonce >> 32), (unsigned long)(g_tsSessionNonce & 0xFFFFFFFFUL),
+            (unsigned)tspool::RING_CAPACITY, (unsigned)g_tsRing.bytes(),
+            (unsigned)g_tsPagesOnFs, (unsigned)g_tsPartDiscarded);
+}
+
+// Producent: wołane z saveHistoryPoint() (Core 0) — te same wartości co wiersz CSV.
+static void tsProduceFromHistory(const int pwmPct[5], float totalPowerW) {
+  if (!g_tsReady) return;
+  tspool::Sample s{};
+  s.sessionNonce = g_tsSessionNonce;
+  s.sampleSeq = ++g_tsSampleSeq;
+  const time_t nowT = time(nullptr);
+  s.unixTs = (nowT > 1600000000) ? (uint32_t)nowT : 0U;   // 0 = brak NTP
+  s.uptimeS = (uint32_t)(millis() / 1000UL);
+  // Temperatury poza zakresem sensora (-10..90 °C) → brak odczytu (jak w filtrze setupu).
+  auto tX10 = [](float t) -> int16_t {
+    return (t >= -10.0f && t <= 90.0f) ? (int16_t)lroundf(t * 10.0f) : tspool::NA_X10;
+  };
+  s.tWaterX10 = tX10(tempWater);
+  s.tPlate1X10 = tX10(tempPlate1);
+  s.tPlate2X10 = tX10(tempPlate2);
+  s.luxRoom = (luxPokojowy >= 0.0f) ? tsClampU16(luxPokojowy) : tspool::NA_U16;
+  s.luxWater = (luxNadWoda >= 0.0f) ? tsClampU16(luxNadWoda) : tspool::NA_U16;
+  for (int i = 0; i < 5; ++i) s.pwm[i] = (uint16_t)constrain(pwmPct[i], 0, 100);
+  s.powerWX10 = tsClampU16(totalPowerW * 10.0f);
+  s.wifiRssi = (WiFi.status() == WL_CONNECTED) ? (int8_t)constrain((int)WiFi.RSSI(), -127, 0) : 0;
+  s.stateBits = (uint8_t)((tryb ? 0x01 : 0) | (minLuxModeActive ? 0x02 : 0) |
+                          (regulacjaAdaptacyjnaWlaczona ? 0x04 : 0));
+  if (g_tsRing.push(s)) g_tsProduced++;
+  else g_tsDropped++;
+}
+
+static void tsFinishReplayPage() {
+  if (tspool::removePageSeq(g_tsReplay.pageSeq)) g_tsPagesDeleted++;
+  g_tsReplayOpen = false;
+  g_tsReplay = tspool::ReplayCursor{};
+  tspool::spoolFsStats(g_tsPagesOnFs, g_tsBytesOnFs);
+}
+
+// Spill + utrzymanie FS. Wołane z tgTaskFn (Core 0) po histSavePending.
+static void tsSpillTick() {
+  if (!g_tsReady) return;
+  const uint32_t now = millis();
+  static uint32_t lastTickMs = 0;
+  if ((uint32_t)(now - lastTickMs) < 1000U) return;   // throttle: nie odpytuj FS co takt pętli
+  lastTickMs = now;
+  const bool transportUp = (WiFi.status() == WL_CONNECTED) && fbAppReady && fbApp.ready();
+  if (transportUp) g_tsOfflineSinceMs = 0U;
+  else if (g_tsOfflineSinceMs == 0U) g_tsOfflineSinceMs = now ? now : 1U;
+
+  // Wolne miejsce: najpierw kasujemy najstarsze strony (max 4 na takt), potem spill.
+  for (uint8_t k = 0; k < 4U; ++k) {
+    const size_t total = LittleFS.totalBytes();
+    const size_t used = LittleFS.usedBytes();
+    const size_t freeB = (total > used) ? (total - used) : 0U;
+    const bool tooFull = (freeB < tspool::FS_MIN_FREE_BYTES) || (g_tsPagesOnFs > tspool::MAX_PAGES_ON_FS);
+    if (!tooFull) break;
+    uint64_t removed = 0;
+    if (!tspool::removeOldestPage(removed)) break;
+    if (g_tsReplayOpen && removed == g_tsReplay.pageSeq) {
+      g_tsReplayOpen = false;                       // strona otwarta do replayu właśnie zniknęła
+      g_tsReplay = tspool::ReplayCursor{};
+    }
+    g_tsQuotaDrops++;
+    logPrintf("lvl=WARN tag=TSPOOL akcja=quota_drop page=%010llu free=%u\n",
+              (unsigned long long)removed, (unsigned)freeB);
+    tspool::spoolFsStats(g_tsPagesOnFs, g_tsBytesOnFs);
+  }
+
+  const size_t totalB = LittleFS.totalBytes();
+  const size_t usedB = LittleFS.usedBytes();
+  tspool::SpillInputs in{};
+  in.ringSize = g_tsRing.size();
+  in.transportUp = transportUp;
+  in.offlineSinceMs = g_tsOfflineSinceMs;
+  in.nowMs = now;
+  in.lastSpillMs = g_tsLastSpillMs;
+  in.fsFreeOk = (totalB > usedB) && ((totalB - usedB) >= tspool::FS_MIN_FREE_BYTES);
+  uint32_t count = 0;
+  if (!tspool::spillDue(in, count)) return;
+
+  esp_task_wdt_reset();
+  const uint64_t seq = g_tsNextPageSeq;
+  g_tsNextPageSeq++;                                // numer zużyty nawet przy błędzie
+  g_tsLastSpillMs = now;
+  uint64_t firstSeq = 0, lastSeq = 0;
+  char why[40] = {};
+  if (!tspool::writePageFromRing(g_tsRing, count, seq, firstSeq, lastSeq, why, sizeof(why))) {
+    g_tsSpillFailures++;
+    logPrintf("lvl=ERR tag=TSPOOL akcja=spill_fail why=%s count=%u\n", why, (unsigned)count);
+    return;
+  }
+  // Ogon ringu przesuwamy dopiero po zweryfikowanej, finalnej stronie.
+  if (!g_tsRing.commitPopN(count)) {
+    logPrintln("lvl=ERR tag=TSPOOL akcja=commit_fail msg=\"ring tail nie przesunięty\"");
+  }
+  g_tsSpilledRecords += count;
+  g_tsPagesCreated++;
+  tspool::spoolFsStats(g_tsPagesOnFs, g_tsBytesOnFs);
+  logPrintf("lvl=INFO tag=TSPOOL akcja=spill page=%010llu records=%u first=%lu last=%lu ring=%u offline=%d\n",
+            (unsigned long long)seq, (unsigned)count, (unsigned long)firstSeq,
+            (unsigned long)lastSeq, (unsigned)g_tsRing.size(), transportUp ? 0 : 1);
+}
+
+// Replay: jedna partia (max REPLAY_BATCH_MAX) jako operacja asynchroniczna.
+// Wysyłka: PATCH na /aquarium/telemetry/v1 — klucze deterministyczne → ponowienie bezpieczne.
+static void fbAsyncStartTelemetryReplay() {
+  if (!g_tsReady || !g_tsJson) return;
+  if (g_fbAsyncOp != FbAsyncOp::NONE || fbQueueInFlight) return;
+  if (!g_tsReplayOpen && g_tsPagesOnFs == 0U) return;   // nic do wysłania — bez skanu katalogu
+  if (millis() < g_tsNextReplayAttemptMs) return;
+  if (!fbAsyncEnsureReady()) return;
+
+  if (!g_tsReplayOpen) {
+    uint32_t bad = 0;
+    const bool opened = tspool::replayOpenOldest(g_tsReplay, bad);
+    g_tsBadPagesRemoved += bad;
+    tspool::spoolFsStats(g_tsPagesOnFs, g_tsBytesOnFs);
+    if (!opened) return;
+    g_tsReplayOpen = true;
+  }
+
+  const uint32_t corruptBefore = g_tsReplay.corruptSkipped;
+  uint32_t taken = 0;
+  const int code = tspool::replayBuildBatch(g_tsReplay, g_tsJson, tspool::JSON_BUFFER_BYTES, taken);
+  const uint32_t corruptDelta = g_tsReplay.corruptSkipped - corruptBefore;
+  g_tsCorruptRecords += corruptDelta;
+  if (code == 0) { tsFinishReplayPage(); return; }
+  if (code < 0) {
+    g_tsReplayFailures++;
+    g_tsNextReplayAttemptMs = millis() + 5000UL;
+    logPrintf("lvl=WARN tag=TSPOOL akcja=replay_build_fail page=%010llu cursor=%u\n",
+              (unsigned long long)g_tsReplay.pageSeq, (unsigned)g_tsReplay.cursor);
+    return;
+  }
+  if (code == 2) {                                  // same uszkodzone rekordy — bez sieci
+    tspool::replayAck(g_tsReplay, taken);
+    if (g_tsReplay.cursor >= g_tsReplay.recordCount) tsFinishReplayPage();
+    return;
+  }
+
+  g_tsPendingTaken = taken;
+  g_tsPendingSent = taken - corruptDelta;
+  g_fbTelemResult = AsyncResult{};
+  object_t payload(g_tsJson);
+  fbDatabase.update<object_t>(fbAsyncClient, "/aquarium/telemetry/v1", payload, g_fbTelemResult);
+  g_fbAsyncOp = FbAsyncOp::SET_TELEMETRY;
+  g_fbAsyncOpStartedMs = millis();
+  g_fbAsyncOpTimeoutMs = FB_ASYNC_SEND_TIMEOUT_MS;
+  g_fbAsyncResultHandled = false;
+  logPrintfNoFile("lvl=INFO tag=FB-ASYNC op=TELEM_SET state=START page=%010llu cursor=%u taken=%u\n",
+                  (unsigned long long)g_tsReplay.pageSeq, (unsigned)g_tsReplay.cursor, (unsigned)taken);
+}
+
+static void fbAsyncHandleTelemetryResult() {
+  AsyncResult &r = g_fbTelemResult;
+  if (r.isError()) { fbAsyncFail("TELEM_ERROR"); return; }   // kursor bez zmian → ponowienie
+  if (!r.isResult() || r.isEvent() || r.isDebug()) return;
+  fbClientLastUse = millis();
+  NET_SUCCESS(_fbFailStreak);
+  tspool::replayAck(g_tsReplay, g_tsPendingTaken);
+  g_tsReplayedRecords += g_tsPendingSent;
+  g_tsNextReplayAttemptMs = 0;
+  logPrintfNoFile("lvl=INFO tag=FB-ASYNC op=TELEM_SET state=DONE sent=%u cursor=%u/%u\n",
+                  (unsigned)g_tsPendingSent, (unsigned)g_tsReplay.cursor, (unsigned)g_tsReplay.recordCount);
+  g_fbAsyncCompletedCount++;
+  fbAsyncResetOperation();
+  if (g_tsReplay.cursor >= g_tsReplay.recordCount) tsFinishReplayPage();
+}
+
 static void fbAsyncProcessResult() {
   if (g_fbAsyncOp == FbAsyncOp::NONE) return;
   if (g_fbAsyncOpTimeoutMs && millis() - g_fbAsyncOpStartedMs > g_fbAsyncOpTimeoutMs) {
@@ -7368,6 +7613,7 @@ static void fbAsyncProcessResult() {
     case FbAsyncOp::GET_CONFIG: fbAsyncHandleConfigResult(); break;
     case FbAsyncOp::DELETE_COMMAND: fbAsyncHandleDeleteResult(); break;
     case FbAsyncOp::SET_STATUS: fbAsyncHandleStatusResult(); break;
+    case FbAsyncOp::SET_TELEMETRY: fbAsyncHandleTelemetryResult(); break;
     default: break;
   }
 }
@@ -7667,6 +7913,8 @@ static void fbAsyncSchedulerStep() {
     fbAsyncStartStatusSet();
     return;
   }
+  // [4.2.0 SPOOL] replay telemetrii — najniższy priorytet, po status/cmd/cfg
+  fbAsyncStartTelemetryReplay();
 }
 
 void tgTaskFn(void* /*pvParams*/) {
@@ -7964,6 +8212,8 @@ void tgTaskFn(void* /*pvParams*/) {
       saveEnergyStats();
       esp_task_wdt_reset();      // [v101] FIX-4: reset po całości bloku
     }
+    // [4.2.0 SPOOL] TelemetryRing → strona na LittleFS (offline/backlog) + utrzymanie FS
+    tsSpillTick();
 
     // ── [FIX race-audit 2026-08-13] Single-writer dla akumulatorów energii ──
     // logDailySummary() (Core 1/loop()) tylko wykrywa zmianę dnia i ustawia flagę;
@@ -9468,6 +9718,7 @@ void setup() {
     logPrintln("lvl=INFO tag=DIR msg=\"LittleFS OK, dane zachowane\"");
     littlefsReady = true;
   }
+  tsBoot();   // [4.2.0 SPOOL] TelemetryRing + sessionNonce + sprzątanie *.part
   if (littlefsReady) {
     // [v152] FIX-FS-CAPACITY: odczytaj PRAWDZIWY rozmiar wolumenu zamiast polegać
     // na zaszytej na sztywno wartości 10420224 B (błędnej od v113 - zmiana partycji coredump o 65536 B).
@@ -10785,6 +11036,32 @@ webserialServer.on("/api/history/clear", HTTP_POST, [](AsyncWebServerRequest *re
 });  // [OK] FIX: brakujące zamknięcie handlera /api/history/clear
 
 // ═══════════════════════════════════════════════════════════
+//  API: /api/telemetry/status - stan Spool V2 / TelemetryRing (Etap 3, diagnostyka)
+//  Czyta tylko liczniki RAM i cache FS (bez I/O na async_tcp).
+// ═══════════════════════════════════════════════════════════
+webserialServer.on("/api/telemetry/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+  char buf[720];
+  snprintf(buf, sizeof(buf),
+    "{\"ready\":%s,\"sessionNonce\":\"%08lX%08lX\","
+    "\"ring\":{\"size\":%u,\"capacity\":%u,\"bytes\":%u},"
+    "\"counters\":{\"produced\":%lu,\"dropped\":%lu,\"spilledRecords\":%lu,\"pagesCreated\":%lu,"
+    "\"spillFailures\":%lu,\"replayedRecords\":%lu,\"pagesDeleted\":%lu,\"replayFailures\":%lu,"
+    "\"corruptRecords\":%lu,\"badPagesRemoved\":%lu,\"quotaDrops\":%lu,\"partDiscarded\":%lu},"
+    "\"fs\":{\"pages\":%lu,\"bytes\":%lu,\"replayOpen\":%s},"
+    "\"psramFree\":%lu}",
+    g_tsReady ? "true" : "false",
+    (unsigned long)(g_tsSessionNonce >> 32), (unsigned long)(g_tsSessionNonce & 0xFFFFFFFFUL),
+    (unsigned)g_tsRing.size(), (unsigned)g_tsRing.capacity(), (unsigned)g_tsRing.bytes(),
+    (unsigned long)g_tsProduced, (unsigned long)g_tsDropped, (unsigned long)g_tsSpilledRecords,
+    (unsigned long)g_tsPagesCreated, (unsigned long)g_tsSpillFailures, (unsigned long)g_tsReplayedRecords,
+    (unsigned long)g_tsPagesDeleted, (unsigned long)g_tsReplayFailures, (unsigned long)g_tsCorruptRecords,
+    (unsigned long)g_tsBadPagesRemoved, (unsigned long)g_tsQuotaDrops, (unsigned long)g_tsPartDiscarded,
+    (unsigned long)g_tsPagesOnFs, (unsigned long)g_tsBytesOnFs, g_tsReplayOpen ? "true" : "false",
+    (unsigned long)ESP.getFreePsram());
+  request->send(200, "application/json", buf);
+});
+
+// ═══════════════════════════════════════════════════════════
 //  API: /api/fs-list - lista plików LittleFS z rozmiarami
 // ═══════════════════════════════════════════════════════════
 webserialServer.on("/api/fs-list", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -11911,6 +12188,7 @@ void saveHistoryPoint() {
   _minLuxWasActive = minLuxModeActive;
   // Aktualizuj szczytową moc dziś
   if (totalPowerW > peakPowerWToday) peakPowerWToday = totalPowerW;
+  tsProduceFromHistory(pwmPct, totalPowerW);   // [4.2.0 SPOOL] próbka do TelemetryRing (Etap 3)
 
   // ── Wykres godzinowy mocy: akumuluj Wh w bieżącej godzinie ──
   {

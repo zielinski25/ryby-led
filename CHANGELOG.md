@@ -8,6 +8,40 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.2.0+build.264] SPOOL — 2026-10-10
+
+- Co: Etap 3 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`, szczegóły w
+  `docs/03_ETAP3_SPOOL_V2.md`): **trwała telemetria akwarium** w stylu Centrali.
+  - `TelemetryRing` — bufor SPSC w PSRAM (288 próbek × 48 B = 13,8 KB), próbka
+    co 5 min (ten sam cykl co wpis historii CSV).
+  - **Persistent Spool V2** na LittleFS (`/spool/pNNNNNNNNNN.spl`): nagłówek 64 B,
+    rekordy 48 B próbki + CRC32, stopka 64 B = commit. Strona przed publikacją
+    jest weryfikowana (CRC nagłówka, stopki, payloadu i każdego rekordu).
+  - `sessionNonce` (losowany przy każdym starcie) — klucze RTDB
+    `<nonce>_<sampleSeq>`, więc ponowne wysłanie batcha jest bezpieczne.
+  - Replay FIFO: `PATCH /aquarium/telemetry/v1`, max 12 rekordów na żądanie,
+    jako operacja asynchroniczna w schedulerze Firebase (najniższy priorytet).
+  - Nowy endpoint diagnostyczny `GET /api/telemetry/status` (ring, liczniki,
+    strony na FS, sessionNonce, wolny PSRAM).
+  - Spill do FS: gdy offline ≥ 60 s albo ring ≥ 6 próbek (30 min); polityka
+    wolnego miejsca: najpierw kasowanie najstarszych stron (< 64 KB wolnego lub > 240 stron).
+  - Przy starcie: usuwane osierocone `*.part` (przerwany zapis przy zaniku zasilania).
+- Testy: `firmware/tests/host/run_tests.sh` — 200 testów logiki Spool V2 (ASan + UBSan)
+  oraz kompilacja bloku integracyjnego z `Ryby_LED_fi_S3.cpp`. Test na płytce (zanik
+  zasilania w trakcie wysyłki) — procedura w `docs/03`, do wykonania przed release.
+- Dlaczego: dane akwarium (temperatury, lux, PWM, moc) mają przeżywać restart i brak
+  sieci; po zaniku zasilania odtwarzane są strony zapisane na FS, a uszkodzone
+  rekordy są odrzucane zamiast wysyłane.
+- Logika sterowania: NIETKNIĘTA (Ramp Arbiter, MIN LUX, PWM, Core 1). Zmiany tylko
+  w `saveHistoryPoint()` (producent), `tgTaskFn` (spill), schedulerze FB (replay).
+- Ograniczenia: próbki zalegające w RAM (≤ 30 min) przepadają przy zaniku zasilania —
+  zapisane strony już nie. `/api/history/long` i kanały wykresów tygodniowych — w kolejnym
+  kroku Etapu 3. Retencja węzłów `/aquarium/telemetry` w RTDB — do ustalenia.
+- Kolejność wdrożenia: najpierw flash **4.1.1** (sekrety, zbudowany i sprawdzony),
+  dopiero potem **4.2.0** po teście na płytce.
+
+---
+
 ## [4.1.1+build.263] SECRETS — 2026-10-09
 
 - Co: Etap 2 planu upgrade (część 1): sekrety poza kodem. `FIREBASE_HOST`,
