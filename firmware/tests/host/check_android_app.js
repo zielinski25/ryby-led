@@ -115,6 +115,28 @@ for (const f of [
 }
 check(/MainActivity/.test(MANIFEST) && /android:name="\.MainActivity"/.test(MANIFEST), "manifest wskazuje .MainActivity");
 
+// ───── 6b) importy: każdy użyty symbol Compose/Kotlin musi być zaimportowany (błędy z Android Studio) ─────
+const IMPORT_OF = {
+  rememberSaveable: "androidx.compose.runtime.saveable.rememberSaveable",
+  mutableIntStateOf: "androidx.compose.runtime.mutableIntStateOf",
+  mutableStateOf: "androidx.compose.runtime.mutableStateOf",
+  remember: "androidx.compose.runtime.remember",
+  LaunchedEffect: "androidx.compose.runtime.LaunchedEffect",
+  rememberScrollState: "androidx.compose.foundation.rememberScrollState",
+  verticalScroll: "androidx.compose.foundation.verticalScroll",
+  PasswordVisualTransformation: "androidx.compose.ui.text.input.PasswordVisualTransformation",
+  viewModel: "androidx.lifecycle.viewmodel.compose.viewModel",
+  roundToInt: "kotlin.math.roundToInt",
+};
+const uiCode = UI.replace(/^import .*$/gm, "");
+for (const [sym, imp] of Object.entries(IMPORT_OF)) {
+  if (new RegExp("\\b" + sym + "\\b").test(uiCode)) {
+    check(UI.includes("import " + imp + "\n"), "App.kt importuje " + sym);
+  }
+}
+check([LOGIC, STATUS, RTDB, VM, UI, PREFS].every((t) =>
+  (t.match(/\{/g) || []).length === (t.match(/\}/g) || []).length), "klamry {} zbalansowane we wszystkich plikach Kotlin");
+
 // ───── 7) nawigacja: 5 zakładek jak w HTML ─────
 const tabs = (UI.match(/TAB_LABELS = listOf\(([\s\S]*?)\)/) || [])[1] || "";
 check([...tabs.matchAll(/"([^"]+)"/g)].length === 5, "5 zakładek: Główna, Światło, Pompa, Energia, Ustawienia");
