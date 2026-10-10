@@ -8,6 +8,20 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.7.0+build.269] ASTRO — 2026-10-10
+
+- Co: Etap 6 planu upgrade, pkt 1 — **moduł efemeryd słonecznych** (`firmware/src/astro.h/.cpp`):
+  wschód, zachód, świt i zmierzch cywilny z równań NOAA dla dowolnej szerokości/długości,
+  offline, bez API. Dokładność ~1 min względem biblioteki `astral` w testach.
+  **Moduł NIE jest podłączony** do harmonogramu ani do rampy (Ramp Arbiter i MIN LUX nietknięte).
+  Podłączenie to osobna decyzja — `docs/06`, sekcja 4.
+- Testy: `test_astro.cpp` (ASan+UBSan, 141 asercji): 18 par data×miejsce (Kraków, Warszawa,
+  Gdańsk, Tromsø, Sydney) z tolerancją 2 min, kolejność zdarzeń, długość dnia, tzMin,
+  polarny dzień/noc (Tromsø), walidacja wejścia. Generator wartości: `astro_ref_gen.py`.
+- Wersja: 4.7.0+build.269.
+
+---
+
 ## [4.6.0+build.268] MENU-GROUP — 2026-10-10
 
 - Co: Etap 5 planu upgrade, pkt 2 — **pogrupowane menu Telegrama** (`docs/04`, sekcja 3).

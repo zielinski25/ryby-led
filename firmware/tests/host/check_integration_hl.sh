@@ -36,7 +36,7 @@ needles = [
   'webserialServer.on(AsyncURIMatcher::exact("/api/history"), HTTP_GET',
   'webserialServer.on(AsyncURIMatcher::exact("/api/history/clear"), HTTP_POST',
   '#include "histlong.h"',
-  '"v4.6.0+build.268"',
+  '#define RYBY_FW_VERSION "v',
 ]
 for n in needles:
     assert n in ryby, "brak wpięcia: " + n

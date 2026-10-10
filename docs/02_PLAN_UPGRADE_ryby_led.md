@@ -13,7 +13,7 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 | 3. Spool V2 + telemetria | 🟡 KOD + TESTY HOSTOWE GOTOWE | 4.2.0 / 4.5.0 | ring PSRAM + Spool V2 (CRC, commit) + sessionNonce + replay FIFO + `/api/telemetry/status`; 200 testów hostowych OK; DoD na płytce (zanik zasilania w trakcie wysyłki) do wykonania — procedura: `docs/03_ETAP3_SPOOL_V2.md`; **historia długa `/api/history/long` + wykres tygodniowy w panelu: 4.5.0** (KOD + testy hostowe, DoD na płytce: `docs/05`, sekcja 7) |
 | 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | 🟡 | 4.3.0+build.265 | KOD GOTOWY: CORS-PNA + OPTIONS, panel v14 (LAN/zdalnie, OTA, skan Wi-Fi). Test z telefonu na LTE do wykonania w domu |
 | 5. Log krytyczny + Telegram | 🟡 | 4.4.0+build.266, menu 4.6.0+build.268 | KOD GOTOWY: critlog (+testy), /log_krytyczny, menu pogrupowane (sekcje + 1 klik do raportu), karta w panelu. Test na płytce wg `docs/04`, sekcja 6 |
-| 6. Astronomia + RTC | ⬜ | — | |
+| 6. Astronomia + RTC | 🟡 | 4.7.0+build.269 | moduł `astro` (NOAA) gotowy i przetestowany hostowo (141 asercji), NIE podłączony do harmonogramu; RTC DS3231 — decyzja właściciela; karta „Dzień” w panelu do zrobienia. Szczegóły: `docs/06` |
 | 7. Panel LVGL | ⬜ opcjonalny | — | |
 
 ### ⚠️ PILNE (poza kolejnością) — sekrety w publicznym zipie
