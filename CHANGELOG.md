@@ -31,6 +31,11 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
   wymaga osobnej decyzji (przepisanie historii `main`), a rotacja i tak jest konieczna.
 - **Nie zrobione (wymagają decyzji i testu na płytce):** weryfikacja TLS (`setInsecure()` dla Firebase
   i Telegrama) oraz migracja LegacyToken → UserAuth z regułami per urządzenie. Patrz `docs/02`, Etap 2.
+- **Panel v14 — komendy zdalne (Etap 4, tryb zdalny):** panel wysyłał komendy na legacy
+  `/aquarium/cmd.json`, którego firmware już nie czyta (v246: tylko kolejka `/aquarium/commands`).
+  Zdalne sterowanie z LTE nie działało. Naprawiono: `sendFireCmd` robi `POST` na `/aquarium/commands.json`
+  z `{cmd, token, ts}`. Plik panelu nie jest wgrywany do ESP, więc wersja firmware się nie zmienia.
+  Test: `firmware/tests/host/check_panel_cmd.js` (23 asercje; wykrywa stary panel).
 - Wersja: 4.7.1+build.271.
 
 ---

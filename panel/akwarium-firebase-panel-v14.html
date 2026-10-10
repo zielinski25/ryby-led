@@ -1045,13 +1045,22 @@ async function fbPatch(path, data){
   if(!r.ok) throw new Error("HTTP "+r.status);
   return r.json();
 }
+async function fbPost(path, data){
+  var r = await fetch(DB_URL+path+"?auth="+DB_SECRET, {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
 
 // ── SEND COMMAND ─────────────────────────────────────
+// Firmware czyta WYŁĄCZNIE kolejkę /aquarium/commands (v246); legacy /aquarium/cmd jest
+// ignorowany. POST = push z kluczem czasowym, a firmware sprawdza ts (rosnący) i token.
 var _cmdTs = 0;
 async function sendFireCmd(cmd){
   try {
     _cmdTs = Date.now();
-    await fbPatch("/aquarium/cmd.json", {
+    await fbPost("/aquarium/commands.json", {
       cmd: cmd, token: CMD_TOKEN, ts: _cmdTs
     });
     toast("✅ Wysłano: "+cmd, "ok");
