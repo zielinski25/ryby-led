@@ -11,7 +11,7 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 | 1. OTA GitHub + release'y | ✅ KOD ZBUDOWANY + RELEASE v4.1.0 OPUBLIKOWANY | 4.1.0 | commity `cb16f00` + `037cd7a` (FIX-ORDER); build po stronie użytkownika OK, release v4.1.0 z `firmware.bin`+`.elf` publiczny; czeka: flash USB w domu + test OTA |
 | 2. Bezpieczeństwo Firebase | 🟡 W TOKU (część 1/2 gotowa) | 4.1.1 | sekrety przeniesione do `src/secrets.h` (poza repo, `.gitignore`); do zrobienia po stronie użytkownika: nowy Database Secret w Firebase Console → wpisać do `secrets.h` → build → flash → **odwołanie starego sekretu**; potem zmiana CMD_TOKEN + hasła espota; część 2 (NVS+UserAuth) później |
 | 3. Spool V2 + telemetria | 🟡 KOD + TESTY HOSTOWE GOTOWE | 4.2.0 | ring PSRAM + Spool V2 (CRC, commit) + sessionNonce + replay FIFO + `/api/telemetry/status`; 200 testów hostowych OK; DoD na płytce (zanik zasilania w trakcie wysyłki) do wykonania — procedura: `docs/03_ETAP3_SPOOL_V2.md`; brak jeszcze `/api/history/long` i panelu |
-| 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | ⬜ | — | CORS bazowy już jest (DefaultHeaders `*`); brakuje `Allow-Private-Network` i OPTIONS |
+| 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | 🟡 | 4.3.0+build.265 | KOD GOTOWY: CORS-PNA + OPTIONS, panel v14 (LAN/zdalnie, OTA, skan Wi-Fi). Test z telefonu na LTE do wykonania w domu |
 | 5. Log krytyczny + Telegram | ⬜ | — | |
 | 6. Astronomia + RTC | ⬜ | — | |
 | 7. Panel LVGL | ⬜ opcjonalny | — | |
@@ -57,7 +57,7 @@ o strukturze Centrali; wersje przestają się rozjeżdżać.
      src/NetDiag.h
      src/log_printf_wrap.c
      scripts/build_gate.ps1        (z Etapu 1)
-   panel/                          (panel v15 / zdalny — patrz Etap 4)
+   panel/                          (akwarium-firebase-panel-v14.html — patrz Etap 4)
    docs/                           (ten dokument + plany PLAN_*.md z src/)
    CHANGELOG.md
    README.md

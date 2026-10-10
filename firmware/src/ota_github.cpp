@@ -312,8 +312,11 @@ void otaGithubRegisterEndpoints() {
 
   // POST /api/ota-start[?force=1] — start aktualizacji (task na Core 0).
   webserialServer.on("/api/ota-start", HTTP_POST, [](AsyncWebServerRequest *request) {
-    bool force = request->hasParam("force", true) &&
-                 request->getParam("force", true)->value() == "1";
+    // [4.3.0] force z query (?force=1 — panel) albo z formularza POST (body).
+    bool force = (request->hasParam("force") &&
+                  request->getParam("force")->value() == "1") ||
+                 (request->hasParam("force", true) &&
+                  request->getParam("force", true)->value() == "1");
     String err;
     bool ok = otaGithubRequest(force, err);
     if (ok) {

@@ -8,6 +8,25 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.3.0+build.265] PANEL-CORS — 2026-10-10
+
+- Co: Etap 4 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`): panel WWW obsługuje
+  tryb LAN i zdalny.
+  - **Firmware (CORS/PNA):** nagłówek `Access-Control-Allow-Private-Network: true`,
+    `Access-Control-Max-Age: 600`, a preflight `OPTIONS` dla dowolnej ścieżki API zwraca 204
+    (`webserialServer.onNotFound`). Wzór: Centrala Pieca v3.32.1/v3.32.2.
+  - **Firmware (OTA):** `/api/ota-start` akceptuje `force=1` w query (`?force=1`) albo w body.
+  - **Panel → `panel/akwarium-firebase-panel-v14.html`:**
+    - badge trybu połączenia w nagłówku (LAN ✓ / ZDALNIE (Firebase));
+    - karta „Aktualizacja firmware (OTA)”: lokalnie `POST /api/ota-start`, zdalnie komenda
+      `update` przez Firebase;
+    - karta „Skan sieci Wi-Fi” (tylko LAN);
+    - sekrety (`DB_SECRET`, `CMD_TOKEN`) z `localStorage`, nie z pliku.
+- Testy: firmware: fragment CORS/OPTIONS sprawdzony `-fsyntax-only` z atrapami
+  ESPAsyncWebServer. Panel: `node --check` + testy jsdom (9 testów: tryby LAN/zdalnie,
+  OTA, skan, escapowanie HTML). **Nie testowano** na ESP ani z telefonu na LTE.
+- Bez zmian: sterowanie i odczyt nadal przez Firebase. Logika Ramp/MIN LUX nietknięta.
+
 ## [4.2.0+build.264] SPOOL — 2026-10-10
 
 - Co: Etap 3 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`, szczegóły w

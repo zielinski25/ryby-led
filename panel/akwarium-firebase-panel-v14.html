@@ -271,6 +271,7 @@ input[type="time"].cfg-input{color-scheme:dark}
   </div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
     <div id="sh-wifi" class="sys-badge ok"><div class="sbdot" style="background:#4ade80"></div>WiFi ESP</div>
+    <div id="conn-mode" class="sys-badge">—</div>
     <div id="sh-ntp" class="sys-badge ok"><div class="sbdot" style="background:#4ade80"></div>NTP</div>
     <div id="sh-mode" class="sys-badge blue">AUTO</div>
     <div class="sys-badge" style="background:rgba(255,140,0,.12);border-color:rgba(255,140,0,.3);color:#ffb347">☁ Firebase</div>
@@ -829,6 +830,44 @@ input[type="time"].cfg-input{color-scheme:dark}
         <button class="save-btn" onclick="luxSimSaveAuto()" style="margin-top:0">💾 Zapisz parametry AUTO</button>
       </div>
     </div>
+  <!-- [v14] AKTUALIZACJA FIRMWARE (GitHub Releases) -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-power">⬆</div>Aktualizacja firmware (OTA)</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="row" style="padding-top:0">
+        <div><div class="row-label">Wersja na ESP</div><div class="row-desc" id="ota-ver">—</div></div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Status</div><div class="row-desc" id="ota-state">—</div></div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Postęp</div><div class="row-desc" id="ota-prog">—</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 0">
+        <button class="save-btn" style="margin-top:0" onclick="otaStart(false)">⬆ Sprawdź i zainstaluj</button>
+        <button class="save-btn" style="margin-top:0;background:var(--navy)" onclick="otaStart(true)">↻ Wymuś reinstalację (LAN)</button>
+      </div>
+      <div class="row-desc" style="font-size:.7rem">Poza siecią domową komenda idzie przez Firebase (ESP sam pobiera release z GitHuba). Wymuszenie działa tylko w LAN.</div>
+    </div>
+  </div>
+
+  <!-- [v14] SKAN SIECI WI-FI (tylko LAN) -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-power">📶</div>Skan sieci Wi-Fi</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0 8px">
+        <button class="save-btn" style="margin-top:0" onclick="wifiScanStart()">📡 Skanuj sieci</button>
+        <span class="row-desc" id="wifi-scan-state"></span>
+      </div>
+      <div id="wifi-scan-list" style="font-size:.78rem"></div>
+    </div>
+  </div>
   </div>
 
 <!-- ═══ PAGE: TERMINAL ═══ -->
@@ -1250,7 +1289,9 @@ async function loadStatus(){
     gid("sh-wifi").className = "sys-badge ok";
     var bm=gid("sh-mode"); if(bm){ bm.textContent=mode; bm.style.color=mode==="AUTO"?"var(--cyan)":"var(--warm)"; }
     if(d.localIp){
+      var _ipChanged = (_localIp !== d.localIp);
       _localIp = d.localIp;
+      if(_ipChanged || _espLan === null){ espProbeLan().then(otaRefresh); }
       var ip=d.localIp, base="http://"+ip+":8080";
       gid("sh-ip").textContent=ip;
       ["local-link","local-link-terminal","local-link-wykresy","local-link-logi"].forEach(function(id){
@@ -1973,10 +2014,109 @@ function luxSimSaveAuto(){
     .catch(function(e){ toast("❌ "+e.message,"err"); });
 }
 
+// ── [v14] TRYB POŁĄCZENIA: LAN (bezpośrednio do ESP) vs ZDALNIE (Firebase) ──
+// Sterowanie i odczyt zawsze idą przez Firebase (działa zdalnie). Lokalne endpointy
+// ESP (OTA, skan Wi-Fi) wymagają LAN. Uwaga: panel otwarty z HTTPS (np. GitHub Pages)
+// nie połączy się z http://<IP-ESP> (mixed content) — wtedy działa tryb zdalny.
+var _espLan = null;   // null = nieznane, true = LAN działa, false = tylko zdalnie
+async function espLocalFetch(path, opts, timeoutMs){
+  var base = espLocalBase();
+  if(!base) throw new Error("brak IP ESP (status z Firebase)");
+  var ctrl = new AbortController();
+  var tm = setTimeout(function(){ ctrl.abort(); }, timeoutMs || 4000);
+  try {
+    var o = Object.assign({ signal: ctrl.signal, cache: "no-store" }, opts || {});
+    var r = await fetch(base + path, o);
+    if(!r.ok){
+      var msg = "HTTP " + r.status;
+      try { var j = await r.json(); if(j && j.error) msg = j.error; } catch(e){}
+      throw new Error(msg);
+    }
+    return await r.json();
+  } finally { clearTimeout(tm); }
+}
+async function espProbeLan(){
+  if(!espLocalBase()){ _espLan = false; renderConnMode(); return false; }
+  try { await espLocalFetch("/api/ota-status", {}, 2500); _espLan = true; }
+  catch(e){ _espLan = false; }
+  renderConnMode();
+  return _espLan;
+}
+function renderConnMode(){
+  var el = gid("conn-mode"); if(!el) return;
+  if(_espLan === true){ el.textContent = "LAN ✓"; el.className = "sys-badge ok"; }
+  else if(_espLan === false){ el.textContent = "ZDALNIE (Firebase)"; el.className = "sys-badge warn"; }
+  else { el.textContent = "—"; el.className = "sys-badge"; }
+}
+
+// ── [v14] OTA (GitHub Releases) ─────────────────────
+var _otaPoll = null;
+function otaRender(st){
+  gid("ota-ver").textContent = st.current || "—";
+  var state = st.running ? "w toku" : (st.last_ok === true ? "OK" : (st.last_error ? "błąd: " + st.last_error : "—"));
+  gid("ota-state").textContent = state + (st.last_tag ? " · tag " + st.last_tag : "");
+  gid("ota-prog").textContent = st.running ? (st.progress + "%") : "—";
+  return !!st.running;
+}
+async function otaRefresh(){
+  if(!(await espProbeLan())){ gid("ota-state").textContent = "tylko w sieci lokalnej"; return false; }
+  try { return otaRender(await espLocalFetch("/api/ota-status", {}, 3000)); }
+  catch(e){ gid("ota-state").textContent = "błąd odczytu: " + e.message; return false; }
+}
+async function otaStart(force){
+  if(!(await espProbeLan())){
+    if(force){ toast("Wymuszenie działa tylko w sieci lokalnej", "warn"); return; }
+    await sendFireCmd("update");   // ESP: komenda "update" → otaGithubRequest(false)
+    return;
+  }
+  try {
+    await espLocalFetch("/api/ota-start" + (force ? "?force=1" : ""), { method: "POST" }, 5000);
+    toast("⬆ OTA uruchomione (LAN)", "ok");
+  } catch(e){ toast("❌ OTA: " + e.message, "err"); return; }
+  clearInterval(_otaPoll);
+  _otaPoll = setInterval(async function(){
+    var running = await otaRefresh();
+    if(!running){ clearInterval(_otaPoll); _otaPoll = null; }
+  }, 2000);
+  setTimeout(function(){ if(_otaPoll){ clearInterval(_otaPoll); _otaPoll = null; } }, 300000);
+}
+
+// ── [v14] SKAN SIECI WI-FI (LAN) ────────────────────
+function escHtml(t){ return String(t).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+var _scanPoll = null;
+function renderScan(nets){
+  var box = gid("wifi-scan-list"); if(!box) return;
+  if(!nets.length){ box.innerHTML = "<div class=\"row-desc\">Brak sieci w zasięgu</div>"; return; }
+  nets.sort(function(a,b){ return b.rssi - a.rssi; });
+  box.innerHTML = nets.map(function(n){
+    return "<div class=\"row\"><div><div class=\"row-label\">" + escHtml(n.ssid || "(ukryta)") + "</div>" +
+      "<div class=\"row-desc\">" + n.rssi + " dBm" + (n.known ? " · zapisana" : "") + "</div></div></div>";
+  }).join("");
+}
+async function wifiScanStart(){
+  if(!(await espProbeLan())){ _warnLocalOnly("Skan sieci Wi-Fi"); return; }
+  try {
+    await espLocalFetch("/api/wifi/scan/start", { method: "POST" }, 4000);
+  } catch(e){ toast("❌ Skan: " + e.message, "err"); return; }
+  gid("wifi-scan-state").textContent = "skanowanie…";
+  clearInterval(_scanPoll);
+  var tries = 0;
+  _scanPoll = setInterval(async function(){
+    tries++;
+    try {
+      var r = await espLocalFetch("/api/wifi/scan/result", {}, 3000);
+      if(r.status === "done"){ clearInterval(_scanPoll); gid("wifi-scan-state").textContent = "gotowe"; renderScan(r.networks || []); }
+      else if(r.status === "idle"){ clearInterval(_scanPoll); gid("wifi-scan-state").textContent = "brak wyniku"; }
+    } catch(e){}
+    if(tries > 20){ clearInterval(_scanPoll); gid("wifi-scan-state").textContent = "timeout"; }
+  }, 1000);
+}
+
 // ── INIT ────────────────────────────────────────────
 window.addEventListener("load", function(){
   loadStatus();
   setInterval(loadStatus, 10000);
+  setInterval(espProbeLan, 30000);
 });
 </script>
 </body>

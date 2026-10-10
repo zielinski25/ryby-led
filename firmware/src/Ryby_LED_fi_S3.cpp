@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.2.0+build.264"
+#define RYBY_FW_VERSION "v4.3.0+build.265"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -11543,10 +11543,24 @@ otaGithubRegisterEndpoints();
 
 
 
-    // CORS - pozwala narzędziu migracji łączyć się z panelem z lokalnego pliku HTML
+    // [4.3.0 CORS-PNA] Etap 4: panel WWW otwarty z innego originu (plik HTML na telefonie,
+    // inny host) musi czytać endpointy LAN. Chrome/Edge (Private Network Access) wysyła
+    // preflight OPTIONS z Access-Control-Request-Private-Network — stąd nagłówek PNA
+    // i odpowiedź 204 na OPTIONS poniżej. Wzór: Centrala Pieca v3.32.1/v3.32.2.
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin",  "*");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Private-Network", "true");
+    DefaultHeaders::Instance().addHeader("Access-Control-Max-Age", "600");
+    // Preflight OPTIONS dla dowolnej ścieżki API (route pasuje po ścieżce, nie po metodzie,
+    // więc OPTIONS trafia tu). Pozostałe nieznane ścieżki: 404 jak dotąd.
+    webserialServer.onNotFound([](AsyncWebServerRequest *request) {
+      if (request->method() == HTTP_OPTIONS) {
+        request->send(204);
+        return;
+      }
+      request->send(404, "text/plain", "Not found");
+    });
     // [v93] FIX-WDT-LIBRARY: mathieucarbou/AsyncTCP obsługuje locking wewnętrznie.
     // Prosty begin() bez żadnego wrappera. esp_task_wdt_reset() zachowane defensywnie.
     esp_task_wdt_reset();
