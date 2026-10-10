@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.8"
+        android:scaleY="0.8"
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- bąbelki -->
+        <path
+            android:fillColor="#7DD3FC"
+            android:pathData="M30,30m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0" />
+        <path
+            android:fillColor="#7DD3FC"
+            android:pathData="M23,22m-2,0a2,2 0 1,0 4,0a2,2 0 1,0 -4,0" />
+        <!-- ciało ryby -->
+        <path
+            android:fillColor="#38BDF8"
+            android:pathData="M24,54 C24,41 39,36 53,36 C67,36 80,43 84,54 C80,65 67,72 53,72 C39,72 24,67 24,54 Z" />
+        <!-- ogon -->
+        <path
+            android:fillColor="#38BDF8"
+            android:pathData="M81,54 L98,40 Q94,54 98,68 Z" />
+        <!-- oko -->
+        <path
+            android:fillColor="#09131B"
+            android:pathData="M40,54m-4.5,0a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0" />
+    </group>
+</vector>

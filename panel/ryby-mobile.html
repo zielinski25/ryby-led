@@ -1,0 +1,872 @@
+<!doctype html>
+<!-- Ryby LED — aplikacja na telefon (jeden plik, jak Piec). Zdalnie przez Firebase. 4.7.2+build.272.
+     Sekrety tylko w localStorage tej przeglądarki (akw_db_secret, akw_cmd_token). Nic nie jest w kodzie. -->
+
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1a24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ryby LED">
+<meta name="description" content="Ryby LED — zdalne sterowanie i podgląd akwarium przez Firebase">
+<title>Ryby LED</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMCIgZmlsbD0iIzBiMWEyNCIvPgogIDxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTUwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMGQ0ZjUiIHN0cm9rZS13aWR0aD0iMjIiIG9wYWNpdHk9Ii4zNSIvPgogIDxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iOTIiIGZpbGw9IiMwMGQ0ZjUiLz4KICA8cGF0aCBkPSJNMTQwIDM1MiBRMjU2IDMwMCAzNzIgMzUyIiBmaWxsPSJub25lIiBzdHJva2U9IiMyMmQzYWEiIHN0cm9rZS13aWR0aD0iMTgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K" type="image/svg+xml">
+<style>
+  :root{
+    --bg:#0b1a24; --card:#102632; --card2:#153241; --line:#1e4456;
+    --text:#e6f4f8; --muted:#8fb3c1; --cyan:#00d4f5; --green:#22d3aa;
+    --red:#ff4d6d; --amber:#fbbf24; --violet:#a78bfa;
+    --nav-h:64px; --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;
+    overscroll-behavior-y:contain}
+  body{padding:env(safe-area-inset-top,0px) 0 calc(var(--nav-h) + var(--safe-b) + 16px)}
+  header{position:sticky;top:0;z-index:5;background:rgba(11,26,36,.94);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0;flex:1}
+  .pill{font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line);
+    background:var(--card);color:var(--muted);white-space:nowrap}
+  .pill.online{color:var(--green);border-color:rgba(34,211,170,.4)}
+  .pill.stale{color:var(--amber);border-color:rgba(251,191,36,.4)}
+  .pill.none,.pill.error{color:var(--red);border-color:rgba(255,77,109,.4)}
+  .sub{font-size:12px;color:var(--muted);padding:6px 16px 0}
+  main{padding:12px 12px 0;max-width:560px;margin:0 auto}
+  section.tab{display:none}
+  section.tab.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:700}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .metric .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .metric .l{font-size:12px;color:var(--muted);margin-top:2px}
+  .grid3 .metric .v{font-size:18px;white-space:nowrap}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-size:12px;padding:4px 9px;border-radius:999px;background:var(--card2);color:var(--muted);border:1px solid var(--line)}
+  .chip.on{color:var(--green);border-color:rgba(34,211,170,.45)}
+  .chip.warn{color:var(--amber);border-color:rgba(251,191,36,.45)}
+  .bar{height:8px;background:var(--card2);border-radius:999px;overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));width:0%}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--card2);color:var(--text);
+    font:inherit;font-weight:600;min-height:48px;padding:10px 14px;border-radius:12px;cursor:pointer;width:100%}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:rgba(0,212,245,.14);border-color:rgba(0,212,245,.45);color:var(--cyan)}
+  .btn.good{background:rgba(34,211,170,.14);border-color:rgba(34,211,170,.45);color:var(--green)}
+  .btn.danger{background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.45);color:var(--red)}
+  .btn.active{outline:2px solid var(--cyan);outline-offset:1px}
+  .btn[disabled]{opacity:.5}
+  .row{display:flex;gap:10px;margin-top:10px}
+  .row > .btn{flex:1}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ch{display:grid;grid-template-columns:70px 1fr 64px;align-items:center;gap:10px;margin:10px 0}
+  .ch label{color:var(--muted);font-size:14px}
+  .ch output{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+  input[type=range]{width:100%;accent-color:var(--cyan);height:28px}
+  input[type=text],input[type=password],input[type=url]{
+    width:100%;font:inherit;font-size:16px;padding:12px;border-radius:10px;border:1px solid var(--line);
+    background:var(--card2);color:var(--text);margin-top:4px}
+  .field{margin-bottom:12px}
+  .field label{font-size:13px;color:var(--muted)}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+  .kv:last-child{border-bottom:0}
+  .kv span:first-child{color:var(--muted)}
+  .kv span:last-child{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+  .note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}
+  .hist{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:6px}
+  .hist > div{flex:1;background:linear-gradient(180deg,var(--cyan),rgba(0,212,245,.25));border-radius:4px 4px 0 0;min-height:2px}
+  nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(5,1fr);
+    background:rgba(11,26,36,.97);border-top:1px solid var(--line);padding-bottom:var(--safe-b);height:calc(var(--nav-h) + var(--safe-b))}
+  nav.bottom button{appearance:none;background:none;border:0;color:var(--muted);font:inherit;font-size:11px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:var(--nav-h);cursor:pointer}
+  nav.bottom button .ic{font-size:20px;line-height:1}
+  nav.bottom button.active{color:var(--cyan)}
+  #toast{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h) + var(--safe-b) + 12px);pointer-events:none;
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;
+    transform:translateY(160%);transition:transform .25s ease;z-index:9;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  #toast.show{transform:translateY(0)}
+  #toast.err{border-color:rgba(255,77,109,.6);color:#ffc2cc}
+  @media (min-width:769px){ main{max-width:720px} nav.bottom{max-width:720px;left:50%;right:auto;transform:translateX(-50%);width:720px} }
+  @media (max-width:360px){ .grid3{grid-template-columns:1fr 1fr} .ch{grid-template-columns:56px 1fr 56px} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ryby LED</h1>
+  <span id="conn" class="pill none">BRAK DANYCH</span>
+</header>
+<div class="sub" id="lastInfo">Wpisz sekrety w Ustawieniach, żeby zobaczyć dane.</div>
+
+<main>
+
+  <!-- ───────── GŁÓWNA ───────── -->
+  <section id="tab-home" class="tab active">
+    <div class="card">
+      <h2>Oświetlenie</h2>
+      <div class="seg">
+        <button class="btn good" id="btnOn" data-cmd="power_on">Włącz</button>
+        <button class="btn danger" id="btnOff" data-cmd="power_off">Wyłącz</button>
+      </div>
+      <div class="seg" style="margin-top:8px">
+        <button class="btn" id="btnAuto" data-cmd="mode_auto">Tryb AUTO</button>
+        <button class="btn" id="btnManual" data-cmd="mode_manual">Tryb MANUAL</button>
+      </div>
+      <div class="chips">
+        <span class="chip" id="chWindow">okno oświetlenia: —</span>
+        <span class="chip" id="chMinLux">Min LUX: —</span>
+        <span class="chip" id="chRamp">rampa: —</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Światło</h2>
+      <div class="grid3">
+        <div class="metric"><div class="v" id="pctMain">—</div><div class="l">jasność %</div></div>
+        <div class="metric"><div class="v" id="luxRoom">—</div><div class="l">lux pokój</div></div>
+        <div class="metric"><div class="v" id="luxWater">—</div><div class="l">lux nad wodą</div></div>
+      </div>
+      <div class="bar"><i id="pctBar"></i></div>
+    </div>
+
+    <div class="card">
+      <h2>Temperatury</h2>
+      <div class="grid3">
+        <div class="metric"><div class="v" id="tP1">—</div><div class="l">płytka 1</div></div>
+        <div class="metric"><div class="v" id="tP2">—</div><div class="l">płytka 2</div></div>
+        <div class="metric"><div class="v" id="tW">—</div><div class="l">woda</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Moc</h2>
+      <div class="grid2">
+        <div class="metric"><div class="v" id="powerNow">—</div><div class="l">teraz</div></div>
+        <div class="metric"><div class="v" id="powerLimit">—</div><div class="l">limit</div></div>
+      </div>
+      <div class="bar"><i id="powerBar"></i></div>
+      <div class="note">Szczyt dzisiaj: <b id="peakToday">—</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Sterownik</h2>
+      <div class="kv"><span>Sygnał Wi-Fi</span><span id="rssi">—</span></div>
+      <div class="kv"><span>Czas pracy</span><span id="uptime">—</span></div>
+      <div class="kv"><span>Ostatni zapis ESP</span><span id="lastSeen">—</span></div>
+      <div class="row"><button class="btn danger" id="btnRestart" data-cmd="restart">Restart ESP32</button></div>
+    </div>
+  </section>
+
+  <!-- ───────── ŚWIATŁO ───────── -->
+  <section id="tab-light" class="tab">
+    <div class="card">
+      <h2>Kanały PWM (0–1023)</h2>
+      <div id="pwmRows"></div>
+      <div class="note">Przesuń suwaki i wyślij. Suwaki nadpisują się danymi z ESP, dopóki ich nie ruszysz; „Wczytaj z ESP” przywraca bieżące wartości.</div>
+      <div class="row">
+        <button class="btn" id="btnLoadPwm">Wczytaj z ESP</button>
+        <button class="btn primary" id="btnSendPwm">Wyślij PWM</button>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnSaveAuto">Zapisz jako tryb AUTO</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Szybkie akcje</h2>
+      <div class="seg">
+        <button class="btn primary" data-cmd="led_100">LED 100%</button>
+        <button class="btn" data-cmd="led_off">LED WYŁ</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Harmonogram (tylko odczyt)</h2>
+      <div class="kv"><span>Poranek (dni robocze)</span><span id="sMWD">—</span></div>
+      <div class="kv"><span>Poranek (weekend)</span><span id="sMWE">—</span></div>
+      <div class="kv"><span>Wyłączenie w południe</span><span id="sMid">—</span></div>
+      <div class="kv"><span>Wieczór: start względem zachodu</span><span id="sEvB">—</span></div>
+      <div class="kv"><span>Wieczór: wyłączenie</span><span id="sEvO">—</span></div>
+      <div class="kv"><span>Czas rampy</span><span id="sFade">—</span></div>
+      <div class="kv"><span>Rampa PWM</span><span id="sRamp">—</span></div>
+      <div class="note">Zmiany harmonogramu są w panelu WWW (wymagają zapisu konfiguracji).</div>
+    </div>
+  </section>
+
+  <!-- ───────── POMPA ───────── -->
+  <section id="tab-pump" class="tab">
+    <div class="card">
+      <h2>Pompa</h2>
+      <div class="kv"><span>Stan</span><span id="pumpState">—</span></div>
+      <div class="seg" style="margin-top:10px">
+        <button class="btn good" data-cmd="pump_on">Pompa WŁ</button>
+        <button class="btn danger" data-cmd="pump_off">Pompa WYŁ</button>
+      </div>
+      <div class="note">Ręczne sterowanie trzyma stan około 30 minut, potem wraca do harmonogramu.</div>
+    </div>
+    <div class="card">
+      <h2>Przedziały pracy</h2>
+      <div id="slots" class="note">—</div>
+    </div>
+  </section>
+
+  <!-- ───────── ENERGIA ───────── -->
+  <section id="tab-energy" class="tab">
+    <div class="card">
+      <h2>Energia i koszt</h2>
+      <div class="grid3">
+        <div class="metric"><div class="v" id="eToday">—</div><div class="l">dziś</div></div>
+        <div class="metric"><div class="v" id="eWeek">—</div><div class="l">tydzień</div></div>
+        <div class="metric"><div class="v" id="eMonth">—</div><div class="l">miesiąc</div></div>
+      </div>
+      <div class="kv" style="margin-top:10px"><span>Koszt dziś</span><span id="cToday">—</span></div>
+      <div class="kv"><span>Koszt miesiąc</span><span id="cMonth">—</span></div>
+      <div class="kv"><span>Cena prądu (z ESP)</span><span id="kwh">—</span></div>
+    </div>
+    <div class="card">
+      <h2>Czas świecenia LED</h2>
+      <div class="kv"><span>Dziś</span><span id="ledToday">—</span></div>
+      <div class="kv"><span>Tydzień</span><span id="ledWeek">—</span></div>
+      <div class="kv"><span>Miesiąc</span><span id="ledMonth">—</span></div>
+    </div>
+    <div class="card">
+      <h2>Historia dzienna (Wh, wg ESP)</h2>
+      <div class="hist" id="histDay"></div>
+    </div>
+    <div class="card">
+      <h2>Moc w godzinach dziś (Wh, wg ESP)</h2>
+      <div class="hist" id="histHour"></div>
+    </div>
+  </section>
+
+  <!-- ───────── USTAWIENIA ───────── -->
+  <section id="tab-settings" class="tab">
+    <div class="card">
+      <h2>Połączenie z Firebase</h2>
+      <div class="field">
+        <label for="setUrl">Adres bazy (URL)</label>
+        <input type="url" id="setUrl" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="setSecret">Database Secret</label>
+        <input type="password" id="setSecret" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="setToken">CMD_TOKEN (token komend)</label>
+        <input type="password" id="setToken" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="row">
+        <button class="btn primary" id="btnSaveSet">Zapisz</button>
+        <button class="btn" id="btnTest">Sprawdź połączenie</button>
+      </div>
+      <div class="note" id="setMsg"></div>
+    </div>
+    <div class="card">
+      <h2>Prywatność</h2>
+      <div class="note">Sekrety są zapisane tylko w tej przeglądarce (localStorage) i nigdzie indziej. Nie są w repozytorium. Ten sam klucz używa panel WWW, więc na tym telefonie nie musisz wpisywać ich drugi raz.</div>
+      <div class="row"><button class="btn danger" id="btnClear">Usuń dane z tej przeglądarki</button></div>
+    </div>
+    <div class="card">
+      <h2>O aplikacji</h2>
+      <div class="kv"><span>Wersja aplikacji</span><span>1.0 (4.7.2)</span></div>
+      <div class="note">Komendy trafiają do kolejki Firebase. ESP odbiera je co ok. 14 s, więc reakcja nie jest natychmiastowa. Stan na ekranie odświeża się, gdy ESP zapisze status (ok. co 60 s).</div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="bottom" aria-label="Zakładki">
+  <button data-tab="tab-home" class="active"><span class="ic">🏠</span>Główna</button>
+  <button data-tab="tab-light"><span class="ic">💡</span>Światło</button>
+  <button data-tab="tab-pump"><span class="ic">💧</span>Pompa</button>
+  <button data-tab="tab-energy"><span class="ic">⚡</span>Energia</button>
+  <button data-tab="tab-settings"><span class="ic">⚙️</span>Ustawienia</button>
+</nav>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* LOGIC-BEGIN — app-logic (czysta logika, testowana przez check_mobile_app.js) */
+/*
+ * Ryby LED — aplikacja mobilna: logika bez DOM (czysta, testowalna w Node).
+ *
+ * Kontrakt z firmware (4.7.2+build.272):
+ *   - odczyt:  GET  {DB}/aquarium/status.json?auth=SECRET   (firmware pisze co ~60 s)
+ *   - komendy: POST {DB}/aquarium/commands.json?auth=SECRET  body {cmd, token, ts}
+ *              firmware czyta kolejkę co ~14 s; ts MUSI rosnąć (inaczej STALE).
+ *   - komendy z argumentami: "pwm a b c d e" (0–1023), "autosave a b c d e".
+ *
+ * Plik nie zna DOM ani sieci. Eksport: window.RybyLogic (przeglądarka) / module.exports (Node).
+ */
+(function (root) {
+  "use strict";
+
+  var DEFAULT_DB_URL = "https://akwarium-367be-default-rtdb.europe-west1.firebasedatabase.app";
+  // Status zapisywany co 60 s; po 150 s bez zmiany updatedAt uznajemy, że ESP nie pisze.
+  var STALE_MS = 150000;
+  var PWM_MAX = 1023;
+
+  // Komendy bez argumentów, które firmware obsługuje (dispatcher wykonajKomendeFirebase).
+  var PLAIN_CMDS = [
+    "power_on", "power_off", "mode_auto", "mode_manual",
+    "pump_on", "pump_off", "led_100", "led_test", "led_off", "restart"
+  ];
+
+  function isFiniteNum(x) {
+    return typeof x === "number" && isFinite(x);
+  }
+
+  function num(x) {
+    if (typeof x === "string" && x.trim() !== "") x = Number(x);
+    return isFiniteNum(x) ? x : null;
+  }
+
+  function clampPwm(v) {
+    var n = Math.round(Number(v));
+    if (!isFinite(n)) return 0;
+    return Math.max(0, Math.min(PWM_MAX, n));
+  }
+
+  // 5 kanałów -> "a b c d e" (kolejność jak w firmware)
+  function pwmArgs(arr) {
+    var out = [];
+    for (var i = 0; i < 5; i++) out.push(clampPwm(arr && arr[i]));
+    return out.join(" ");
+  }
+
+  function pwmToPct(v) {
+    var n = num(v);
+    if (n === null) return 0;
+    return Math.round((Math.max(0, Math.min(PWM_MAX, n)) / PWM_MAX) * 100);
+  }
+
+  // ts musi być rosnący względem ostatnio wysłanego (firmware odrzuca STALE)
+  function nextTs(nowMs, lastTs) {
+    var last = isFiniteNum(lastTs) ? lastTs : 0;
+    return Math.max(Math.floor(nowMs), last + 1);
+  }
+
+  // Buduje body POST /aquarium/commands.json. Rzuca błąd dla nieznanej komendy lub pustego tokenu.
+  function buildCommand(cmd, token, ts) {
+    if (typeof cmd !== "string" || cmd === "") throw new Error("pusta komenda");
+    if (!token) throw new Error("brak CMD_TOKEN — wpisz go w Ustawieniach");
+    if (!isFiniteNum(ts) || ts <= 0) throw new Error("ts musi być dodatni");
+    return { cmd: cmd, token: token, ts: ts };
+  }
+
+  // Zamienia nazwę akcji z UI na tekst komendy dla firmware.
+  // action: string z PLAIN_CMDS, albo {type:"pwm", values:[5]}, albo {type:"autosave", values:[5]}
+  function commandText(action) {
+    if (typeof action === "string") {
+      if (PLAIN_CMDS.indexOf(action) < 0) throw new Error("nieznana komenda: " + action);
+      return action;
+    }
+    if (action && (action.type === "pwm" || action.type === "autosave")) {
+      if (!action.values || action.values.length !== 5) throw new Error("wymagane 5 wartości PWM");
+      return action.type + " " + pwmArgs(action.values);
+    }
+    throw new Error("nieznana akcja");
+  }
+
+  // Normalizuje surowy JSON /aquarium/status do płaskiego modelu dla UI.
+  // Brakujące pola dostają bezpieczne wartości (null / 0 / []) — UI nie może wywalić się na starym firmware.
+  function normalizeStatus(d) {
+    d = d || {};
+    var temps = Array.isArray(d.temps) ? d.temps : [];
+    var pwm = Array.isArray(d.pwm) ? d.pwm : [];
+    var sch = d.schedule || {};
+    var slots = Array.isArray(d.pumpSlots) ? d.pumpSlots : [];
+    var dayH = Array.isArray(d.dayHistory) ? d.dayHistory : [];
+    var hourH = Array.isArray(d.hourPowerWh) ? d.hourPowerWh : [];
+    var weekH = Array.isArray(d.weekHistory) ? d.weekHistory : [];
+    var chW = Array.isArray(d.powerNowCh) ? d.powerNowCh : [];
+    var luxRoom = num(d.luxRoom);
+    if (luxRoom === null) luxRoom = num(d.lux);
+    return {
+      mode: d.mode === "MANUAL" ? "MANUAL" : (d.mode === "AUTO" ? "AUTO" : null),
+      power: d.power === true,
+      pumpOn: d.pumpOn === true,
+      temps: [num(temps[0]), num(temps[1]), num(temps[2])],
+      luxRoom: luxRoom,
+      luxNadWoda: num(d.luxNadWoda),
+      pwm: [0, 1, 2, 3, 4].map(function (i) { return clampPwm(pwm[i]); }),
+      pct: num(d.pct),
+      autoPWM: num(d.autoPWM),
+      powerNowW: num(d.powerNowW),
+      powerLimitW: num(d.powerLimitW),
+      powerNowCh: [0, 1, 2, 3, 4].map(function (i) { return num(chW[i]) || 0; }),
+      peakPowerWToday: num(d.peakPowerWToday),
+      energy: {
+        today: num(d.energyTodayWh) || 0,
+        week: num(d.energyWeekWh) || 0,
+        month: num(d.energyMonthWh) || 0
+      },
+      ledMin: {
+        today: num(d.ledOnMinutesToday) || 0,
+        week: num(d.ledOnMinutesWeek) || 0,
+        month: num(d.ledOnMinutesMonth) || 0
+      },
+      kwhPrice: num(d.kwhPrice),
+      dayHistory: dayH.map(function (x) { return num(x) || 0; }),
+      weekHistory: weekH.map(function (x) { return num(x) || 0; }),
+      hourPowerWh: hourH.map(function (x) { return num(x) || 0; }),
+      pumpSlots: slots.map(function (s) {
+        return { start: num(s && s.start), end: num(s && s.end) };
+      }),
+      schedule: {
+        morningWD: num(sch.morningWD),
+        morningWE: num(sch.morningWE),
+        middayOff: num(sch.middayOff),
+        eveningBefore: num(sch.eveningBefore),
+        eveningOff: num(sch.eveningOff)
+      },
+      fadeMinutes: num(d.fadeMinutes),
+      rampSec: num(d.rampSec),
+      minLuxEnabled: d.minLuxEnabled === true,
+      minLuxActive: d.minLuxActive === true,
+      minLuxTarget: num(d.minLuxTarget),
+      inLightingWindow: d.inLightingWindow === true,
+      isNight: d.isNight === true,
+      rampActive: d.rampActive === true,
+      adaptEnabled: d.adaptEnabled === true,
+      wifiRssi: num(d.wifi_rssi),
+      uptimeS: num(d.uptime),
+      updatedAt: num(d.updatedAt)
+    };
+  }
+
+  // Śledzi, kiedy po raz ostatni zmienił się updatedAt (licznik millis z ESP, nie czas unix).
+  // tracker = {updatedAt, changedAt} (ms wg zegara telefonu). Zwraca nowy tracker.
+  function trackUpdate(tracker, updatedAt, nowMs) {
+    var prev = tracker || { updatedAt: null, changedAt: null };
+    if (updatedAt === null || updatedAt === undefined) return prev;
+    if (prev.updatedAt === null || updatedAt !== prev.updatedAt) {
+      return { updatedAt: updatedAt, changedAt: nowMs };
+    }
+    return prev;
+  }
+
+  // "online" = dane świeże; "stale" = dane są, ale ESP nie zapisał od dawna; "none" = brak danych.
+  function connectionState(tracker, nowMs) {
+    if (!tracker || tracker.changedAt === null) return "none";
+    return (nowMs - tracker.changedAt) > STALE_MS ? "stale" : "online";
+  }
+
+  function fmtTemp(v) {
+    var n = num(v);
+    return n === null ? "—" : n.toFixed(1) + " °C";
+  }
+
+  function fmtLux(v) {
+    var n = num(v);
+    return n === null ? "—" : Math.round(n) + " lx";
+  }
+
+  function fmtWatts(v) {
+    var n = num(v);
+    return n === null ? "—" : n.toFixed(1) + " W";
+  }
+
+  // Wh -> "123 Wh" / "1.23 kWh"
+  function fmtWh(v) {
+    var n = num(v);
+    if (n === null) return "—";
+    if (Math.abs(n) >= 1000) return (n / 1000).toFixed(2) + " kWh";
+    return Math.round(n) + " Wh";
+  }
+
+  // minuty -> "2 h 05 min"
+  function fmtMinutes(v) {
+    var n = num(v);
+    if (n === null) return "—";
+    n = Math.max(0, Math.round(n));
+    var h = Math.floor(n / 60), m = n % 60;
+    if (h === 0) return m + " min";
+    return h + " h " + (m < 10 ? "0" : "") + m + " min";
+  }
+
+  // minuty od północy -> "HH:MM"
+  function fmtHHMM(minutes) {
+    var n = num(minutes);
+    if (n === null || n < 0 || n > 1439) return "—";
+    var h = Math.floor(n / 60), m = n % 60;
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+  }
+
+  // Koszt energii w PLN (cena z ESP; brak ceny -> null)
+  function costPln(wh, pricePerKwh) {
+    var w = num(wh), p = num(pricePerKwh);
+    if (w === null || p === null) return null;
+    return Math.round((w / 1000) * p * 100) / 100;
+  }
+
+  function fmtPln(v) {
+    return v === null || v === undefined ? "—" : v.toFixed(2) + " zł";
+  }
+
+  // Uptime sekundy -> "3 d 4 h" / "12 min"
+  function fmtUptime(seconds) {
+    var s = num(seconds);
+    if (s === null) return "—";
+    s = Math.max(0, Math.floor(s));
+    var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d > 0) return d + " d " + h + " h";
+    if (h > 0) return h + " h " + m + " min";
+    return m + " min";
+  }
+
+  var api = {
+    DEFAULT_DB_URL: DEFAULT_DB_URL,
+    STALE_MS: STALE_MS,
+    PLAIN_CMDS: PLAIN_CMDS,
+    clampPwm: clampPwm,
+    pwmArgs: pwmArgs,
+    pwmToPct: pwmToPct,
+    nextTs: nextTs,
+    buildCommand: buildCommand,
+    commandText: commandText,
+    normalizeStatus: normalizeStatus,
+    trackUpdate: trackUpdate,
+    connectionState: connectionState,
+    fmtTemp: fmtTemp,
+    fmtLux: fmtLux,
+    fmtWatts: fmtWatts,
+    fmtWh: fmtWh,
+    fmtMinutes: fmtMinutes,
+    fmtHHMM: fmtHHMM,
+    costPln: costPln,
+    fmtPln: fmtPln,
+    fmtUptime: fmtUptime
+  };
+
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.RybyLogic = api;
+})(typeof window !== "undefined" ? window : globalThis);
+/* LOGIC-END */
+</script>
+<script>
+(function () {
+  "use strict";
+  var L = window.RybyLogic;
+  var KEYS = { url: "ryby_db_url", secret: "akw_db_secret", token: "akw_cmd_token", lastTs: "ryby_last_ts" };
+  var POLL_MS = 5000;
+
+  var cfg = {
+    url: localStorage.getItem(KEYS.url) || L.DEFAULT_DB_URL,
+    secret: localStorage.getItem(KEYS.secret) || "",
+    token: localStorage.getItem(KEYS.token) || ""
+  };
+  var lastTs = Number(localStorage.getItem(KEYS.lastTs) || 0) || 0;
+  var tracker = null;          // {updatedAt, changedAt}
+  var lastStatus = null;       // znormalizowany status
+  var pwmDirty = false;        // użytkownik ruszył suwakami
+  var pollTimer = null;
+  var toastTimer = null;
+
+  function $(id) { return document.getElementById(id); }
+  function setText(id, text) { var el = $(id); if (el) el.textContent = text; }
+  function setPill(cls, text) { var el = $("conn"); el.className = "pill " + cls; el.textContent = text; }
+
+  function toast(msg, isErr) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.className = "show" + (isErr ? " err" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = isErr ? "err" : ""; }, 3800);
+  }
+
+  function dbUrl(path) {
+    return cfg.url.replace(/\/+$/, "") + path + "?auth=" + encodeURIComponent(cfg.secret);
+  }
+
+  // ───── zakładki ─────
+  function showTab(id) {
+    var secs = document.querySelectorAll("section.tab");
+    for (var i = 0; i < secs.length; i++) secs[i].classList.toggle("active", secs[i].id === id);
+    var btns = document.querySelectorAll("nav.bottom button");
+    for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("active", btns[j].getAttribute("data-tab") === id);
+    window.scrollTo(0, 0);
+  }
+  var navBtns = document.querySelectorAll("nav.bottom button");
+  for (var i = 0; i < navBtns.length; i++) {
+    navBtns[i].addEventListener("click", function (e) { showTab(e.currentTarget.getAttribute("data-tab")); });
+  }
+
+  // ───── odczyt statusu ─────
+  function fetchStatus() {
+    if (!cfg.secret) return Promise.reject(new Error("brak Database Secret — wpisz go w Ustawieniach"));
+    return fetch(dbUrl("/aquarium/status.json"), { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+
+  function refresh() {
+    if (!cfg.secret) { setPill("none", "BRAK SEKRETU"); setText("lastInfo", "Wpisz sekrety w Ustawieniach."); return; }
+    fetchStatus().then(function (raw) {
+      if (!raw) { setPill("none", "BRAK DANYCH"); setText("lastInfo", "Firebase nie ma statusu ESP."); return; }
+      var s = L.normalizeStatus(raw);
+      tracker = L.trackUpdate(tracker, s.updatedAt, Date.now());
+      lastStatus = s;
+      render();
+      tick();
+    }).catch(function (err) {
+      setPill("error", "BŁĄD");
+      setText("lastInfo", err.message);
+    });
+  }
+
+  // co sekundę: wiek danych i stan połączenia
+  function tick() {
+    if (!tracker || tracker.changedAt === null) return;
+    var st = L.connectionState(tracker, Date.now());
+    var ageS = Math.round((Date.now() - tracker.changedAt) / 1000);
+    if (st === "online") setPill("online", "ONLINE");
+    else if (st === "stale") setPill("stale", "OPÓŹNIONE");
+    else setPill("none", "BRAK DANYCH");
+    setText("lastInfo", "ostatnia zmiana statusu ESP: " + ageS + " s temu");
+    setText("lastSeen", ageS < 60 ? ageS + " s temu" : Math.round(ageS / 60) + " min temu");
+  }
+
+  // ───── render ─────
+  function setBtnActive(id, on) { var el = $(id); if (el) el.classList.toggle("active", !!on); }
+
+  function render() {
+    var s = lastStatus;
+    if (!s) return;
+
+    setBtnActive("btnOn", s.power);
+    setBtnActive("btnOff", !s.power);
+    setBtnActive("btnAuto", s.mode === "AUTO");
+    setBtnActive("btnManual", s.mode === "MANUAL");
+
+    var win = $("chWindow");
+    win.textContent = "okno oświetlenia: " + (s.inLightingWindow ? "tak" : "nie");
+    win.className = "chip" + (s.inLightingWindow ? " on" : "");
+    var ml = $("chMinLux");
+    ml.textContent = "Min LUX: " + (s.minLuxEnabled ? (s.minLuxActive ? "aktywny" : "włączony") : "wyłączony");
+    ml.className = "chip" + (s.minLuxActive ? " warn" : "");
+    var rp = $("chRamp");
+    rp.textContent = "rampa: " + (s.rampActive ? "w toku" : "nie");
+    rp.className = "chip" + (s.rampActive ? " on" : "");
+
+    setText("pctMain", s.pct === null ? "—" : Math.round(s.pct) + "%");
+    setText("luxRoom", L.fmtLux(s.luxRoom));
+    setText("luxWater", L.fmtLux(s.luxNadWoda));
+    $("pctBar").style.width = Math.max(0, Math.min(100, s.pct || 0)) + "%";
+
+    setText("tP1", L.fmtTemp(s.temps[0]));
+    setText("tP2", L.fmtTemp(s.temps[1]));
+    setText("tW", L.fmtTemp(s.temps[2]));
+
+    setText("powerNow", L.fmtWatts(s.powerNowW));
+    setText("powerLimit", L.fmtWatts(s.powerLimitW));
+    var pf = (s.powerLimitW && s.powerNowW !== null) ? Math.min(100, (s.powerNowW / s.powerLimitW) * 100) : 0;
+    $("powerBar").style.width = Math.max(0, pf) + "%";
+    setText("peakToday", L.fmtWatts(s.peakPowerWToday));
+
+    setText("rssi", s.wifiRssi === null ? "—" : s.wifiRssi + " dBm");
+    setText("uptime", L.fmtUptime(s.uptimeS));
+
+    renderPwm(s);
+    renderSchedule(s);
+    renderPump(s);
+    renderEnergy(s);
+  }
+
+  var pwmInputs = [];
+  function buildPwmRows() {
+    var host = $("pwmRows");
+    for (var i = 0; i < 5; i++) {
+      var row = document.createElement("div");
+      row.className = "ch";
+      var lab = document.createElement("label");
+      lab.htmlFor = "pwm" + i;
+      lab.textContent = "Kanał " + (i + 1);
+      var inp = document.createElement("input");
+      inp.type = "range"; inp.min = "0"; inp.max = "1023"; inp.step = "1"; inp.id = "pwm" + i; inp.value = "0";
+      var out = document.createElement("output");
+      out.id = "pwmv" + i; out.textContent = "0";
+      (function (idx, el, o) {
+        el.addEventListener("input", function () { pwmDirty = true; o.textContent = el.value; });
+      })(i, inp, out);
+      row.appendChild(lab); row.appendChild(inp); row.appendChild(out);
+      host.appendChild(row);
+      pwmInputs.push(inp);
+    }
+  }
+  buildPwmRows();
+
+  function renderPwm(s) {
+    if (pwmDirty) return;
+    for (var i = 0; i < 5; i++) {
+      pwmInputs[i].value = s.pwm[i];
+      setText("pwmv" + i, String(s.pwm[i]));
+    }
+  }
+
+  function renderSchedule(s) {
+    var sc = s.schedule;
+    setText("sMWD", L.fmtHHMM(sc.morningWD));
+    setText("sMWE", L.fmtHHMM(sc.morningWE));
+    setText("sMid", L.fmtHHMM(sc.middayOff));
+    setText("sEvB", sc.eveningBefore === null ? "—" : sc.eveningBefore + " min");
+    setText("sEvO", L.fmtHHMM(sc.eveningOff));
+    setText("sFade", s.fadeMinutes === null ? "—" : s.fadeMinutes + " min");
+    setText("sRamp", s.rampSec === null ? "—" : s.rampSec + " s");
+  }
+
+  function renderPump(s) {
+    setText("pumpState", s.pumpOn ? "WŁĄCZONA" : "WYŁĄCZONA");
+    var list = $("slots");
+    list.textContent = "";
+    if (!s.pumpSlots.length) { list.textContent = "brak przedziałów"; return; }
+    s.pumpSlots.forEach(function (sl) {
+      var d = document.createElement("div");
+      d.className = "kv";
+      var a = document.createElement("span"); a.textContent = "przedział";
+      var b = document.createElement("span"); b.textContent = L.fmtHHMM(sl.start) + " – " + L.fmtHHMM(sl.end);
+      d.appendChild(a); d.appendChild(b);
+      list.appendChild(d);
+    });
+  }
+
+  function renderEnergy(s) {
+    setText("eToday", L.fmtWh(s.energy.today));
+    setText("eWeek", L.fmtWh(s.energy.week));
+    setText("eMonth", L.fmtWh(s.energy.month));
+    setText("cToday", L.fmtPln(L.costPln(s.energy.today, s.kwhPrice)));
+    setText("cMonth", L.fmtPln(L.costPln(s.energy.month, s.kwhPrice)));
+    setText("kwh", s.kwhPrice === null ? "—" : s.kwhPrice.toFixed(2) + " zł/kWh");
+    setText("ledToday", L.fmtMinutes(s.ledMin.today));
+    setText("ledWeek", L.fmtMinutes(s.ledMin.week));
+    setText("ledMonth", L.fmtMinutes(s.ledMin.month));
+    bars("histDay", s.dayHistory);
+    bars("histHour", s.hourPowerWh);
+  }
+
+  function bars(id, values) {
+    var host = $(id);
+    host.textContent = "";
+    var max = 0;
+    values.forEach(function (v) { if (v > max) max = v; });
+    values.forEach(function (v) {
+      var d = document.createElement("div");
+      d.style.height = (max > 0 ? Math.max(2, Math.round((v / max) * 100)) : 2) + "%";
+      d.title = Math.round(v) + " Wh";
+      host.appendChild(d);
+    });
+  }
+
+  // ───── komendy ─────
+  function sendAction(action, label) {
+    var text;
+    try {
+      text = L.commandText(action);
+      lastTs = L.nextTs(Date.now(), lastTs);
+      localStorage.setItem(KEYS.lastTs, String(lastTs));
+      var body = L.buildCommand(text, cfg.token, lastTs);
+      if (!cfg.secret) throw new Error("brak Database Secret");
+    } catch (e) {
+      toast("❌ " + e.message, true);
+      return;
+    }
+    fetch(dbUrl("/aquarium/commands.json"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(L.buildCommand(text, cfg.token, lastTs))
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      toast("✅ Wysłano: " + (label || text) + " — ESP odbierze w ciągu ok. 14 s");
+      setTimeout(refresh, 15000);
+    }).catch(function (e) {
+      toast("❌ Nie wysłano: " + e.message, true);
+    });
+  }
+
+  function cmdFromButton(e) {
+    var cmd = e.currentTarget.getAttribute("data-cmd");
+    if (cmd === "restart" && !confirm("Zrestartować ESP32?")) return;
+    sendAction(cmd, e.currentTarget.textContent.trim());
+  }
+  var cmdBtns = document.querySelectorAll("[data-cmd]");
+  for (var k = 0; k < cmdBtns.length; k++) cmdBtns[k].addEventListener("click", cmdFromButton);
+
+  function currentPwm() {
+    return pwmInputs.map(function (el) { return Number(el.value); });
+  }
+  $("btnSendPwm").addEventListener("click", function () {
+    // pwmDirty zostaje true: suwaki trzymają wysłane wartości, aż ESP zapisze status
+    // (bez tego odczyt co 5 s cofnąłby je do starych wartości) lub kliknięto „Wczytaj z ESP”.
+    sendAction({ type: "pwm", values: currentPwm() }, "PWM " + currentPwm().join(" "));
+  });
+  $("btnSaveAuto").addEventListener("click", function () {
+    if (!confirm("Zapisać te wartości PWM jako tryb AUTO w ESP (EEPROM)?")) return;
+    sendAction({ type: "autosave", values: currentPwm() }, "zapis AUTO");
+  });
+  $("btnLoadPwm").addEventListener("click", function () {
+    pwmDirty = false;
+    if (lastStatus) renderPwm(lastStatus);
+    toast("Wczytano wartości z ESP");
+  });
+
+  // ───── ustawienia ─────
+  function loadSettingsForm() {
+    $("setUrl").value = cfg.url;
+    $("setSecret").value = cfg.secret;
+    $("setToken").value = cfg.token;
+  }
+  $("btnSaveSet").addEventListener("click", function () {
+    var url = $("setUrl").value.trim() || L.DEFAULT_DB_URL;
+    if (!/^https?:\/\//.test(url)) { setText("setMsg", "Adres musi zaczynać się od https://"); return; }
+    cfg.url = url;
+    cfg.secret = $("setSecret").value.trim();
+    cfg.token = $("setToken").value.trim();
+    localStorage.setItem(KEYS.url, cfg.url);
+    localStorage.setItem(KEYS.secret, cfg.secret);
+    localStorage.setItem(KEYS.token, cfg.token);
+    setText("setMsg", "Zapisano w tej przeglądarce.");
+    refresh();
+  });
+  $("btnTest").addEventListener("click", function () {
+    setText("setMsg", "Sprawdzam…");
+    var prevSecret = cfg.secret;
+    cfg.secret = $("setSecret").value.trim();
+    var url = $("setUrl").value.trim() || L.DEFAULT_DB_URL;
+    var savedUrl = cfg.url;
+    cfg.url = url;
+    fetchStatus().then(function (raw) {
+      var n = raw ? Object.keys(raw).length : 0;
+      setText("setMsg", raw ? "Połączono. Pól w statusie: " + n + "." : "Połączono, ale brak statusu ESP.");
+    }).catch(function (e) {
+      setText("setMsg", "Błąd: " + e.message);
+    }).then(function () {
+      cfg.secret = prevSecret; cfg.url = savedUrl;
+    });
+  });
+  $("btnClear").addEventListener("click", function () {
+    if (!confirm("Usunąć adres, sekret i token z tej przeglądarki?")) return;
+    localStorage.removeItem(KEYS.url);
+    localStorage.removeItem(KEYS.secret);
+    localStorage.removeItem(KEYS.token);
+    localStorage.removeItem(KEYS.lastTs);
+    location.reload();
+  });
+
+  // ───── start ─────
+  loadSettingsForm();
+  refresh();
+  pollTimer = setInterval(function () {
+    if (document.visibilityState === "visible") refresh();
+  }, POLL_MS);
+  setInterval(tick, 1000);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") refresh();
+  });
+
+})();
+</script>
+</body>
+</html>

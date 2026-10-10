@@ -1,0 +1,11 @@
+# Name,   Type, SubType, Offset,  Size,
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x300000,
+app1,     app,  ota_1,   0x310000,0x300000,
+# [v113] Partycja coredump dodana: 64 KB wystarczają na pełny core dump ESP32-S3.
+# Przesunięcie spiffs o 0x10000 w górę, rozmiar zmniejszony o 64 KB (9830400→9699328 B).
+# Cel: CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y — pełny backtrace wszystkich tasków
+# przy następnym crashu (idf.py coredump-info / espcoredump.py).
+coredump, data, coredump,0x610000,0x10000,
+spiffs,   data, spiffs,  0x620000,0x9E0000,
