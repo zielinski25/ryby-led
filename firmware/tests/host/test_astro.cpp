@@ -118,7 +118,33 @@ static void testWrap() {
   CHECK(near(astro::wrapMinutes(720), 720, 1e-9), "wrap bez zmian");
 }
 
+static void testLocationValidation() {
+  CHECK(astro::validLocation(52.1345, 20.1418), "lok: dom poprawna");
+  CHECK(astro::validLocation(-90, -180) && astro::validLocation(90, 180), "lok: granice");
+  CHECK(!astro::validLocation(90.001, 0), "lok: lat > 90");
+  CHECK(!astro::validLocation(-91, 0), "lok: lat < -90");
+  CHECK(!astro::validLocation(0, 180.5), "lok: lon > 180");
+  CHECK(!astro::validLocation(0, -181), "lok: lon < -180");
+  CHECK(!astro::validLocation(NAN, 20), "lok: NaN lat");
+  CHECK(!astro::validLocation(52, INFINITY), "lok: inf lon");
+}
+
+static void testJsonNumber() {
+  double v = 0;
+  CHECK(astro::jsonNumber("{\"lat\":52.1345,\"lon\":20.1418}", "lat", v) && near(v, 52.1345, 1e-9), "json: lat");
+  CHECK(astro::jsonNumber("{\"lat\":52.1345,\"lon\":20.1418}", "lon", v) && near(v, 20.1418, 1e-9), "json: lon");
+  CHECK(astro::jsonNumber("{ \"lat\" :  -33.5 }", "lat", v) && near(v, -33.5, 1e-9), "json: spacje, ujemna");
+  CHECK(!astro::jsonNumber("{\"lon\":20}", "lat", v), "json: brak klucza");
+  CHECK(!astro::jsonNumber("{\"lat\":\"52.1\"}", "lat", v), "json: liczba w cudzyslowie odrzucona");
+  CHECK(!astro::jsonNumber("{\"lat\":nan}", "lat", v), "json: nan odrzucone");
+  CHECK(!astro::jsonNumber("{\"lat\":inf}", "lat", v), "json: inf odrzucone");
+  CHECK(!astro::jsonNumber("{\"lat\" 52}", "lat", v), "json: brak dwukropka");
+  CHECK(!astro::jsonNumber(nullptr, "lat", v), "json: null body");
+}
+
 int main() {
+  testLocationValidation();
+  testJsonNumber();
   testReference();
   testOrderingAndDayLength();
   testTimezoneShift();

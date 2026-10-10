@@ -5,6 +5,9 @@
 #include "astro.h"
 
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
 namespace astro {
 
@@ -104,6 +107,31 @@ double wrapMinutes(double min) {
   double r = fmod(min, 1440.0);
   if (r < 0) r += 1440.0;
   return r;
+}
+
+bool validLocation(double latDeg, double lonDeg) {
+  if (!isfinite(latDeg) || !isfinite(lonDeg)) return false;
+  return latDeg >= -90.0 && latDeg <= 90.0 && lonDeg >= -180.0 && lonDeg <= 180.0;
+}
+
+bool jsonNumber(const char* body, const char* key, double& out) {
+  if (!body || !key) return false;
+  char pat[64];
+  if (snprintf(pat, sizeof(pat), "\"%s\"", key) >= (int)sizeof(pat)) return false;
+  const char* p = strstr(body, pat);
+  if (!p) return false;
+  p += strlen(pat);
+  while (*p == ' ' || *p == '\t') p++;
+  if (*p != ':') return false;
+  p++;
+  while (*p == ' ' || *p == '\t') p++;
+  // Liczba musi zaczynać się cyfrą lub minusem; strtod nie może przyjąć "nan"/"inf".
+  if (!(*p == '-' || (*p >= '0' && *p <= '9'))) return false;
+  char* end = nullptr;
+  double v = strtod(p, &end);
+  if (end == p || !isfinite(v)) return false;
+  out = v;
+  return true;
 }
 
 }  // namespace astro

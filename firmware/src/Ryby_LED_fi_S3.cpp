@@ -217,6 +217,8 @@ void loadScheduleFromEEPROM();
 void saveMinLuxModeToEEPROM();
 void saveKwhPrice();
 void loadKwhPrice();
+void loadSiteLocation();   // [4.7.0 ASTRO]
+void saveSiteLocation();   // [4.7.0 ASTRO]
 void loadMinLuxModeFromEEPROM();
 uint16_t calculateMinLuxPWM();
 void applyMinLuxMode();
@@ -1693,8 +1695,12 @@ int32_t fadeMinutes = 30;
  *************************************************************/
 // minuty od północy
 int sunsetMinutes = 1140; // 19:00 domyślnie
-const double latitude  = 52.1345;
-const double longitude = 20.1418;
+// [4.7.0 ASTRO] Lokalizacja do zachodu: domyślnie 52,1345 / 20,1418; nadpisywana
+// z NVS (namespace astro_loc) po ustawieniu w panelu (POST /api/location).
+static constexpr const char* ASTRO_LOC_NVS_NS = "astro_loc";
+double latitude  = 52.1345;
+double longitude = 20.1418;
+volatile bool sunsetRecalcRequested = false;  // ustawia endpoint, czyta loop()
 
 /*************************************************************
  *  TERMICZNY DERATING
@@ -4401,6 +4407,30 @@ void loadKwhPrice() {
   EEPROM.get(EEPROM_ADDR_KWH_PRICE, v);
   if (isnan(v) || isinf(v) || v < 0.01f || v > 99.0f) v = 0.80f;
   kwhPrice = v;
+}
+
+// [4.7.0 ASTRO] Lokalizacja do zachodu — NVS (namespace astro_loc).
+// Brak wpisu albo wartość poza zakresem → zostaje domyślna z kodu (52,1345 / 20,1418).
+void loadSiteLocation() {
+  Preferences prefs;
+  if (!prefs.begin(ASTRO_LOC_NVS_NS, true)) return;
+  if (prefs.isKey("lat") && prefs.isKey("lon")) {
+    float la = prefs.getFloat("lat", 0.0f);
+    float lo = prefs.getFloat("lon", 0.0f);
+    if (astro::validLocation((double)la, (double)lo)) {
+      latitude  = (double)la;
+      longitude = (double)lo;
+    }
+  }
+  prefs.end();
+}
+
+void saveSiteLocation() {
+  Preferences prefs;
+  if (!prefs.begin(ASTRO_LOC_NVS_NS, false)) return;
+  (void)prefs.putFloat("lat", (float)latitude);
+  (void)prefs.putFloat("lon", (float)longitude);
+  prefs.end();
 }
 
 void loadMinLuxModeFromEEPROM() {
@@ -9824,6 +9854,7 @@ void setup() {
   loadPumpScheduleFromEEPROM();
   loadMinLuxModeFromEEPROM();
   loadKwhPrice();
+  loadSiteLocation();  // [4.7.0 ASTRO] lokalizacja z NVS
   odczytajAdaptacjeZEEPROM();
   loadPowerTrybFromEEPROM();
   prevPowerGlobal = power;
@@ -11282,6 +11313,51 @@ webserialServer.on("/api/log-critical-download", HTTP_GET, [](AsyncWebServerRequ
   }
   request->send(LittleFS, path, "text/plain", true);
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  API: LOKALIZACJA DO ZACHODU SŁOŃCA [4.7.0 ASTRO] Etap 6
+//  GET  /api/location → {"ok":true,"lat":..,"lon":..,"sunset":"HH:MM","timeSynced":bool}
+//  POST /api/location  body {"lat":52.1345,"lon":20.1418}
+//       → zapis w NVS (namespace astro_loc); zachód przeliczany w pętli loop().
+// ═══════════════════════════════════════════════════════════════
+webserialServer.on("/api/location", HTTP_GET, [](AsyncWebServerRequest *request) {
+  char buf[160];
+  bool ntpOk = time(nullptr) > 1700000000;  // ten sam sens co timeSynced w loop()
+  snprintf(buf, sizeof(buf),
+           "{\"ok\":true,\"lat\":%.4f,\"lon\":%.4f,\"sunset\":\"%02d:%02d\",\"timeSynced\":%s}",
+           latitude, longitude, sunsetMinutes / 60, sunsetMinutes % 60,
+           ntpOk ? "true" : "false");
+  request->send(200, "application/json", buf);
+});
+
+webserialServer.on("/api/location", HTTP_POST,
+  [](AsyncWebServerRequest *request){}, NULL,
+  [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    // Ciało jest małe (<128 B). Odpowiedź wysyłana dopiero przy ostatnim kawałku.
+    if (index + len != total) return;
+    if (index != 0 || total >= 128) {
+      request->send(413, "application/json", "{\"ok\":false,\"error\":\"body\"}");
+      return;
+    }
+    char body[128];
+    memcpy(body, data, len);
+    body[len] = '\0';
+    double lat = 0.0, lon = 0.0;
+    if (!astro::jsonNumber(body, "lat", lat) || !astro::jsonNumber(body, "lon", lon) ||
+        !astro::validLocation(lat, lon)) {
+      request->send(400, "application/json",
+        "{\"ok\":false,\"error\":\"zla lokalizacja (lat -90..90, lon -180..180)\"}");
+      return;
+    }
+    latitude  = lat;
+    longitude = lon;
+    saveSiteLocation();
+    sunsetRecalcRequested = true;  // loop() przelicza zachód przy następnym obiegu
+    logPrintf("lvl=INFO tag=ASTRO msg=\"Lokalizacja zmieniona z panelu\" lat=%.4f lon=%.4f\n",
+              lat, lon);
+    request->send(200, "application/json", "{\"ok\":true}");
+  }
+);
 
 webserialServer.on("/api/fs-list", HTTP_GET, [](AsyncWebServerRequest *request) {
   if (!littlefsReady) {
@@ -13643,7 +13719,8 @@ void loop() {
   // ======================================================
   // 5️⃣ Codzienne przeliczenie zachodu słońca
   // ======================================================
-  if (nowMs - lastSunsetRecalc >= recalcInterval && timeSynced) {
+  if ((nowMs - lastSunsetRecalc >= recalcInterval || sunsetRecalcRequested) && timeSynced) {
+    sunsetRecalcRequested = false;  // [4.7.0 ASTRO] zmiana lokalizacji z panelu
 
     struct tm ti;
     if (getLocalTimePL(&ti)) {

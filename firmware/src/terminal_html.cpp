@@ -620,6 +620,37 @@ extern const uint8_t TERMINAL_HTML[] PROGMEM = R"RAWHTML(<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- LOKALIZACJA (zachód słońca) [4.7.0 ASTRO] -->
+  <div class='card'>
+    <div class='card-header' onclick='toggleCard(this)'>
+      <div class='card-title'><div class='card-icon icon-power'>&#127749;</div>Lokalizacja &#8211; zach&#243;d s&#322;o&#324;ca</div>
+      <span class='chevron'>&#9660;</span>
+    </div>
+    <div class='card-body hidden'>
+      <div style='font-size:.78rem;color:var(--text-dim);margin-bottom:12px'>
+        Wsp&#243;&#322;rz&#281;dne do wyliczenia zachodu (start wieczornej rampy). Zapisywane na ESP, bez przeflashowania.
+      </div>
+      <div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>
+        <div>
+          <label style='font-size:.8rem;color:var(--text-dim);display:block;margin-bottom:4px'>Szeroko&#347;&#263; (lat, N+)</label>
+          <input id='loc-lat' type='number' step='0.0001' min='-90' max='90' placeholder='52.1345'
+            style='width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);padding:8px 12px;font-size:.82rem'>
+        </div>
+        <div>
+          <label style='font-size:.8rem;color:var(--text-dim);display:block;margin-bottom:4px'>D&#322;ugo&#347;&#263; (lon, E+)</label>
+          <input id='loc-lon' type='number' step='0.0001' min='-180' max='180' placeholder='20.1418'
+            style='width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);padding:8px 12px;font-size:.82rem'>
+        </div>
+      </div>
+      <div style='font-size:.82rem;margin-bottom:10px'>Zach&#243;d s&#322;o&#324;ca dzi&#347;: <b id='loc-sunset'>&#8212;</b></div>
+      <div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px'>
+        <button class='save-btn' style='flex:0 0 auto' onclick='locSave()'>&#128190; Zapisz</button>
+        <button class='save-btn' style='flex:0 0 auto;background:rgba(255,255,255,.05)' onclick='locLoad()'>&#128260; Od&#347;wie&#380;</button>
+      </div>
+      <div id='loc-msg' style='font-size:.78rem;min-height:18px;color:#22d3aa'></div>
+    </div>
+  </div>
+
   <!-- HARMONOGRAM DZIENNY -->
   <div class='card'>
     <div class='card-header' onclick='toggleCard(this)'>
@@ -3262,11 +3293,46 @@ window.addEventListener('load', function(){
   if (dash) dash.style.display = 'block';
   loadDash();
   loadCharts();
+  locLoad();  // [4.7.0 ASTRO] lokalizacja do zachodu
   setInterval(function(){
     var d=document.getElementById('p-dash');
     if(d&&d.style.display!=='none') loadDash();
   }, 3000);
 });
+// ── LOKALIZACJA / ZACHÓD SŁOŃCA [4.7.0 ASTRO] ──
+function locMsg(txt,ok){
+  var el=document.getElementById('loc-msg');
+  if(el){el.textContent=txt;el.style.color=ok?'#22d3aa':'#ff4d6d';}
+}
+function locLoad(){
+  fetch(BASE+'/api/location')
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var la=document.getElementById('loc-lat');
+    var lo=document.getElementById('loc-lon');
+    var sn=document.getElementById('loc-sunset');
+    if(la&&document.activeElement!==la) la.value=Number(d.lat).toFixed(4);
+    if(lo&&document.activeElement!==lo) lo.value=Number(d.lon).toFixed(4);
+    if(sn) sn.textContent=d.sunset+(d.timeSynced?'':' (brak czasu NTP, warto\u015b\u0107 domy\u015blna)');
+  })
+  .catch(function(){locMsg('Blad polaczenia',false);});
+}
+function locSave(){
+  var la=parseFloat((document.getElementById('loc-lat')||{}).value);
+  var lo=parseFloat((document.getElementById('loc-lon')||{}).value);
+  if(isNaN(la)||isNaN(lo)||la<-90||la>90||lo<-180||lo>180){
+    locMsg('Szeroko\u015b\u0107 -90..90, d\u0142ugo\u015b\u0107 -180..180',false);return;
+  }
+  fetch(BASE+'/api/location',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({lat:la,lon:lo})})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    locMsg(d.ok?'Zapisano! Zach\u00f3d zostanie przeliczony.':(d.error||'Blad zapisu'),d.ok);
+    if(d.ok) setTimeout(locLoad,1500);
+  })
+  .catch(function(){locMsg('Blad polaczenia',false);});
+}
 // ── TELEGRAM ──
 function tgMsg(txt,ok){
   var el=document.getElementById('tg-msg');

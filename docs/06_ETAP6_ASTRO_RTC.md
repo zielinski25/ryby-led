@@ -28,7 +28,7 @@ Plan: `docs/02_PLAN_UPGRADE_ryby_led.md`, ETAP 6 (P2). Ten dokument opisuje stan
   Efekt: zachód zgodny z `astral` ±2 min zamiast odchylenia do −4,4 min.
 - Testy:
   - `test_astro.cpp`: 22 pary data×miejsce wobec `astral` 3.2 (`astro_ref_gen.py`),
-    w tym lokalizacja domowa 52,1345 / 20,1418. Tolerancja 2 min. 169 PASS, 0 FAIL (ASan + UBSan).
+    w tym lokalizacja domowa 52,1345 / 20,1418. Tolerancja 2 min. 186 PASS, 0 FAIL (ASan + UBSan).
   - `check_integration_hl.sh`: wyciągnięte z pliku Ryby ciało `obliczZachodSlonca` kompiluje się
     z `astro.cpp` i trafia w wartości UTC z `astral` (±2 min), plus polarna noc → −1.
 - **Świt, wschód i zmierzch nie są podłączone.** Rampa poranna nadal ma stałą godzinę.
@@ -54,17 +54,20 @@ Podgląd krzywej świateł na dziś (harmonogram + adaptacja + MIN LUX na osi cz
 Dane: `/history.csv` (dziś, co 5 min) i harmonogram. Wymaga sprawdzenia, czy panel ma
 dostęp do harmonogramu (EEPROM) przez Firebase lub LAN.
 
-## 4. Lokalizacja z panelu i rampy poranne — DO DECYZJI
+## 4. Lokalizacja z panelu (GOTOWE w 4.7.0) i rampy poranne (DO DECYZJI)
 
-Ustalone: lokalizacja ma być ustawiana w panelu i zapisywana na ESP (NVS, wzorem
-`Preferences` z `FB_STATE_NVS_NS`). Stała w kodzie zostaje jako wartość domyślna.
-Do zrobienia: endpoint zapisu, pole w panelu, przeliczenie `sunsetMinutes` po zmianie
-(bez restartu). Osobny krok — nie robiony w 4.7.0.
+**Lokalizacja:** ustawiana w panelu LAN (karta „Lokalizacja – zachód słońca”), zapisywana
+na ESP w NVS (namespace `astro_loc`, klucze `lat`/`lon`). Domyślnie 52,1345 / 20,1418.
+- `GET /api/location` → `{"ok":true,"lat":..,"lon":..,"sunset":"HH:MM","timeSynced":bool}`
+- `POST /api/location`, body `{"lat":52.1345,"lon":20.1418}` → `{"ok":true}`; zła wartość → 400
+  (poprzednia zachowana), body > 127 B → 413.
+- Po zapisie zachód przeliczany w następnym obiegu `loop()` (flaga `sunsetRecalcRequested`).
+- Test hostowy: `check_location.sh` (endpointy i NVS wyciągnięte z Ryby, atrapy NVS/serwera).
 
-Otwarte pytania:
-1. Rampa poranna: pozostaje stałą godziną, czy też ma startować od świtu/wschodu
-   z przesunięciem (jak wieczorna od zachodu)?
-2. Fallback przy braku czasu: sztywne 19:00 / stała godzina (jak dziś) — potwierdzić.
+**Rampy poranne — otwarte:** rampa poranna nadal startuje o stałej godzinie. Czy ma iść
+według świtu/wschodu z przesunięciem (jak wieczorna od zachodu)? To zmienia start rampy
+porannej, więc wymaga decyzji właściciela.
+Fallback przy braku czasu (NTP/RTC) pozostaje jak dziś: 19:00 dla zachodu.
 
 ## 5. DoD (w domu, po flashu 4.7.0)
 
@@ -72,6 +75,7 @@ Otwarte pytania:
   dla 52,1345 / 20,1418 (±2 min) w dniu testu.
 - Zachowanie rampy wieczornej bez zmian poza przesunięciem zachodu o ≤4 min.
 - Brak NTP → 19:00 jak w 4.6.0.
+- Panel: zmiana lokalizacji zapisuje się i po restarcie ESP zachód liczony z nowych wartości.
 
 ## 6. Rollback
 

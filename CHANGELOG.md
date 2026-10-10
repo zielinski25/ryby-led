@@ -17,9 +17,15 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
   wieczornej) używa `astro::compute`. Poprzedni wzór odchylał się do −4,4 min (zima/wiosna);
   nowy jest zgodny z `astral` ±2 min. Kontrakt bez zmian (minuty UTC, `-1` = brak zachodu),
   więc strefa, zmiana czasu, `EVENING_ON_BEFORE_SUNSET_MIN` i fallback 19:00 działają jak dotąd.
+- **Lokalizacja z panelu:** szerokość/długość ustawiane w panelu LAN (karta „Lokalizacja –
+  zachód słońca”), zapisywane na ESP w NVS (namespace `astro_loc`), bez przeflashowania.
+  `GET /api/location` (lat, lon, zachód HH:MM, czy czas z NTP), `POST /api/location` z JSON
+  `{"lat":..,"lon":..}`. Walidacja: lat −90..90, lon −180..180; zła wartość → 400, zachowana
+  poprzednia. Zmiana → zachód przeliczany w następnym obiegu pętli. Brak wpisu w NVS → domyślne
+  52,1345 / 20,1418. Test: `check_location.sh` (27 asercji, endpointy wyciągnięte z Ryby).
 - **Nie podłączone:** świt i wschód (rampa poranna nadal stała godzina). Ramp Arbiter
   i MIN LUX nietknięte. Decyzje — `docs/06`, sekcja 4.
-- Testy: `test_astro.cpp` (ASan+UBSan, 169 asercji): 22 pary data×miejsce (Kraków, Warszawa,
+- Testy: `test_astro.cpp` (ASan+UBSan, 186 asercji): 22 pary data×miejsce (Kraków, Warszawa,
   Gdańsk, Tromsø, Sydney, dom 52,1345/20,1418) z tolerancją 2 min, kolejność zdarzeń, długość dnia,
   tzMin, polarny dzień/noc (Tromsø), walidacja wejścia. Generator wartości: `astro_ref_gen.py`.
   `check_integration_hl.sh`: prawdziwe ciało `obliczZachodSlonca` vs `astral` (±2 min).

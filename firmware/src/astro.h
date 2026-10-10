@@ -4,9 +4,10 @@
 //  Wschód, zachód, świt cywilny i zmierzch cywilny z równań NOAA (dokładność
 //  ~1 min dla szerokości Polski). Bez sieci, bez RTC — wystarcza czas z NTP.
 //
-//  STATUS: moduł izolowany. NIE podłączony do harmonogramu ani do rampy
-//  (Ramp Arbiter i MIN LUX nie są dotykane). Podłączenie wymaga decyzji
-//  właściciela (docs/06, sekcja 4). Testy: firmware/tests/host/test_astro.cpp.
+//  STATUS: zachód słońca podłączony (obliczZachodSlonca → sunsetMinutes →
+//  wieczorna rampa). Świt/wschód NIE podłączone (Ramp Arbiter i MIN LUX nie
+//  są dotykane). Lokalizacja ustawiana w panelu i trzymana w NVS (docs/06, §4).
+//  Testy: firmware/tests/host/test_astro.cpp.
 // ═══════════════════════════════════════════════════════════════════════════
 #pragma once
 
@@ -32,5 +33,13 @@ bool compute(int y, int m, int d, double latDeg, double lonDeg, int tzMin, Times
 
 // Minuty z zakresu [0,1440) dla wartości z Times (do porównań z harmonogramem).
 double wrapMinutes(double min);
+
+// Czy para (szerokość, długość) jest poprawną lokalizacją: skończona liczba,
+// lat w [-90,90], lon w [-180,180]. Ustawienie z panelu przechodzi tę walidację.
+bool validLocation(double latDeg, double lonDeg);
+
+// Odczytuje pole liczbowe "key":<liczba> z ciała JSON (prosty parser bez zależności).
+// Zwraca false, gdy klucza nie ma, wartość nie jest liczbą albo jest nieskończona.
+bool jsonNumber(const char* body, const char* key, double& out);
 
 }  // namespace astro
