@@ -11,7 +11,7 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 | 1. OTA GitHub + release'y | ✅ KOD ZBUDOWANY + RELEASE v4.1.0 OPUBLIKOWANY | 4.1.0 | commity `cb16f00` + `037cd7a` (FIX-ORDER); build po stronie użytkownika OK, release v4.1.0 z `firmware.bin`+`.elf` publiczny; czeka: flash USB w domu + test OTA |
 | 2. Bezpieczeństwo Firebase | 🟡 W TOKU (sekrety w `secrets.h` + OTA/TG w 4.7.1; TLS i UserAuth do decyzji) | 4.1.1 / 4.7.1 | sekrety przeniesione do `src/secrets.h` (poza repo, `.gitignore`); do zrobienia po stronie użytkownika: nowy Database Secret w Firebase Console → wpisać do `secrets.h` → build → flash → **odwołanie starego sekretu**; potem zmiana CMD_TOKEN + hasła espota; część 2 (NVS+UserAuth) później |
 | 3. Spool V2 + telemetria | 🟡 KOD + TESTY HOSTOWE GOTOWE | 4.2.0 / 4.5.0 | ring PSRAM + Spool V2 (CRC, commit) + sessionNonce + replay FIFO + `/api/telemetry/status`; 200 testów hostowych OK; DoD na płytce (zanik zasilania w trakcie wysyłki) do wykonania — procedura: `docs/03_ETAP3_SPOOL_V2.md`; **historia długa `/api/history/long` + wykres tygodniowy w panelu: 4.5.0** (KOD + testy hostowe, DoD na płytce: `docs/05`, sekcja 7) |
-| 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | 🟡 | 4.3.0+build.265, naprawa 4.7.1+build.271 | KOD GOTOWY: CORS-PNA + OPTIONS, panel v14 (LAN/zdalnie, OTA, skan Wi-Fi). 4.7.1: komendy zdalne panelu wysyłane do kolejki `/aquarium/commands` (wcześniej martwa ścieżka `/aquarium/cmd.json`). 4.7.2+build.272: zapis AUTO zdalnie jako komenda `autosave a b c d e` (wcześniej ignorowany typ konfiguracji); symulacja LUX w panelu zablokowana, bo firmware jej nie ma. Test z telefonu na LTE: `docs/07`, krok 4 |
+| 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | 🟡 | 4.3.0+build.265, naprawa 4.7.1+build.271 | KOD GOTOWY: CORS-PNA + OPTIONS, panel v14 (LAN/zdalnie, OTA, skan Wi-Fi). 4.7.1: komendy zdalne panelu wysyłane do kolejki `/aquarium/commands` (wcześniej martwa ścieżka `/aquarium/cmd.json`). 4.7.2+build.272: zapis AUTO zdalnie jako komenda `autosave a b c d e` (wcześniej ignorowany typ konfiguracji); symulacja LUX z panelu (`configType:"luxSim"`) — parser dodany w firmware (symulacja była, brakowało parsera). Test z telefonu na LTE: `docs/07`, krok 4 |
 | 5. Log krytyczny + Telegram | 🟡 | 4.4.0+build.266, menu 4.6.0+build.268 | KOD GOTOWY: critlog (+testy), /log_krytyczny, menu pogrupowane (sekcje + 1 klik do raportu), karta w panelu. Test na płytce wg `docs/04`, sekcja 6 |
 | 6. Astronomia + RTC | 🟡 | 4.7.0+build.270 | KOD GOTOWY: moduł `astro` (NOAA, 197 asercji), zachód/świt/wschód podłączone; lokalizacja i tryb rampy porannej (stała / świt / wschód + przesunięcie) z panelu (NVS); RTC: sterownik `rtc13` (DS1307/DS3231, 59 asercji) i karta w panelu, domyślnie wyłączony. Karta „Dzień” z `morningEff`. Do zrobienia w domu: identyfikacja modułu (nadruk), test na płytce wg `docs/06`, sekcja 5 |
 | 7. Panel LVGL | ⬜ opcjonalny | — | |
@@ -200,10 +200,10 @@ jak R250 Centrali); pamięć: pomiar zajętości PSRAM przed/po (budżet!).
   `pump` (`pumpSlots` z `HH:MM`), `telegram`, `minlux` (po korekcie zakresu minLuxTarget 500–8000).
   Test `check_panel_cmd.js`, sekcje 6–7.
 - `autoSave` (zdalny zapis AUTO) — naprawiony: komenda `autosave` w kolejce (4.7.2).
-- `luxSim` (symulacja LUX) — firmware nie ma tej funkcji. Panel blokuje zapis
-  ostrzeżeniem, zamiast pokazywać fałszywe „AKTYWNA”. **Otwarta decyzja:** wdrożyć
-  symulację LUX w firmware (osobny etap, wpływa na sterowanie oświetleniem) czy
-  usunąć kartę z panelu.
+- `luxSim` (symulacja LUX) — symulacja jest w firmware (`simLux*`, jak `/api/sim`), brakowało
+  parsera `configType:"luxSim"`. Dodany w 4.7.2 (bez zapisu do NVS, po restarcie wyłączona).
+  Decyzja właściciela: wdrożyć (opcja 1). Test na płytce: log `SIM-CFG`, przy niepowodzeniu wrócić do tej sekcji.
+- Panel v15: brak, źródłem jest `panel/akwarium-firebase-panel-v14.html` (decyzja właściciela).
 4. Uzupełnić `docs/` o strukturę panelu i instrukcję otwierania zdalnego.
 
 **DoD:** panel otwarty z telefonu na LTE (poza WiFi domowym) steruje

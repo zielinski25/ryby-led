@@ -1357,16 +1357,18 @@ struct PumpSlot { int start; int end; };
 static constexpr uint8_t FB_CFG_KEY_LEN = 64;
 static constexpr uint8_t TG_TOKEN_SNAPSHOT_LEN = 64;
 static constexpr uint8_t TG_CHAT_SNAPSHOT_LEN  = 40;
-enum FirebaseConfigField : uint16_t {
+enum FirebaseConfigField : uint32_t {
   CFG_MWD=1u<<0, CFG_MWE=1u<<1, CFG_MIDOFF=1u<<2, CFG_EVENB=1u<<3, CFG_EVENOFF=1u<<4, CFG_FADE=1u<<5,
   CFG_SENSOR=1u<<6, CFG_ADAPT=1u<<7, CFG_LEARN=1u<<8,
   CFG_ML_ENABLED=1u<<9, CFG_ML_TARGET=1u<<10, CFG_ML_INTERVAL=1u<<11,
-  CFG_KWH=1u<<12, CFG_RAMP=1u<<13, CFG_EMA=1u<<14, CFG_SENSINT=1u<<15
+  CFG_KWH=1u<<12, CFG_RAMP=1u<<13, CFG_EMA=1u<<14, CFG_SENSINT=1u<<15,
+  // [4.7.2 LUXSIM] symulacja czujnika światła z panelu (configType:"luxSim")
+  CFG_LS_MODE=1u<<16, CFG_LS_LUX=1u<<17, CFG_LS_MIN=1u<<18, CFG_LS_MAX=1u<<19, CFG_LS_PERIOD=1u<<20
 };
 
 struct FirebaseConfigSnapshot {
   uint64_t cfgTs = 0;
-  uint16_t fieldMask = 0;
+  uint32_t fieldMask = 0;
   char firebaseKey[FB_CFG_KEY_LEN] = {0}; // niepuste tylko dla config_refresh
   char configType[16] = {0};
 
@@ -1403,6 +1405,14 @@ struct FirebaseConfigSnapshot {
   bool telegramEnabledValue = false;
   char telegramToken[TG_TOKEN_SNAPSHOT_LEN] = {0};
   char telegramChatId[TG_CHAT_SNAPSHOT_LEN] = {0};
+
+  // [4.7.2 LUXSIM] 0=off, 1=auto (sinusoida), 2=stała
+  bool hasLuxSim = false;
+  uint8_t luxSimMode = 0;
+  float luxSimLuxValue = 300.0f;
+  float luxSimMinValue = 0.0f;
+  float luxSimMaxValue = 1500.0f;
+  uint32_t luxSimPeriodS = 600;
 };
 
 QueueHandle_t fbConfigApplyQueue = nullptr; // Core 0 -> Core 1
@@ -13192,6 +13202,28 @@ static bool fbParseConfigSnapshot(const String& body, FirebaseConfigSnapshot& ou
     if (extractBool("tgEnabled", b)) { out.telegramEnabledValue=b; out.telegramEnabledPresent=true; h=true; }
     out.hasTelegram=h; any |= h;
   }
+  // [4.7.2 LUXSIM] Tylko jawny configType "luxSim" (pusty typ NIE włącza symulacji).
+  // Stan NIE jest zapisywany do NVS: po restarcie symulacja wyłączona (jak /api/sim).
+  if (cfgType == "luxSim") {
+    bool h = false;
+    const String modeKey = "\"luxSimMode\":\"";
+    int mIdx = body.indexOf(modeKey);
+    if (mIdx >= 0) {
+      int st = mIdx + modeKey.length();
+      int en = body.indexOf("\"", st);
+      String m = (en > st) ? body.substring(st, en) : String("");
+      if (m == "off")        { out.luxSimMode = 0; out.fieldMask |= CFG_LS_MODE; h = true; }
+      else if (m == "auto")  { out.luxSimMode = 1; out.fieldMask |= CFG_LS_MODE; h = true; }
+      else if (m == "const") { out.luxSimMode = 2; out.fieldMask |= CFG_LS_MODE; h = true; }
+    }
+    float lf;
+    if (extractFloat("luxSimLux", lf) && lf >= 0.0f && lf <= 50000.0f) { out.luxSimLuxValue = lf; out.fieldMask |= CFG_LS_LUX; h = true; }
+    if (extractFloat("luxSimMin", lf) && lf >= 0.0f && lf <= 50000.0f) { out.luxSimMinValue = lf; out.fieldMask |= CFG_LS_MIN; h = true; }
+    if (extractFloat("luxSimMax", lf) && lf >= 0.0f && lf <= 50000.0f) { out.luxSimMaxValue = lf; out.fieldMask |= CFG_LS_MAX; h = true; }
+    int32_t lp;
+    if (extractInt32("luxSimPeriod", lp) && lp >= 10 && lp <= 86400) { out.luxSimPeriodS = (uint32_t)lp; out.fieldMask |= CFG_LS_PERIOD; h = true; }
+    out.hasLuxSim = h; any |= h;
+  }
   if (!any) return false;
   if (Komentarze) logPrintf("lvl=INFO tag=FB-CFG state=PARSED ts=%llu typ=%s\n", (unsigned long long)out.cfgTs, out.configType);
   return true;
@@ -13277,6 +13309,29 @@ static void applyFirebaseConfigSnapshotRuntime(const FirebaseConfigSnapshot& c) 
     if (c.telegramToken[0]) tgBotToken = String(c.telegramToken);
     if (c.telegramChatId[0]) tgChatId = String(c.telegramChatId);
     if (c.telegramEnabledPresent) tgEnabled = c.telegramEnabledValue;
+  }
+  if (c.hasLuxSim) {
+    // [4.7.2 LUXSIM] te same zmienne co /api/sim i terminal [SIM]. Min < Max wymagane.
+    if (c.fieldMask & (CFG_LS_MIN | CFG_LS_MAX)) {
+      float mn = (c.fieldMask & CFG_LS_MIN) ? c.luxSimMinValue : simLuxAutoMin;
+      float mx = (c.fieldMask & CFG_LS_MAX) ? c.luxSimMaxValue : simLuxAutoMax;
+      if (mn < mx) { simLuxAutoMin = mn; simLuxAutoMax = mx; }
+      else logPrintf("lvl=WARN tag=SIM-CFG msg=\"min >= max, zakres sinusoidy bez zmian\"\n");
+    }
+    if (c.fieldMask & CFG_LS_PERIOD) simLuxAutoPeriodMs = (unsigned long)c.luxSimPeriodS * 1000UL;
+    if (c.fieldMask & CFG_LS_LUX) simLuxValue = c.luxSimLuxValue;
+    if (c.fieldMask & CFG_LS_MODE) {
+      if (c.luxSimMode == 0) {
+        simLuxEnabled = false; simLuxAuto = false; simLuxSmoothed = 0.0f;
+      } else {
+        simLuxEnabled = true;
+        simLuxAuto = (c.luxSimMode == 1);
+        simLuxSmoothed = simLuxAuto ? 0.0f : simLuxValue;
+        czujnikPokojowyAktywny = true;
+      }
+    }
+    logPrintf("lvl=INFO tag=SIM-CFG state=APPLIED mode=%d lux=%.0f min=%.0f max=%.0f okres=%lus\n",
+              (int)c.luxSimMode, simLuxValue, simLuxAutoMin, simLuxAutoMax, simLuxAutoPeriodMs / 1000UL);
   }
 }
 

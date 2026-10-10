@@ -2143,14 +2143,7 @@ function openLocalLogs(){
 
 // ── LUX SIMULATION ────────────────────────────────────
 var _luxSimMode = 'off';
-// Symulacja LUX NIE istnieje w firmware (brak obsługi pola luxSim) — nic nie wysyłamy,
-// żeby panel nie pokazywał fałszywego „AKTYWNA”.
-function luxSimUnsupported(){
-  toast("⚠️ Symulacja LUX nie jest obsługiwana przez firmware — nic nie wysłano","err");
-  return true;
-}
 function luxSimSet(mode){
-  if(luxSimUnsupported()) return;
   _luxSimMode = mode;
   var badge = gid('lux-sim-badge');
   if(!badge) return;
@@ -2175,14 +2168,12 @@ function luxSimSet(mode){
   }
 }
 function luxSimSaveConst(){
-  if(luxSimUnsupported()) return;
   var v = parseInt(gid('lux-sim-const-val').value)||300;
   fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), luxSimMode:'const', luxSimLux:v, configType:'luxSim'})
     .then(function(){ toast("🌤 Symulacja stała: "+v+" lx → Firebase","ok"); })
     .catch(function(e){ toast("❌ "+e.message,"err"); });
 }
 function luxSimSaveAuto(){
-  if(luxSimUnsupported()) return;
   var mn = parseInt(gid('lux-sim-min').value)||0;
   var mx = parseInt(gid('lux-sim-max').value)||1500;
   var pr = parseInt(gid('lux-sim-period').value)||600;

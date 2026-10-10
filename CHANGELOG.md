@@ -15,15 +15,19 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
     parser `/aquarium/config` nie zna — zapis był po cichu ignorowany. Teraz panel wysyła komendę
     kolejki `autosave a b c d e` (5 wartości PWM, 0–1023); firmware zapisuje je jako tryb AUTO do EEPROM
     tą samą ścieżką co `/api/save-auto` (nowy typ `AUTO_SAVE_PWM`). Mniej niż 5 wartości = odrzucenie.
-  - **Symulacja LUX z panelu** (`luxSimSet`, `luxSimSaveConst`, `luxSimSaveAuto`): firmware nie ma tej
-    funkcji (brak parsera `luxSim` i logiki). Panel pokazywał „AKTYWNA”, a nic nie docierało do ESP.
-    Teraz funkcje są zablokowane ostrzeżeniem i nic nie wysyłają. Implementacja w firmware to osobna decyzja.
+  - **Symulacja LUX z panelu** (`luxSimSet`, `luxSimSaveConst`, `luxSimSaveAuto`): symulacja czujnika
+    światła istnieje w firmware (`simLux*`, tryby stały / AUTO-sinusoida / wyłączony, jak `/api/sim` i terminal
+    `[SIM]`), ale parser `/aquarium/config` nie znał `configType:"luxSim"`, więc zapisy z panelu były ignorowane.
+    Dodany parser i aplikacja (`CFG_LS_*`, pole `fieldMask` poszerzone do 32 bitów). Stan symulacji **nie jest
+    zapisywany do NVS**: po restarcie symulacja wyłączona, hardware przejmuje czujnik. Pusty `configType` nie
+    włącza symulacji (tylko jawny `luxSim`).
   - **Zakres Min LUX w panelu**: panel dopuszczał target 0–8000, a firmware przyjmuje 500–8000 (wartości
     poniżej 500 były cicho odrzucane). Slider i walidacja w panelu dopasowane do firmware.
 - Testy: `check_panel_cmd.js` rozszerzony o wykonanie `saveToAutoFb` (oczekiwane `autosave 10 11 12 13 14`),
-  blokadę LUX, zgodność `configType` panelu z parserem firmware i zakres minLuxTarget. 37 PASS.
+  parsowanie `luxSim` (klucze i payloady panelu), zgodność `configType` z parserem i zakres minLuxTarget. 47 PASS.
 - Wersja: `v4.7.2+build.272` (zmiana firmware), `version.txt` 4.7.2.
-- Do sprawdzenia na płytce: zapis AUTO z panelu przez LTE → po restarcie wartości AUTO z EEPROM.
+- Do sprawdzenia na płytce: zapis AUTO z panelu przez LTE → po restarcie wartości AUTO z EEPROM; symulacja LUX
+  z panelu (stała i AUTO) → log `SIM-CFG state=APPLIED`, po restarcie `simEnabled=false`.
 
 ## [4.7.1+build.271] SECRETS-2 — 2026-10-10
 

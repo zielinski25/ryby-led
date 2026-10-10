@@ -107,28 +107,41 @@ const { sendFireCmd } = factory(
   check(sentAuto.length === 1 && sentAuto[0] === 'autosave 10 11 12 13 14',
         'saveToAutoFb → sendFireCmd("autosave 10 11 12 13 14") (jest: ' + JSON.stringify(sentAuto) + ')');
 
-  // ── 5) Symulacja LUX: w firmware jej nie ma → panel nic nie wysyła ───────
-  const lsStart = panel.indexOf('function luxSimUnsupported(');
+  // ── 5) Symulacja LUX (4.7.2): panel wysyła configType:"luxSim" z poprawnymi polami ──
+  const lsStart = panel.indexOf('function luxSimSet(');
   const lsEnd = panel.indexOf('// ── [v14] TRYB POŁĄCZENIA');
   const lsBlock = panel.slice(lsStart, lsEnd);
   const lsSent = [];
+  const lsVals = { 'lux-sim-const-val': '777', 'lux-sim-min': '100', 'lux-sim-max': '900', 'lux-sim-period': '120' };
   const lsFactory = new Function('fbPatch', 'toast', 'gid', 'CMD_TOKEN', 'Date',
-    lsBlock + '\nreturn { luxSimSet, luxSimSaveConst, luxSimSaveAuto };');
+    lsBlock + '\nreturn { luxSimSaveConst, luxSimSaveAuto };');
   const ls = lsFactory(
     async (path, body) => { lsSent.push(body); },
     () => {},
-    () => ({ value: '300' }),
+    (id) => ({ value: lsVals[id] || '0' }),
     'T', FakeDate
   );
-  ls.luxSimSet('auto'); ls.luxSimSaveConst(); ls.luxSimSaveAuto();
-  check(lsSent.length === 0, 'symulacja LUX: brak wysyłki do Firebase (jest ' + lsSent.length + ')');
+  ls.luxSimSaveConst();
+  ls.luxSimSaveAuto();
+  check(lsSent.length === 2, 'luxSim: 2 zapisy wysłane (jest ' + lsSent.length + ')');
+  check(lsSent[0] && lsSent[0].configType === 'luxSim' && lsSent[0].luxSimMode === 'const' && lsSent[0].luxSimLux === 777,
+        'luxSim const → {luxSimMode:"const", luxSimLux:777, configType:"luxSim"}');
+  check(lsSent[1] && lsSent[1].luxSimMode === 'auto' && lsSent[1].luxSimMin === 100 && lsSent[1].luxSimMax === 900 && lsSent[1].luxSimPeriod === 120,
+        'luxSim auto → min/max/period z panelu');
+  // Walidacja min < max po stronie panelu (bez wysyłki przy złym zakresie)
+  lsVals['lux-sim-min'] = '900';
+  ls.luxSimSaveAuto();
+  check(lsSent.length === 2, 'luxSim auto: min >= max → brak wysyłki');
+  // Firmware musi znać każdy klucz wysyłany przez panel
+  for (const k of ['luxSimMode', 'luxSimLux', 'luxSimMin', 'luxSimMax', 'luxSimPeriod']) {
+    check(fw.includes(k), 'firmware parsuje klucz ' + k);  // w C++ klucz jest w \"escapowanych\" cudzysłowach
+  }
+  check(fw.includes('cfgType == "luxSim"'), 'firmware: blok configType "luxSim"');
 
   // ── 6) Wszystkie configType z panelu są parsowane przez firmware ─────────
-  const fwTypes = new Set(['schedule', 'adapt', 'minlux', 'params', 'pump', 'telegram']);
+  const fwTypes = new Set(['schedule', 'adapt', 'minlux', 'params', 'pump', 'telegram', 'luxSim']);
   const panelTypes = new Set();
   for (const m of panel.matchAll(/configType\s*:\s*["']([A-Za-z]+)["']/g)) panelTypes.add(m[1]);
-  // luxSim celowo pominięty: zapisy są zablokowane strażnikiem (sekcja 5), więc nie trafiają do firmware
-  panelTypes.delete('luxSim');
   for (const t of panelTypes) {
     check(fwTypes.has(t), 'firmware parsuje configType "' + t + '" z panelu');
   }
