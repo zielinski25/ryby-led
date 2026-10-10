@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Akwarium LED – Firebase</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060d18;--surface:#0c1829;--surface2:#111f35;
+  --border:rgba(0,180,220,.15);--border-h:rgba(0,220,255,.35);
+  --cyan:#00d4f5;--blue:#0070ff;--teal:#00b4aa;
+  --warm:#ff9f43;--red:#ff4d6d;--white-led:#e8f4ff;
+  --fs:#7ad4ff;--navy:#001b3a;--text:#c8e0f5;--text-dim:#5a7a99;
+  --glow-c:0 0 20px rgba(0,212,245,.25);--glow-b:0 0 20px rgba(0,112,255,.3);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 50% at 20% 0%,rgba(0,80,180,.12) 0%,transparent 70%),radial-gradient(ellipse 50% 40% at 80% 100%,rgba(0,160,200,.08) 0%,transparent 70%);pointer-events:none;z-index:0}
+.navbar{position:sticky;top:0;z-index:100;background:rgba(6,13,24,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;padding:0 20px;height:56px}
+.brand{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--cyan);letter-spacing:.05em;margin-right:28px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.brand-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.tabs{display:flex;align-items:stretch;gap:0;height:100%;flex:1;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:7px;padding:0 18px;font-size:.82rem;font-weight:500;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.02em}
+.tab:hover{color:var(--text);border-bottom-color:var(--border-h)}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan);text-shadow:0 0 12px rgba(0,212,245,.5)}
+.tab-icon{font-size:.9rem}
+.fb-badge{background:rgba(255,140,0,.18);border:1px solid rgba(255,140,0,.4);color:#ffb347;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.04em}
+.status-bar{display:flex;align-items:center;gap:12px;margin-left:auto;flex-shrink:0}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(0,180,100,.12);border:1px solid rgba(0,180,100,.3);border-radius:20px;padding:4px 12px;font-size:.74rem;color:#4ade80;font-weight:500}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px #4ade80}
+.status-pill.offline{background:rgba(255,77,109,.1);border-color:rgba(255,77,109,.3);color:var(--red)}
+.status-pill.offline .status-dot{background:var(--red);box-shadow:0 0 6px var(--red)}
+@media(max-width:520px){.navbar{padding:0 6px}.brand{margin-right:8px}.brand-text,.fb-badge{display:none}.tab{padding:0 10px;font-size:.78rem;gap:4px}.status-pill .pill-text{display:none}.status-pill{padding:4px 8px}}
+/* SYS HEADER */
+.sys-header{background:rgba(8,16,30,.7);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sys-badge{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:.68rem;font-weight:600;letter-spacing:.04em;border:1px solid}
+.sys-badge.ok{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.3);color:#4ade80}
+.sys-badge.blue{background:rgba(0,212,245,.1);border-color:rgba(0,212,245,.3);color:var(--cyan)}
+.sys-badge.warn{background:rgba(255,180,0,.1);border-color:rgba(255,180,0,.3);color:#fbbf24}
+.sbdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+/* MAIN */
+.main{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:24px 16px 60px;display:flex;flex-direction:column;gap:16px}
+.page{display:none}.page.active{display:flex;flex-direction:column;gap:16px}
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;transition:border-color .2s}
+.card:hover{border-color:var(--border-h)}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+.card-header.collapsed{border-bottom-color:transparent}
+.card-title{display:flex;align-items:center;gap:10px;font-size:.95rem;font-weight:600;letter-spacing:.02em}
+.card-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.icon-power{background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.25)}
+.icon-pwm{background:rgba(0,212,245,.1);border:1px solid rgba(0,212,245,.2)}
+.icon-adapt{background:rgba(0,180,170,.1);border:1px solid rgba(0,180,170,.2)}
+.icon-temp{background:rgba(255,159,67,.1);border:1px solid rgba(255,159,67,.2)}
+.icon-sched{background:rgba(0,112,255,.12);border:1px solid rgba(0,112,255,.25)}
+.icon-quick{background:rgba(122,212,255,.1);border:1px solid rgba(122,212,255,.2)}
+.icon-green{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25)}
+.icon-violet{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25)}
+.icon-gear{background:rgba(100,120,160,.1);border:1px solid rgba(100,120,160,.25)}
+.icon-tg{background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.25)}
+.icon-pump{background:rgba(0,180,170,.1);border:1px solid rgba(0,180,170,.2)}
+.pump-slot-row{display:flex;gap:10px;align-items:flex-end;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}
+.pump-rm{background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.25);color:#ff4d6d;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:.9rem;flex-shrink:0;font-family:'Outfit',sans-serif;transition:all .2s}
+.pump-rm:hover{background:rgba(255,77,109,.2)}
+.time-field{display:flex;flex-direction:column;gap:4px}
+.time-field label{font-size:.75rem;color:var(--text-dim)}
+.time-sel{display:flex;align-items:center;gap:4px;background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:4px 8px;width:100%;box-sizing:border-box;transition:border-color .2s}
+.time-sel:focus-within{border-color:var(--cyan)}
+.time-sel select{background:transparent;border:none;color:var(--text);font-family:'Space Mono',monospace;font-size:.88rem;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;text-align:center;width:38px}
+.time-sel select:focus{color:var(--cyan)}
+.time-sel select option{background:#001b3a;color:var(--text)}
+.time-sel-sep{color:var(--cyan);font-family:'Space Mono',monospace;font-weight:700;font-size:1rem;line-height:1}
+.adapt-stats-box{background:rgba(0,112,255,.08);border:1px solid rgba(0,112,255,.2);border-radius:10px;padding:12px 14px;font-size:.8rem;margin-top:10px}
+.adapt-stats-box strong{color:#7ab8ff;display:block;margin-bottom:5px}
+.tg-input{background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:.82rem;width:100%;box-sizing:border-box;outline:none;transition:border-color .2s}
+.tg-input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,212,245,.12)}
+.chevron{font-size:.7rem;color:var(--text-dim);transition:transform .25s}
+.chevron.open{transform:rotate(180deg)}
+.card-body{padding:20px}
+.card-body.hidden{display:none}
+/* ROWS */
+.row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:16px}
+.row:last-child{border-bottom:none;padding-bottom:0}.row:first-child{padding-top:0}
+.row-label{font-size:.87rem;font-weight:500}
+.row-desc{font-size:.75rem;color:var(--text-dim);margin-top:2px}
+/* TOGGLE */
+.toggle{position:relative;width:48px;height:26px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:rgba(255,255,255,.1);border-radius:13px;cursor:pointer;transition:background .25s;border:1px solid rgba(255,255,255,.12)}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .25s;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.toggle input:checked~.toggle-track{background:var(--cyan);border-color:var(--cyan);box-shadow:var(--glow-c)}
+.toggle input:checked~.toggle-track .toggle-thumb{left:25px}
+/* SEG */
+.seg{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--navy)}
+.seg-btn{padding:6px 14px;font-size:.78rem;font-weight:500;cursor:pointer;color:var(--text-dim);border:none;background:none;transition:all .2s;white-space:nowrap;font-family:'Outfit',sans-serif}
+.seg-btn.active{background:var(--cyan);color:#000;font-weight:600}
+.seg-btn:not(.active):hover{color:var(--text);background:rgba(255,255,255,.05)}
+/* SLIDERS */
+.slider-wrap{display:flex;flex-direction:column;gap:10px}
+.slider-label-row{display:flex;align-items:center;justify-content:space-between;font-size:.82rem}
+.slider-label{color:var(--text-dim);display:flex;align-items:center;gap:6px}
+.channel-dot{width:9px;height:9px;border-radius:50%}
+.dot-white{background:#e8f4ff;box-shadow:0 0 6px #e8f4ff}.dot-fs{background:#7ad4ff;box-shadow:0 0 6px #7ad4ff}
+.dot-fsw{background:#b0e8ff;box-shadow:0 0 6px #b0e8ff}.dot-blue{background:#4060ff;box-shadow:0 0 6px #4060ff}
+.dot-red{background:#ff4d6d;box-shadow:0 0 6px #ff4d6d}.dot-all{background:linear-gradient(135deg,#fff,#00d4f5)}
+.slider-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;min-width:80px;text-align:right}
+.pct{color:var(--text-dim);font-size:.72rem;font-weight:400;margin-left:3px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;cursor:pointer;outline:none;background:rgba(255,255,255,.08)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px rgba(0,212,245,.6),0 2px 4px rgba(0,0,0,.4);cursor:pointer;transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+.slider-white input[type=range]::-webkit-slider-thumb{background:#e8f4ff;box-shadow:0 0 10px rgba(232,244,255,.5)}
+.slider-fs input[type=range]::-webkit-slider-thumb{background:#7ad4ff}
+.slider-fsw input[type=range]::-webkit-slider-thumb{background:#b0e8ff}
+.slider-blue input[type=range]::-webkit-slider-thumb{background:#4060ff}
+.slider-red input[type=range]::-webkit-slider-thumb{background:#ff4d6d}
+.slider-divider{height:1px;background:var(--border);margin:8px 0}
+/* TEMP GRID */
+.temp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.temp-chip{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 12px;text-align:center}
+.temp-chip .label{font-size:.72rem;color:var(--text-dim);margin-bottom:6px}
+.temp-chip .value{font-family:'Space Mono',monospace;font-size:1.35rem;font-weight:700}
+.temp-chip .unit{font-size:.8rem;color:var(--text-dim)}
+.temp-chip.plate{border-color:rgba(255,159,67,.2)}.temp-chip.plate .value{color:var(--warm)}
+.temp-chip.water{border-color:rgba(0,212,245,.2)}.temp-chip.water .value{color:var(--cyan)}
+/* LUX */
+.lux-bar-wrap{margin-top:6px}
+.lux-bar-bg{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+.lux-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#0070ff,#00d4f5);transition:width .6s ease}
+.lux-stats{display:flex;justify-content:space-between;margin-top:6px;font-size:.75rem;color:var(--text-dim)}
+.lux-val{font-family:'Space Mono',monospace;color:var(--cyan);font-weight:700;font-size:.9rem}
+/* ENERGY */
+.en-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.035)}
+.en-row:last-child{border-bottom:none;padding-bottom:0}.en-row:first-child{padding-top:0}
+.en-lbl{font-size:.83rem;font-weight:500}
+.en-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700}
+.en-unit{font-size:.68rem;color:var(--text-dim);margin-left:3px;font-family:'Outfit',sans-serif}
+/* PHASE */
+.phase-row{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:9px;border:1px solid transparent;border-left-width:3px;transition:all .25s;margin-bottom:5px}
+.ph-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+@keyframes phblink{0%,100%{opacity:1}50%{opacity:.3}}
+.ph-dot.pulse{animation:phblink 1.6s ease-in-out infinite;width:10px;height:10px;margin-top:4px}
+.ph-content{flex:1;min-width:0}
+.ph-name{font-size:.8rem;font-weight:600;line-height:1.2;margin-bottom:3px}
+.ph-sub{font-size:.65rem;color:var(--text-dim);font-family:'Space Mono',monospace;line-height:1.4}
+.ph-now-tag{display:inline-block;margin-top:3px;font-size:.58rem;background:rgba(0,212,245,.18);color:var(--cyan);border:1px solid rgba(0,212,245,.4);padding:1px 6px;border-radius:3px;font-weight:700;letter-spacing:.04em}
+.ph-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.ph-times{font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;white-space:nowrap;line-height:1.3}
+.ph-times .td{color:var(--text-dim);font-weight:400}
+.ramp-badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:5px;font-size:.62rem;font-weight:700;white-space:nowrap;letter-spacing:.03em}
+.rb-up{background:linear-gradient(90deg,rgba(255,130,0,.55),rgba(255,210,60,.35));color:#ffd060;border:1px solid rgba(255,170,30,.7)}
+.rb-down{background:linear-gradient(90deg,rgba(255,160,50,.3),rgba(30,70,220,.55));color:#a0bcff;border:1px solid rgba(60,100,240,.65)}
+.ph-wd{color:rgba(0,212,245,.75)}.ph-we{color:rgba(255,159,67,.65)}
+.ph-wd-active{color:var(--cyan);font-weight:700}.ph-we-active{color:var(--warm);font-weight:700}
+.ph-sep{height:1px;background:rgba(255,255,255,.04);margin:0 0 4px}
+.phase-row:last-child{margin-bottom:0}.phase-row.ph-active{box-shadow:0 2px 16px rgba(0,0,0,.25)}
+/* PERIOD TABS */
+.period-tabs{display:flex;gap:4px;margin-bottom:14px}
+.ptab{padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);color:var(--text-dim);background:transparent;transition:all .2s;font-family:'Outfit',sans-serif}
+.ptab:hover{color:var(--text);border-color:var(--border-h)}
+.ptab.on{background:rgba(0,212,245,.1);border-color:rgba(0,212,245,.4);color:var(--cyan)}
+.period-panel{display:none}.period-panel.on{display:block}
+/* EN PERIOD GRID (3-col header) */
+.en-period-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.epg{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px;text-align:center}
+.epg-lbl{font-size:.64rem;font-family:'Space Mono',monospace;text-transform:uppercase;letter-spacing:.1em;color:var(--text-dim);margin-bottom:5px}
+.epg-val{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700}
+/* MINI BAR */
+.mini-bar-wrap{display:flex;align-items:flex-end;gap:3px}
+.mb{flex:1;border-radius:1px 1px 0 0;min-height:2px;background:rgba(0,212,245,.25)}
+.mb.hi{background:rgba(0,212,245,.55)}.mb.today{background:var(--cyan)}
+/* QUICK GRID */
+.quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:500px){.quick-grid{grid-template-columns:repeat(3,1fr)}}
+.qa-btn{display:flex;flex-direction:column;align-items:center;gap:7px;padding:16px 10px;border-radius:12px;cursor:pointer;border:1px solid var(--border);background:var(--surface2);font-family:'Outfit',sans-serif;color:var(--text);font-size:.8rem;font-weight:500;text-align:center;transition:all .2s;line-height:1.3}
+.qa-btn:hover{border-color:var(--cyan);background:rgba(0,212,245,.07);color:var(--cyan)}
+.qa-btn .qa-icon{font-size:1.4rem}
+.qa-btn.danger:hover{border-color:var(--red);background:rgba(255,77,109,.08);color:var(--red)}
+/* IP BAR */
+.ip-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 16px;font-family:'Space Mono',monospace;font-size:.78rem;color:var(--text-dim);display:flex;align-items:center;gap:10px}
+.ip-bar span{color:var(--cyan)}
+/* SAVE BTN */
+.save-btn{display:block;width:100%;margin-top:14px;padding:10px;background:linear-gradient(135deg,var(--teal),var(--cyan));border:none;border-radius:10px;color:#000;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .2s}
+.save-btn:hover{opacity:.85}
+.save-btn.warn-btn{background:linear-gradient(135deg,#e07020,var(--warm))}
+/* TOAST */
+#toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);z-index:9999;background:rgba(12,24,41,.97);border:1px solid var(--cyan);border-radius:14px;padding:16px 28px;font-family:'Outfit',sans-serif;font-size:.95rem;color:var(--text);text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.7),0 0 20px rgba(0,212,245,.15);pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;min-width:200px;max-width:80vw}
+#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#toast.toast-ok{border-color:var(--cyan);color:var(--cyan)}
+#toast.toast-err{border-color:var(--red);color:var(--red)}
+#toast.toast-warn{border-color:var(--warm);color:var(--warm)}
+/* BADGE */
+.badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:600}
+.badge-on{background:rgba(0,212,245,.15);color:var(--cyan)}.badge-off{background:rgba(255,255,255,.07);color:var(--text-dim)}
+/* DISABLED PAGE */
+.page-disabled{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;color:var(--text-dim)}
+.page-disabled .dis-icon{font-size:3rem;margin-bottom:16px;filter:grayscale(1);opacity:.5}
+.page-disabled h3{font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:8px}
+.page-disabled p{font-size:.85rem;line-height:1.6;max-width:360px;margin:0 auto 16px}
+.page-disabled a{color:var(--cyan);text-decoration:none}
+.page-disabled a:hover{text-decoration:underline}
+/* DASH SBS */
+.dash-sbs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:620px){.dash-sbs{grid-template-columns:1fr!important}}
+@media(max-width:480px){.temp-grid{grid-template-columns:1fr 1fr}}
+/* FIREBASE NOTICE */
+.fb-age{font-size:.7rem;color:var(--text-dim);font-family:'Space Mono',monospace;margin-top:8px;text-align:right}
+.fb-age.ok{color:#4ade80}.fb-age.warn{color:var(--warm)}.fb-age.err{color:var(--red)}
+/* ══ SETTINGS-specific styles ══ */
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.cfg-grid{grid-template-columns:1fr}}
+.sched-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:480px){.sched-grid{grid-template-columns:1fr}}
+.time-field{display:flex;flex-direction:column;gap:4px}
+.time-field label{font-size:.75rem;color:var(--text-dim)}
+.info-box{background:rgba(0,112,255,.08);border:1px solid rgba(0,112,255,.2);border-radius:10px;padding:12px 14px;font-size:.8rem;margin-top:10px}
+.info-box strong{color:#7ab8ff;display:block;margin-bottom:5px}
+.cfg-field{display:flex;flex-direction:column;gap:5px}
+.cfg-label{font-size:.75rem;color:var(--text-dim);font-weight:500;letter-spacing:.03em}
+.cfg-input{background:var(--navy);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Space Mono',monospace;font-size:.85rem;width:100%;outline:none;transition:border-color .2s}
+.cfg-input:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,212,245,.12)}
+input[type="time"].cfg-input{color-scheme:dark}
+.cfg-note{background:rgba(0,180,220,.06);border:1px solid rgba(0,180,220,.15);border-radius:8px;padding:9px 13px;font-size:.76rem;color:rgba(180,220,240,.8);line-height:1.5}
+.cfg-note.warn-note{background:rgba(255,159,67,.06);border-color:rgba(255,159,67,.2);color:rgba(255,200,140,.85)}
+.cfg-section-title{font-size:.68rem;font-weight:600;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;padding:10px 0 4px;border-top:1px solid rgba(255,255,255,.05);margin-top:6px}
+.cfg-section-title:first-child{border-top:none;margin-top:0;padding-top:0}
+.cfg-status-row{display:flex;align-items:center;gap:8px;font-size:.77rem;color:var(--text-dim);font-family:'Space Mono',monospace}
+.cfg-status-dot{width:8px;height:8px;border-radius:50%;background:var(--text-dim)}
+.cfg-status-dot.live{background:#4ade80;box-shadow:0 0 6px #4ade80}
+.cfg-pending-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;font-size:.65rem;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="brand">
+    <div class="brand-dot" id="bdot"></div>
+    <span class="brand-text">AKWARIUM LED</span>
+    <span class="fb-badge">☁ Firebase</span>
+    <span id="fb-stale-badge" style="display:none;font-size:.62rem;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid;margin-left:4px;letter-spacing:.04em"></span>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('dash',this)"><span class="tab-icon">🏠</span> Dashboard</div>
+    <div class="tab" onclick="showTab('ustawienia',this)"><span class="tab-icon">⚙</span> Ustawienia</div>
+    <div class="tab" onclick="showTab('terminal',this)"><span class="tab-icon">&rsaquo;_</span> Terminal</div>
+    <div class="tab" onclick="showTab('wykresy',this)"><span class="tab-icon">↗</span> Wykresy</div>
+    <div class="tab" onclick="showTab('logi',this)"><span class="tab-icon">≡</span> Logi</div>
+  </div>
+  <div class="status-bar">
+    <div class="status-pill" id="conn-pill">
+      <div class="status-dot"></div>
+      <span class="pill-text" id="connlabel">Łączenie...</span>
+    </div>
+  </div>
+</nav>
+
+<!-- SYS HEADER -->
+<div class="sys-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="font-size:1.6rem;filter:drop-shadow(0 0 8px rgba(0,200,255,.4))">🐟</div>
+    <div>
+      <div style="font-family:Syne,sans-serif;font-size:1.1rem;font-weight:700;color:#fff;letter-spacing:.02em">Akwarium LED</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);margin-top:2px">
+        <span id="sh-ip" style="color:var(--cyan)">Firebase</span>&nbsp;·&nbsp;<span id="sh-time">--:--:--</span>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <div id="sh-wifi" class="sys-badge ok"><div class="sbdot" style="background:#4ade80"></div>WiFi ESP</div>
+    <div id="sh-ntp" class="sys-badge ok"><div class="sbdot" style="background:#4ade80"></div>NTP</div>
+    <div id="sh-mode" class="sys-badge blue">AUTO</div>
+    <div class="sys-badge" style="background:rgba(255,140,0,.12);border-color:rgba(255,140,0,.3);color:#ffb347">☁ Firebase</div>
+  </div>
+</div>
+
+<div class="main" id="main-wrap">
+
+<!-- ═══ PAGE: DASHBOARD ═══ -->
+<div class="page active" id="p-dash">
+  <div class="ip-bar">🏠 Dashboard &nbsp;—&nbsp; <span id="dash-time">--:--:--</span> &nbsp;·&nbsp; dane z Firebase RTDB</div>
+
+  <!-- STATUS -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-power">⚡</div>Status systemu</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body" style="padding:10px 14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px">
+          <div style="font-size:.63rem;color:var(--text-dim);letter-spacing:.05em;margin-bottom:3px">ZASILANIE</div>
+          <div id="d-power" style="font-weight:700;font-size:.82rem;font-family:'Space Mono',monospace">—</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px">
+          <div style="font-size:.63rem;color:var(--text-dim);letter-spacing:.05em;margin-bottom:3px">TRYB</div>
+          <div id="d-mode" style="font-weight:700;font-size:.82rem;font-family:'Space Mono',monospace">—</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px">
+          <div style="font-size:.63rem;color:var(--text-dim);letter-spacing:.05em;margin-bottom:3px">CZUJNIK</div>
+          <div id="d-sensor" style="font-weight:700;font-size:.82rem;font-family:'Space Mono',monospace">—</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px">
+          <div style="font-size:.63rem;color:var(--text-dim);letter-spacing:.05em;margin-bottom:3px">ADAPTACJA</div>
+          <div id="d-adapt" style="font-weight:700;font-size:.82rem;font-family:'Space Mono',monospace">—</div>
+          <div id="d-adapt-trans" style="font-size:.63rem;color:var(--text-dim);margin-top:2px">—</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px">
+          <div style="font-size:.63rem;color:var(--text-dim);letter-spacing:.05em;margin-bottom:3px">POMPKA</div>
+          <div id="d-pump" style="font-weight:700;font-size:.82rem;font-family:'Space Mono',monospace">—</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px">
+          <div style="font-size:.63rem;color:var(--text-dim);letter-spacing:.05em;margin-bottom:3px">RAMPA</div>
+          <div id="d-ramp" style="font-weight:700;font-size:.82rem;font-family:'Space Mono',monospace;color:var(--text-dim)">—</div>
+        </div>
+      </div>
+      <div class="fb-age" id="esp-age">Ostatni odczyt Firebase: —</div>
+    </div>
+  </div>
+
+  <!-- TEMP -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-temp">🌡️</div>Temperatury</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="temp-grid">
+        <div class="temp-chip plate"><div class="label">Płyta LED 1</div><div class="value" id="d-t1">—<span class="unit">°C</span></div></div>
+        <div class="temp-chip plate"><div class="label">Płyta LED 2</div><div class="value" id="d-t2">—<span class="unit">°C</span></div></div>
+        <div class="temp-chip water"><div class="label">Temperatura wody</div><div class="value" id="d-tw">—<span class="unit">°C</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LED & ŚWIATŁO -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-pwm">☀</div>LED &amp; Światło</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <!-- 3 stat boxes — spójny format: duża cyfra = lx przy roślinach, subtext = skąd -->
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+
+        <!-- SŁOŃCE -->
+        <div style="flex:1;background:var(--surface2);border:1px solid rgba(255,159,67,.2);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:2px;letter-spacing:.03em">☀ SŁOŃCE</div>
+          <div style="font-family:'Space Mono',monospace;font-size:1.35rem;font-weight:700;color:var(--warm);line-height:1.1" id="d-sun-pct">—</div>
+          <div style="font-size:.65rem;color:var(--text-dim);margin-top:1px">lx przy roślinach</div>
+          <div style="font-size:.62rem;color:rgba(255,159,67,.6);margin-top:3px" id="d-sun-lux">—</div>
+        </div>
+
+        <!-- DOŚWIETLANIE -->
+        <div style="flex:1;background:var(--surface2);border:1px solid rgba(0,212,245,.2);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:2px;letter-spacing:.03em">💡 DOŚWIETLANIE</div>
+          <div style="font-family:'Space Mono',monospace;font-size:1.35rem;font-weight:700;color:var(--cyan);line-height:1.1" id="d-led-val">—</div>
+          <div style="font-size:.65rem;color:var(--text-dim);margin-top:1px">lx przy roślinach</div>
+          <div style="font-size:.62rem;color:rgba(0,212,245,.5);margin-top:3px" id="d-led-pwm-raw">—</div>
+        </div>
+
+        <!-- NAD WODĄ -->
+        <div style="flex:1;background:var(--surface2);border:1px solid rgba(122,212,255,.2);border-radius:12px;padding:12px;text-align:center">
+          <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:2px;letter-spacing:.03em">🎙 NAD WODĄ</div>
+          <div style="font-family:'Space Mono',monospace;font-size:1.35rem;font-weight:700;color:var(--fs);line-height:1.1" id="d-lux-water">—</div>
+          <div style="font-size:.65rem;color:var(--text-dim);margin-top:1px">lx (czujnik)</div>
+          <div style="font-size:.62rem;color:rgba(122,212,255,.5);margin-top:3px">bezpośrednio</div>
+        </div>
+
+      </div>
+      <!-- Bar + etykieta skali + moc -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:.68rem;color:var(--text-dim)">światło łącznie przy roślinach &nbsp;<span id="d-bar-scale" style="color:rgba(255,255,255,.3)"></span></div>
+        <div style="font-family:'Space Mono',monospace;font-size:.76rem;font-weight:700;color:var(--warm)" id="d-power-now-w">—</div>
+      </div>
+      <div style="position:relative;margin-bottom:6px">
+        <canvas id="d-blend-bar" style="width:100%;height:14px;display:block;border-radius:7px"></canvas>
+        <div id="d-bar-sun-pct" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#fff;text-shadow:0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.9);pointer-events:none;font-family:'Space Mono',monospace"></div>
+        <div id="d-bar-pct" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#fff;text-shadow:0 0 4px rgba(0,0,0,.9),0 0 8px rgba(0,0,0,.9);pointer-events:none;font-family:'Space Mono',monospace"></div>
+      </div>
+      <!-- Docelowy LUX -->
+      <div style="margin-bottom:14px;padding:10px 14px;background:var(--surface2);border:1px solid rgba(0,212,245,.15);border-radius:10px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:.65rem;color:var(--text-dim);letter-spacing:.04em;margin-bottom:2px">🎯 DOCELOWY LUX <span style="font-size:.6rem">(tryb MIN. LUX)</span></div>
+          <div style="font-size:.72rem;color:var(--text-dim)">Wartość utrzymywana gdy brak wystarczającego światła</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px">
+          <div id="d-minlux-target" style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--cyan)">—</div>
+          <div id="d-minlux-state" style="font-size:.65rem;margin-top:2px">—</div>
+        </div>
+      </div>
+      <!-- Separator kanały -->
+      <div style="border-top:1px solid rgba(255,255,255,.06);margin:0 -20px 14px;padding:10px 20px 0;font-size:.72rem;font-weight:600;color:var(--text-dim);letter-spacing:.06em;text-transform:uppercase">▪ Kanały LED — PWM / Moc</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:11px;height:11px;border-radius:50%;background:#e8f4ff;box-shadow:0 0 5px #e8f4ff;flex-shrink:0"></div><div style="font-size:.79rem;color:var(--text-dim);width:88px;flex-shrink:0">Białe</div><div style="flex:1;background:rgba(255,255,255,.07);border-radius:4px;height:7px;overflow:hidden"><div id="d-pb0" style="height:100%;border-radius:4px;background:#e8f4ff;transition:width .5s;width:0%"></div></div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);min-width:80px;text-align:right;flex-shrink:0" id="d-pv0">—</div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--warm);min-width:42px;text-align:right;flex-shrink:0" id="d-pw0">—</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:11px;height:11px;border-radius:50%;background:#7ad4ff;box-shadow:0 0 5px #7ad4ff;flex-shrink:0"></div><div style="font-size:.79rem;color:var(--text-dim);width:88px;flex-shrink:0">Full Spectrum</div><div style="flex:1;background:rgba(255,255,255,.07);border-radius:4px;height:7px;overflow:hidden"><div id="d-pb1" style="height:100%;border-radius:4px;background:#7ad4ff;transition:width .5s;width:0%"></div></div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);min-width:80px;text-align:right;flex-shrink:0" id="d-pv1">—</div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--warm);min-width:42px;text-align:right;flex-shrink:0" id="d-pw1">—</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:11px;height:11px;border-radius:50%;background:#b0e8ff;box-shadow:0 0 5px #b0e8ff;flex-shrink:0"></div><div style="font-size:.79rem;color:var(--text-dim);width:88px;flex-shrink:0">FS Białe</div><div style="flex:1;background:rgba(255,255,255,.07);border-radius:4px;height:7px;overflow:hidden"><div id="d-pb2" style="height:100%;border-radius:4px;background:#b0e8ff;transition:width .5s;width:0%"></div></div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);min-width:80px;text-align:right;flex-shrink:0" id="d-pv2">—</div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--warm);min-width:42px;text-align:right;flex-shrink:0" id="d-pw2">—</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:11px;height:11px;border-radius:50%;background:#4060ff;box-shadow:0 0 5px #4060ff;flex-shrink:0"></div><div style="font-size:.79rem;color:var(--text-dim);width:88px;flex-shrink:0">Niebieskie</div><div style="flex:1;background:rgba(255,255,255,.07);border-radius:4px;height:7px;overflow:hidden"><div id="d-pb3" style="height:100%;border-radius:4px;background:#4060ff;transition:width .5s;width:0%"></div></div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);min-width:80px;text-align:right;flex-shrink:0" id="d-pv3">—</div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--warm);min-width:42px;text-align:right;flex-shrink:0" id="d-pw3">—</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:11px;height:11px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 5px #ff4d6d;flex-shrink:0"></div><div style="font-size:.79rem;color:var(--text-dim);width:88px;flex-shrink:0">Czerwone</div><div style="flex:1;background:rgba(255,255,255,.07);border-radius:4px;height:7px;overflow:hidden"><div id="d-pb4" style="height:100%;border-radius:4px;background:#ff4d6d;transition:width .5s;width:0%"></div></div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-dim);min-width:80px;text-align:right;flex-shrink:0" id="d-pv4">—</div><div style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--warm);min-width:42px;text-align:right;flex-shrink:0" id="d-pw4">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARMONOGRAM + ENERGIA -->
+  <div class="dash-sbs">
+    <div class="card" style="margin:0">
+      <div class="card-header" style="cursor:default">
+        <div class="card-title"><div class="card-icon icon-sched">📅</div>Harmonogram dnia</div>
+        <span id="d-sched-badge" style="font-size:.73rem;color:var(--text-dim);display:none">aktywna: <span id="d-sched-phase" style="color:var(--cyan)"></span></span>
+      </div>
+      <div class="card-body" style="padding:14px 16px">
+        <div style="position:relative;margin-bottom:4px">
+          <canvas id="d-tl-canvas" style="display:block;width:100%;height:14px"></canvas>
+          <div id="d-tl-now" style="position:absolute;top:0;width:2px;height:100%;background:rgba(255,255,255,.9);border-radius:1px;box-shadow:0 0 6px #fff;pointer-events:none"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--text-dim);font-family:'Space Mono',monospace;margin-bottom:12px">
+          <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+        </div>
+        <div id="d-phase-list" style="display:flex;flex-direction:column;gap:6px">
+          <div style="color:var(--text-dim);font-size:.78rem;text-align:center;padding:10px">Ładowanie...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin:0">
+      <div class="card-header" style="cursor:default">
+        <div class="card-title"><div class="card-icon icon-adapt">⚡</div>Energia &amp; czas</div>
+      </div>
+      <div class="card-body" style="padding:14px 16px">
+        <div class="period-tabs">
+          <button class="ptab on" onclick="dSetEPeriod('day',this)">Dziś</button>
+          <button class="ptab" onclick="dSetEPeriod('week',this)">Tydzień</button>
+          <button class="ptab" onclick="dSetEPeriod('month',this)">Miesiąc</button>
+        </div>
+        <div class="period-panel on" id="dep-day">
+          <div class="en-row"><span class="en-lbl">Moc teraz</span><span class="en-val" style="color:var(--cyan)"><span id="d-en-pow">—</span><span class="en-unit">W</span></span></div>
+          <div class="en-row"><span class="en-lbl">Energia dziś</span><span class="en-val"><span id="d-en-today">—</span><span class="en-unit">Wh</span></span></div>
+          <div class="en-row"><span class="en-lbl">Koszt dziś</span><span class="en-val" style="color:var(--warm)"><span id="d-en-cost-today">—</span><span class="en-unit">zł</span></span></div>
+          <div class="en-row"><span class="en-lbl">Czas LED dziś</span><span class="en-val" style="color:#7ab8ff" id="d-en-ledtime">—</span></div>
+          <div class="en-row"><span class="en-lbl">🌿 Aktywacje MIN LUX</span><span class="en-val" style="color:#a78bfa"><span id="d-en-minlux-act">—</span><span class="en-unit">×</span></span></div>
+          <div class="en-row"><span class="en-lbl">⚡ Szczytowa moc dziś</span><span class="en-val"><span id="d-en-peak">—</span><span class="en-unit">W</span></span></div>
+          <div class="en-row"><span class="en-lbl">💡 Lux·godz. przy roślinach</span><span class="en-val" style="color:var(--teal)"><span id="d-en-lux-hours">—</span><span class="en-unit">lx·h</span></span></div>
+          <div class="en-row" style="border-bottom:none"><span class="en-lbl">💰 Cena kWh</span><span class="en-val" style="color:var(--text-dim)"><span id="d-en-kwh-price">—</span><span class="en-unit">zł/kWh</span></span></div>
+          <div style="margin-top:12px">
+            <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">⚡ Moc ostatnie 12h (Wh/godz.)</div>
+            <div class="mini-bar-wrap" style="height:44px;align-items:flex-end" id="d-hour-bars"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:.6rem;color:var(--text-dim);font-family:'Space Mono',monospace" id="d-hour-labels"></div>
+          </div>
+        </div>
+        <div class="period-panel" id="dep-week">
+          <div class="en-period-grid">
+            <div class="epg"><div class="epg-lbl">Energia</div><div class="epg-val" style="color:var(--cyan)"><span id="d-en-week">—</span> <span style="font-size:.68rem;font-weight:400;color:var(--text-dim)">Wh</span></div></div>
+            <div class="epg"><div class="epg-lbl">Koszt</div><div class="epg-val" style="color:var(--warm)"><span id="d-en-cost-week">—</span> <span style="font-size:.68rem;font-weight:400;color:var(--text-dim)">zł</span></div></div>
+            <div class="epg"><div class="epg-lbl">Czas LED</div><div class="epg-val" style="color:#7ab8ff" id="d-en-ledtime-week">—</div></div>
+          </div>
+          <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">Energia dzień po dniu (Wh)</div>
+          <div class="mini-bar-wrap" style="height:50px" id="d-week-bars"></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:.62rem;color:var(--text-dim);font-family:'Space Mono',monospace" id="d-week-labels"></div>
+          <div style="height:10px"></div>
+          <div class="en-row"><span class="en-lbl">Śr. dzienna energia</span><span class="en-val" style="color:var(--cyan)"><span id="d-en-avg">—</span><span class="en-unit">Wh</span></span></div>
+          <div class="en-row"><span class="en-lbl">Śr. koszt dzienny</span><span class="en-val" style="color:var(--warm)"><span id="d-en-cost-avg">—</span><span class="en-unit">zł</span></span></div>
+          <div class="en-row"><span class="en-lbl">Śr. czas LED</span><span class="en-val" style="color:#7ab8ff" id="d-en-ledtime-avg">—</span></div>
+          <div class="en-row"><span class="en-lbl">✳ Zaoszcz. tydzień (słońce)</span><span class="en-val" style="color:#4ade80"><span id="d-en-saved-week">0.0</span><span class="en-unit">Wh</span></span></div>
+          <div class="en-row"><span class="en-lbl">🌿 Śr. aktywacje MIN LUX/dzień</span><span class="en-val" style="color:#a78bfa"><span id="d-en-minlux-avg">—</span><span class="en-unit">×</span></span></div>
+          <div class="en-row" style="border-bottom:none"><span class="en-lbl">📈 Prognoza koszt/rok</span><span class="en-val" style="color:var(--warm)"><span id="d-en-cost-year">—</span><span class="en-unit">zł</span></span></div>
+        </div>
+        <div class="period-panel" id="dep-month">
+          <div class="en-period-grid">
+            <div class="epg"><div class="epg-lbl">Energia</div><div class="epg-val" style="color:var(--cyan)"><span id="d-en-month">—</span> <span style="font-size:.68rem;font-weight:400;color:var(--text-dim)">Wh</span></div></div>
+            <div class="epg"><div class="epg-lbl">Koszt</div><div class="epg-val" style="color:var(--warm)"><span id="d-en-cost-month">—</span> <span style="font-size:.68rem;font-weight:400;color:var(--text-dim)">zł</span></div></div>
+            <div class="epg"><div class="epg-lbl">Czas LED</div><div class="epg-val" style="color:#7ab8ff" id="d-en-ledtime-month">—</div></div>
+          </div>
+          <div style="font-size:.72rem;color:var(--text-dim);margin-bottom:6px">Energia tygodniowa (Wh)</div>
+          <div class="mini-bar-wrap" style="height:50px" id="d-month-bars"></div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:.62rem;color:var(--text-dim);font-family:'Space Mono',monospace" id="d-month-labels"></div>
+          <div style="height:10px"></div>
+          <div class="en-row"><span class="en-lbl">Śr. dzienna energia</span><span class="en-val" style="color:var(--cyan)"><span id="d-en-avg-month">—</span><span class="en-unit">Wh</span></span></div>
+          <div class="en-row"><span class="en-lbl">Prognoza miesiąc</span><span class="en-val"><span id="d-en-forecast">—</span><span class="en-unit">Wh</span></span></div>
+          <div class="en-row"><span class="en-lbl">Prognoza koszt</span><span class="en-val" style="color:var(--warm)"><span id="d-en-cost-forecast">—</span><span class="en-unit">zł</span></span></div>
+          <div class="en-row"><span class="en-lbl">⚡ Oszcz. vs brak adaptacji</span><span class="en-val" style="color:#4ade80"><span id="d-en-saved-month">0.00</span><span class="en-unit">zł</span></span></div>
+          <div class="en-row"><span class="en-lbl">💡 Energia bez adaptacji</span><span class="en-val" style="color:var(--text-dim)"><span id="d-en-no-adapt">—</span><span class="en-unit">Wh</span></span></div>
+          <div class="en-row"><span class="en-lbl">⏱ Łączny czas świecenia</span><span class="en-val" style="color:#7ab8ff" id="d-en-ledtime-total">—</span></div>
+          <div class="en-row" style="border-bottom:none"><span class="en-lbl">⚡ Szczytowa moc</span><span class="en-val" style="color:var(--cyan)"><span id="d-en-peak-m">—</span><span class="en-unit">W</span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /p-dash -->
+
+<!-- ═══ PAGE: USTAWIENIA ═══ -->
+<div class="page" id="p-ustawienia">
+  <div class="ip-bar">⚙ Sterowanie przez Firebase RTDB &nbsp;—&nbsp; komenda → ESP ~7s &nbsp;·&nbsp; konfiguracja → ESP ~30s</div>
+
+  <!-- ZASILANIE I TRYB -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-power">⚡</div>Zasilanie i tryb</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="row" style="padding-top:0">
+        <div><div class="row-label">Zasilanie LED</div><div class="row-desc">Włącz lub wyłącz wszystkie diody</div></div>
+        <label class="toggle">
+          <input type="checkbox" id="tog-power" onchange="sendFireCmd(this.checked?'power_on':'power_off')">
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </label>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Tryb pracy</div><div class="row-desc">Auto: harmonogram dzienny / Manual: stałe wartości PWM</div></div>
+        <div class="seg">
+          <button class="seg-btn" id="btn-auto" onclick="sendFireCmd('mode_auto')">Auto</button>
+          <button class="seg-btn" id="btn-man" onclick="sendFireCmd('mode_manual')">Manual</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Czas rampy</div><div class="row-desc">Płynne przejście przy zmianie jasności (minuty)</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" class="cfg-input" id="cfg-fadeMinutes" min="1" max="180" value="30" style="width:70px">
+          <button onclick="saveFadeViaFb()" style="padding:6px 12px;background:rgba(0,212,245,.12);border:1px solid rgba(0,212,245,.25);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem">Ustaw</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-pwm">⬛</div>Sterowanie PWM <span style="color:var(--text-dim);font-weight:400;font-size:.8rem;margin-left:6px">(0 – 1023)</span></div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="slider-wrap">
+        <div class="slider-label-row">
+          <div class="slider-label"><div class="channel-dot dot-all"></div>⭐ Wszystkie naraz</div>
+          <div class="slider-val"><span id="sv-all">0</span><span class="pct" id="sp-all"> 0%</span></div>
+        </div>
+        <input type="range" min="0" max="1023" value="0" id="sl-all" oninput="setAllSlider(this)">
+        <div class="slider-divider"></div>
+        <div class="slider-label-row slider-white">
+          <div class="slider-label"><div class="channel-dot dot-white"></div>Białe</div>
+          <div class="slider-val"><span id="sv0">0</span><span class="pct" id="sp0"> 0%</span></div>
+        </div>
+        <div class="slider-white"><input type="range" id="sl0" min="0" max="1023" value="0" oninput="updSlider(0,this)"></div>
+        <div class="slider-label-row slider-fs" style="margin-top:10px">
+          <div class="slider-label"><div class="channel-dot dot-fs"></div>Full Spectrum</div>
+          <div class="slider-val"><span id="sv1">0</span><span class="pct" id="sp1"> 0%</span></div>
+        </div>
+        <div class="slider-fs"><input type="range" id="sl1" min="0" max="1023" value="0" oninput="updSlider(1,this)"></div>
+        <div class="slider-label-row slider-fsw" style="margin-top:10px">
+          <div class="slider-label"><div class="channel-dot dot-fsw"></div>FS Białe</div>
+          <div class="slider-val"><span id="sv2">0</span><span class="pct" id="sp2"> 0%</span></div>
+        </div>
+        <div class="slider-fsw"><input type="range" id="sl2" min="0" max="1023" value="0" oninput="updSlider(2,this)"></div>
+        <div class="slider-label-row slider-blue" style="margin-top:10px">
+          <div class="slider-label"><div class="channel-dot dot-blue"></div>Niebieskie</div>
+          <div class="slider-val"><span id="sv3">0</span><span class="pct" id="sp3"> 0%</span></div>
+        </div>
+        <div class="slider-blue"><input type="range" id="sl3" min="0" max="1023" value="0" oninput="updSlider(3,this)"></div>
+        <div class="slider-label-row slider-red" style="margin-top:10px">
+          <div class="slider-label"><div class="channel-dot dot-red"></div>Czerwone</div>
+          <div class="slider-val"><span id="sv4">0</span><span class="pct" id="sp4"> 0%</span></div>
+        </div>
+        <div class="slider-red"><input type="range" id="sl4" min="0" max="1023" value="0" oninput="updSlider(4,this)"></div>
+      </div>
+      <button class="save-btn" onclick="sendPwmCmd()">💾 Wyślij PWM do ESP przez Firebase</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="saveToAutoFb()" style="flex:1;padding:9px;background:rgba(0,212,245,.12);border:1px solid rgba(0,212,245,.25);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:600">⭐ Zapisz do AUTO</button>
+        <button onclick="location.reload()" style="flex:1;padding:9px;background:rgba(0,112,255,.12);border:1px solid rgba(0,112,255,.25);color:#7ab8ff;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:600">🔄 Odśwież</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGULACJA ADAPTACYJNA (łączy Adaptację + MIN LUX) -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <div class="card-icon icon-adapt">🌿</div>Regulacja adaptacyjna
+      </div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="cfg-section-title" style="border-top:none;margin-top:0;padding-top:0">Czujnik światła</div>
+      <div class="row" style="padding-top:8px">
+        <div><div class="row-label">Tryb czujników</div><div class="row-desc">Które czujniki TSL2561 są aktywne</div></div>
+        <div class="seg">
+          <button class="seg-btn active" id="sens-btn-0" onclick="setSensorMode(0,this)">OFF</button>
+          <button class="seg-btn" id="sens-btn-1" onclick="setSensorMode(1,this)">Pokój</button>
+          <button class="seg-btn" id="sens-btn-2" onclick="setSensorMode(2,this)">Pokój+Woda</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Filtr czujnika (EMA)</div><div class="row-desc">Szybkość reakcji na zmianę słońca: 0.05=wolny (odporny na chmury) … 0.50=szybki</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" class="cfg-input" id="cfg-emaFilter" min="0.05" max="0.50" step="0.05" value="0.15" style="width:80px">
+          <button onclick="saveEmaViaFb()" style="padding:6px 12px;background:rgba(0,212,245,.12);border:1px solid rgba(0,212,245,.25);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem">Ustaw</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Interwał czujnika (SENS_INT)</div><div class="row-desc">Co ile sekund odczyt TSL2561 i aktualizacja EMA (5–120s)</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" class="cfg-input" id="cfg-sensInt" min="5" max="300" value="30" style="width:80px">
+          <button onclick="saveSensIntViaFb()" style="padding:6px 12px;background:rgba(0,212,245,.12);border:1px solid rgba(0,212,245,.25);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem">Ustaw</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Czas rampy PWM (RAMP_SEC)</div><div class="row-desc">Czas przejścia PWM podczas adaptacji (1–600s)</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" class="cfg-input" id="cfg-rampSec" min="1" max="600" value="30" style="width:80px">
+          <button onclick="saveRampSecViaFb()" style="padding:6px 12px;background:rgba(0,212,245,.12);border:1px solid rgba(0,212,245,.25);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem">Ustaw</button>
+        </div>
+      </div>
+      <div class="cfg-section-title" style="margin-top:10px">Adaptacja i MIN LUX</div>
+      <div class="row" style="padding-top:8px">
+        <div><div class="row-label">Regulacja adaptacyjna</div><div class="row-desc">Automatyczne dostosowanie jasności do warunków</div></div>
+        <label class="toggle">
+          <input type="checkbox" id="cfg-adaptEnabled">
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </label>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Uczenie się</div><div class="row-desc">Zbieranie historii LUX do optymalizacji (8:00–18:00)</div></div>
+        <label class="toggle">
+          <input type="checkbox" id="cfg-learningEnabled">
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </label>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Min. LUX (między fazami)</div><div class="row-desc">Uzupełnianie światła gdy brak aktywnej fazy</div></div>
+        <label class="toggle">
+          <input type="checkbox" id="cfg-minLuxEnabled">
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </label>
+      </div>
+      <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <div><div class="row-label">Docelowy LUX</div><div class="row-desc">Wartość LUX utrzymywana w trybie min. LUX</div></div>
+        <div style="display:flex;align-items:center;gap:10px;width:100%">
+          <input type="range" id="cfg-minLuxTarget" min="0" max="8000" step="50" value="1000" oninput="gid('minLuxTarget-val').textContent=this.value" style="flex:1">
+          <span id="minLuxTarget-val" style="font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--cyan);min-width:70px;text-align:right">1000 lx</span>
+        </div>
+      </div>
+      <div class="row">
+        <div><div class="row-label">Interwał MIN LUX (sek)</div><div class="row-desc">Co ile sekund sprawdza i uzupełnia lux (5–300s)</div></div>
+        <input type="number" class="cfg-input" id="cfg-minLuxInterval" min="5" max="300" step="5" value="30" style="width:90px">
+      </div>
+      <div class="info-box" id="adapt-stats-box">
+        <strong>📊 Statystyki adaptacji</strong>
+        Próbek: <span id="s-adapt-probki">—</span> &nbsp;|&nbsp;
+        Transmisja: <span id="s-adapt-trans">—</span>% &nbsp;|&nbsp;
+        MIN LUX: <span id="s-minlux-state" class="badge badge-off">NIEAKTYWNY</span>
+      </div>
+      <button class="save-btn" onclick="saveAdaptConfig()">💾 Zapisz regulację adaptacyjną</button>
+    </div>
+  </div>
+
+  <!-- TELEGRAM -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-tg">📨</div>Telegram – powiadomienia</div>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-body hidden">
+      <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">
+        Raport wysyłany automatycznie o 00:00 oraz na komendę /sendlogs w Telegramie. Konfiguracja jest zapisywana lokalnie przez ESP.
+      </div>
+      <div style="display:grid;gap:10px;margin-bottom:12px">
+        <div class="cfg-field">
+          <label class="cfg-label">Token bota (od @BotFather)</label>
+          <input id="tg-token" type="password" class="tg-input" placeholder="123456:ABC-xyz...">
+        </div>
+        <div class="cfg-field">
+          <label class="cfg-label">Chat ID (Twój numer)</label>
+          <input id="tg-chatid" class="tg-input" placeholder="987654321">
+        </div>
+        <div class="row" style="padding:8px 0;border-bottom:none">
+          <div class="row-label">Włączone</div>
+          <label class="toggle">
+            <input type="checkbox" id="tg-enabled">
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="save-btn" style="flex:1;margin-top:0" onclick="tgSaveViaFb()">💾 Zapisz</button>
+        <button class="save-btn" style="flex:1;margin-top:0;background:rgba(255,255,255,.06)" onclick="tgLoadStatus()">🔍 Status</button>
+      </div>
+      <div id="tg-msg" style="font-size:.78rem;min-height:18px;color:#22d3aa"></div>
+    </div>
+  </div>
+
+  <!-- HARMONOGRAM OŚWIETLENIA -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <div class="card-icon icon-sched">📅</div>Harmonogram dzienny
+      </div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:14px">
+        ☀️ Wschód/zachód słońca — obliczany automatycznie
+      </div>
+      <div class="sched-grid" style="margin-top:8px">
+        <div class="time-field">
+          <label>Poranek (powszedni)</label>
+          <div class="time-sel" id="ts-mw" data-val="07:00"></div>
+        </div>
+        <div class="time-field">
+          <label>Poranek (weekend)</label>
+          <div class="time-sel" id="ts-me" data-val="08:00"></div>
+        </div>
+        <div class="time-field">
+          <label>Przerwa południowa (OFF)</label>
+          <div class="time-sel" id="ts-mo" data-val="13:00"></div>
+        </div>
+        <div class="time-field" style="grid-column:1/-1">
+          <label>Wieczór — start przed zachodem słońca</label>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px">
+            <span style="font-size:.78rem;color:var(--text-dim)">Zachód: <b id="ev-sunset-time" style="color:var(--cyan)">—</b></span>
+            <span style="font-size:.78rem;color:var(--text-dim)">→ LED włącza się o: <b id="ev-led-time" style="color:#f0c040;font-size:.95rem">—</b></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <span style="font-size:.75rem;color:var(--text-dim);white-space:nowrap">-180 min</span>
+            <input type="range" id="cfg-eveningBefore" min="-180" max="0" step="5" value="0"
+              oninput="updateEveningSlider(this.value)"
+              style="flex:1">
+            <span style="font-size:.75rem;color:var(--text-dim);white-space:nowrap">0 min</span>
+          </div>
+          <div style="text-align:center;font-size:.8rem;color:var(--text-dim);margin-top:4px">
+            Offset: <span id="eveningBefore-label" style="color:var(--cyan)">0 min</span>
+          </div>
+        </div>
+        <div class="time-field">
+          <label>Wyłączenie wieczorne</label>
+          <div class="time-sel" id="ts-eo" data-val="22:00"></div>
+        </div>
+      </div>
+      <button class="save-btn" onclick="saveScheduleConfig()">📅 Zapisz harmonogram</button>
+    </div>
+  </div>
+
+  <!-- HARMONOGRAM POMPKI -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <div class="card-icon icon-pump">💧</div>Harmonogram pompki
+      </div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:12px">Aktywne okna czasowe pompki (maks. 6). Stan pompy: <span id="s-pump-state" class="badge badge-off">—</span></div>
+      <div id="pump-slots" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button onclick="addPumpSlot()" style="padding:8px 16px;background:rgba(0,212,245,.08);border:1px solid rgba(0,212,245,.2);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.82rem">+ Dodaj przedział</button>
+        <button class="save-btn" onclick="savePumpScheduleViaFb()" style="margin-top:0;flex:1">💾 Zapisz pompkę</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- SZYBKIE AKCJE -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-quick">🚀</div>Szybkie akcje</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="quick-grid">
+        <button class="qa-btn" onclick="sendFireCmd('pump_off')"><span class="qa-icon">⛔</span>Pompa WYŁ</button>
+        <button class="qa-btn" style="opacity:.45;cursor:not-allowed" title="Tylko panel lokalny"><span class="qa-icon">📷</span>Kamera WYŁ</button>
+        <button class="qa-btn" onclick="sendFireCmd('led_100')"><span class="qa-icon">💡</span>LED 100%</button>
+        <button class="qa-btn" onclick="sendFireCmd('led_off')"><span class="qa-icon">🌑</span>LED WYŁ</button>
+        <button class="qa-btn" style="opacity:.45;cursor:not-allowed" title="Tylko panel lokalny"><span class="qa-icon">🗑</span>Wyczyść logi</button>
+        <button class="qa-btn" id="qa-btn-logs" onclick="openLocalLogs()" title="Otwiera logi w lokalnym panelu ESP"><span class="qa-icon">📋</span>Podgląd logów</button>
+      </div>
+      <div style="margin-top:10px">
+        <button class="qa-btn danger" style="width:100%" onclick="if(confirm('Restart ESP32?'))sendFireCmd('restart')"><span class="qa-icon">🔁</span>Restart ESP32</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYMULACJA CZUJNIKA ŚWIATŁA -->
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-adapt">🌤️</div>Symulacja czujnika światła</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div style="font-size:.79rem;color:var(--text-dim);margin-bottom:12px;line-height:1.55">
+        Zastępuje fizyczny czujnik TSL2561 wirtualną wartością lux.<br>
+        Przydatne do testowania MIN LUX i adaptacji bez słońca.<br>
+        <span style="color:#fbbf24;font-weight:600">⚠ Wyłącz przed normalną pracą akwarium!</span>
+      </div>
+      <div style="margin-bottom:14px">
+        <span id="lux-sim-badge" class="badge badge-off" style="font-size:.76rem;padding:3px 10px">WYŁĄCZONA – hardware</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+        <button onclick="luxSimSet('const')" style="flex:1;min-width:120px;padding:8px 10px;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);color:#4ade80;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:600">▶ Włącz (stały)</button>
+        <button onclick="luxSimSet('auto')" style="flex:1;min-width:120px;padding:8px 10px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:#fbbf24;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:600">→ Tryb AUTO (sinusoida)</button>
+        <button onclick="luxSimSet('off')" style="flex:1;min-width:120px;padding:8px 10px;background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.3);color:#ff4d6d;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:600">✕ Wyłącz (hardware)</button>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px">
+        <div style="font-size:.75rem;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Stała wartość lux</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="lux-sim-const-slider" min="0" max="5000" step="50" value="300"
+            oninput="gid('lux-sim-const-val').value=this.value" style="flex:1">
+          <input type="number" id="lux-sim-const-val" min="0" max="5000" step="50" value="300"
+            oninput="gid('lux-sim-const-slider').value=this.value" class="cfg-input" style="width:72px">
+          <span style="font-size:.8rem;color:var(--text-dim)">lx</span>
+          <button onclick="luxSimSaveConst()" style="padding:6px 12px;background:rgba(0,212,245,.12);border:1px solid rgba(0,212,245,.25);color:var(--cyan);border-radius:8px;cursor:pointer;font-family:inherit;font-size:.8rem">Ustaw</button>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px">
+        <div style="font-size:.75rem;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Parametry trybu AUTO (sinusoida)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="cfg-field">
+            <label class="cfg-label">Min lux</label>
+            <input type="number" class="cfg-input" id="lux-sim-min" min="0" max="4900" value="0">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Max lux</label>
+            <input type="number" class="cfg-input" id="lux-sim-max" min="100" max="5000" value="1500">
+          </div>
+          <div class="cfg-field">
+            <label class="cfg-label">Okres [s]</label>
+            <input type="number" class="cfg-input" id="lux-sim-period" min="10" max="3600" value="600">
+          </div>
+        </div>
+        <button class="save-btn" onclick="luxSimSaveAuto()" style="margin-top:0">💾 Zapisz parametry AUTO</button>
+      </div>
+    </div>
+  </div>
+
+<!-- ═══ PAGE: TERMINAL ═══ -->
+<div class="page" id="p-terminal">
+  <div class="page-disabled">
+    <div class="dis-icon">💻</div>
+    <h3>Terminal niedostępny przez Firebase</h3>
+    <p>Terminal WebSocket wymaga bezpośredniego połączenia z ESP32 w sieci lokalnej. Użyj lokalnego panelu ESP gdy jesteś w tej samej sieci.</p>
+    <a id="local-link-terminal" href="#" target="_blank">🔗 Otwórz lokalny panel ESP (Terminal) →</a>
+    <div style="margin-top:20px;font-size:.78rem;color:var(--text-dim)">
+      Adres ESP: <span id="local-ip-terminal" style="color:var(--cyan);font-family:'Space Mono',monospace">pobieranie...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: WYKRESY ═══ -->
+<div class="page" id="p-wykresy">
+  <div class="page-disabled">
+    <div class="dis-icon">📈</div>
+    <h3>Wykresy niedostępne przez Firebase</h3>
+    <p>Wykresy historyczne pobierane są z pliku <code style="font-family:'Space Mono',monospace;color:var(--cyan)">/history.csv</code> bezpośrednio z ESP32. Wymaga lokalnego połączenia.</p>
+    <a id="local-link-wykresy" href="#" target="_blank">🔗 Otwórz lokalny panel ESP (Wykresy) →</a>
+    <div style="margin-top:20px;font-size:.78rem;color:var(--text-dim)">
+      Adres ESP: <span id="local-ip-wykresy" style="color:var(--cyan);font-family:'Space Mono',monospace">pobieranie...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PAGE: LOGI ═══ -->
+<div class="page" id="p-logi">
+  <div class="page-disabled">
+    <div class="dis-icon">📋</div>
+    <h3>Logi niedostępne przez Firebase</h3>
+    <p>Logi przechowywane są na karcie LittleFS ESP32 i dostępne wyłącznie przez lokalny panel (port 8080). Telegram może też wysyłać logi na żądanie.</p>
+    <a id="local-link-logi" href="#" target="_blank">🔗 Otwórz lokalny panel ESP (Logi) →</a>
+    <div style="margin-top:20px;font-size:.78rem;color:var(--text-dim)">
+      Adres ESP: <span id="local-ip-logi" style="color:var(--cyan);font-family:'Space Mono',monospace">pobieranie...</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ═══════════════════════════════════════════════════
+//  KONFIGURACJA — ZMIEŃ PONIŻSZE WARTOŚCI
+// ═══════════════════════════════════════════════════
+const DB_URL    = "https://akwarium-367be-default-rtdb.europe-west1.firebasedatabase.app";
+const KWH_PRICE = 0.80;
+// [v13-SEC] Sekrety NIE są w tym pliku (repo jest publiczne). Są w localStorage
+// tej przeglądarki: przy pierwszym otwarciu panel poprosi o DB_SECRET i CMD_TOKEN.
+// Zmiana później: w konsoli przeglądarki wpisz akwResetSecrets().
+var DB_SECRET = localStorage.getItem("akw_db_secret") || "";
+var CMD_TOKEN = localStorage.getItem("akw_cmd_token") || "";
+function akwResetSecrets(){
+  var s = prompt("Firebase Database Secret:", DB_SECRET || "");
+  if (s !== null) { DB_SECRET = s.trim(); localStorage.setItem("akw_db_secret", DB_SECRET); }
+  var t = prompt("CMD_TOKEN (taki jak w src/secrets.h na ESP):", CMD_TOKEN || "");
+  if (t !== null) { CMD_TOKEN = t.trim(); localStorage.setItem("akw_cmd_token", CMD_TOKEN); }
+  location.reload();
+}
+if (!DB_SECRET || !CMD_TOKEN) {
+  window.addEventListener("DOMContentLoaded", function(){ akwResetSecrets(); });
+}
+// ═══════════════════════════════════════════════════
+
+// ── UTILS ──────────────────────────────────────────
+var _toastTimer = null;
+function toast(msg, type) {
+  var t = document.getElementById("toast"); if(!t) return;
+  t.className = "show " + (type==="err"?"toast-err":type==="warn"?"toast-warn":"toast-ok");
+  t.textContent = msg; clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ t.className=""; }, 2800);
+}
+function gid(id){ return document.getElementById(id); }
+function fmt1(v){ return (v!==undefined&&v!==null&&!isNaN(parseFloat(v)))?parseFloat(v).toFixed(1):"—"; }
+function hhmm(m){ m=((parseInt(m)||0)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function timeToMin(str){ var p=(str||"").split(':'); return (parseInt(p[0])||0)*60+(parseInt(p[1])||0); }
+function minToTime(m){ m=((parseInt(m)||0)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+
+// ── ZEGAR ───────────────────────────────────────────
+(function tick(){
+  var n=new Date(),h=String(n.getHours()).padStart(2,'0'),mi=String(n.getMinutes()).padStart(2,'0'),s=String(n.getSeconds()).padStart(2,'0');
+  var ts=h+':'+mi+':'+s;
+  var e=gid('sh-time'); if(e) e.textContent=ts;
+  var d=gid('dash-time'); if(d) d.textContent=ts;
+
+  // [v13] Staleness indicator — aktualizowany co sekundę
+  if(_lastEspTs>0){
+    var ageSec=Math.round((Date.now()-_lastEspTs)/1000);
+    var ageTxt=ageSec<60?ageSec+'s':Math.floor(ageSec/60)+'m '+ageSec%60+'s';
+    var ageEl=gid('esp-age');
+    if(ageEl){ ageEl.textContent='Dane ESP sprzed: '+ageTxt; ageEl.className='fb-age '+(ageSec<30?'ok':ageSec<90?'warn':'err'); }
+
+    // Firebase badge + pill kolor zależy od świeżości danych
+    var fbBadge=gid('fb-stale-badge');
+    var pill=gid('conn-pill');
+    var bdot=gid('bdot');
+    if(ageSec<30){
+      // świeże — normalny kolor
+      if(fbBadge){ fbBadge.style.display='none'; }
+      if(pill)   { pill.className='status-pill'; }
+      if(bdot)   { bdot.style.background='var(--cyan)'; }
+    } else if(ageSec<90){
+      // ostrzeżenie — żółty
+      if(fbBadge){ fbBadge.style.display='inline'; fbBadge.textContent='⚠ '+ageTxt+' temu'; fbBadge.style.background='rgba(255,160,0,.2)'; fbBadge.style.borderColor='rgba(255,160,0,.5)'; fbBadge.style.color='#ffb300'; }
+      if(pill)   { pill.className='status-pill'; }
+      if(bdot)   { bdot.style.background='#ffb300'; }
+    } else {
+      // brak danych — czerwony
+      if(fbBadge){ fbBadge.style.display='inline'; fbBadge.textContent='✕ brak sync '+ageTxt; fbBadge.style.background='rgba(255,60,60,.2)'; fbBadge.style.borderColor='rgba(255,60,60,.5)'; fbBadge.style.color='#ff5555'; }
+      if(pill)   { pill.className='status-pill offline'; }
+      if(bdot)   { bdot.style.background='var(--red)'; }
+    }
+  }
+  setTimeout(tick,1000);
+})();
+
+// ── FIREBASE REST ───────────────────────────────────
+async function fbGet(path){
+  var r = await fetch(DB_URL+path+"?auth="+DB_SECRET);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+async function fbPut(path, data){
+  var r = await fetch(DB_URL+path+"?auth="+DB_SECRET, {
+    method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+async function fbPatch(path, data){
+  var r = await fetch(DB_URL+path+"?auth="+DB_SECRET, {
+    method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+
+// ── SEND COMMAND ─────────────────────────────────────
+var _cmdTs = 0;
+async function sendFireCmd(cmd){
+  try {
+    _cmdTs = Date.now();
+    await fbPatch("/aquarium/cmd.json", {
+      cmd: cmd, token: CMD_TOKEN, ts: _cmdTs
+    });
+    toast("✅ Wysłano: "+cmd, "ok");
+    if(cmd==="power_on")  { var tp=gid("tog-power"); if(tp) tp.checked=true; }
+    if(cmd==="power_off") { var tp=gid("tog-power"); if(tp) tp.checked=false; }
+    if(cmd==="mode_auto")   { gid("btn-auto").classList.add("active"); gid("btn-man").classList.remove("active"); }
+    if(cmd==="mode_manual") { gid("btn-man").classList.add("active"); gid("btn-auto").classList.remove("active"); }
+  } catch(e) { toast("❌ Błąd: "+e.message, "err"); }
+}
+
+async function sendPwmCmd(){
+  var pwms = [];
+  for(var i=0;i<5;i++) pwms.push(parseInt(gid("sl"+i).value)||0);
+  await sendFireCmd("pwm "+pwms.join(" "));
+}
+
+// ── SENSOR MODE ──────────────────────────────────────
+var _currentSensorMode = 0;
+function setSensorMode(mode, btn){
+  _currentSensorMode = mode;
+  [0,1,2].forEach(function(i){
+    var b=gid("sens-btn-"+i);
+    if(b) b.classList.toggle("active", i===mode);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  KONFIGURACJA FIREBASE – zapis do /aquarium/config.json
+//  ESP odczytuje co 30s, porównuje cfgTs, stosuje do EEPROM
+// ─────────────────────────────────────────────────────────────────────────────
+function showPending(key, show){
+  var el=gid("cfg-"+key+"-pending");
+  if(el) el.style.display=show?"inline-flex":"none";
+}
+
+async function saveScheduleConfig(){
+  try {
+    var mWD  = getTimeSel("ts-mw");
+    var mWE  = getTimeSel("ts-me");
+    var midO = getTimeSel("ts-mo");
+    var evO  = getTimeSel("ts-eo");
+    var mWDm  = timeToMin(mWD), mWEm = timeToMin(mWE);
+    var midOm = timeToMin(midO), evOm = timeToMin(evO);
+    var evBef = parseInt(gid("cfg-eveningBefore").value)||0;
+    var fade = parseInt((gid("cfg-fadeMinutes")||{}).value)||30;
+    if(mWDm<0||mWDm>1439||mWEm<0||mWEm>1439||midOm<0||midOm>1439||evOm<0||evOm>1439){
+      toast("❌ Nieprawidłowe godziny!", "err"); return;
+    }
+    if(fade<1||fade>180){ toast("❌ Rampa: 1–180 minut!", "err"); return; }
+    if(evBef<-180||evBef>0){ /* slider is capped to 0 max */ }
+    var cfg = {
+      cfgTs: Date.now(),
+      morningWD: mWDm,
+      morningWE: mWEm,
+      middayOff: midOm,
+      eveningBefore: evBef,
+      eveningOff: evOm,
+      fadeMinutes: fade,
+      configType: "schedule"
+    };
+    await fbPatch("/aquarium/config.json", cfg);
+    toast("📅 Harmonogram wysłany do Firebase!\nESP zastosuje za ~30s", "ok");
+  } catch(e){ toast("❌ Błąd zapisu: "+e.message, "err"); }
+}
+
+async function saveAdaptConfig(){
+  try {
+    var target   = parseInt(gid("cfg-minLuxTarget").value)||1000;
+    var interval = parseInt(gid("cfg-minLuxInterval").value)||30;
+    if(target<0||target>8000){ toast("❌ Target LUX: 0–8000!", "err"); return; }
+    if(interval<5||interval>300){ toast("❌ Interwał: 5–300s!", "err"); return; }
+    var now = Date.now();
+
+    // ── PATCH 1: adaptacja czujników (configType:"adapt") ────────────────────
+    // ESP obsługuje: sensorMode, adaptEnabled, learningEnabled
+    await fbPatch("/aquarium/config.json", {
+      token: CMD_TOKEN,
+      cfgTs: now,
+      sensorMode: _currentSensorMode,
+      adaptEnabled: gid("cfg-adaptEnabled").checked,
+      learningEnabled: gid("cfg-learningEnabled").checked,
+      configType: "adapt"
+    });
+
+    // ── PATCH 2: MIN LUX (configType:"minlux") ───────────────────────────────
+    // cfgTs+1 → ESP widzi nowy cfgTs i nie ignoruje jako duplikat
+    await fbPatch("/aquarium/config.json", {
+      token: CMD_TOKEN,
+      cfgTs: now + 1,
+      minLuxEnabled: gid("cfg-minLuxEnabled").checked,
+      minLuxTarget: target,
+      minLuxInterval: interval,
+      configType: "minlux"
+    });
+
+    showPending && showPending("adapt", false); // noop – badge usunięty
+    toast("🌿 Regulacja adaptacyjna wysłana!\nESP zastosuje za ~30s", "ok");
+  } catch(e){ toast("❌ Błąd zapisu: "+e.message, "err"); }
+}
+
+
+
+// saveParamsConfig removed – Parametry systemu card usunięta (sync z ESP)
+
+// ── LOAD STATUS ──────────────────────────────────────
+var _lastEspTs = 0;
+var _lastEspUptimeMs = 0;
+var _kwhPrice = KWH_PRICE;
+var _localIp = "";   // wypełniany z d.localIp – potrzebny do lokalnych endpointów ESP
+function espLocalBase(){ return _localIp ? "http://"+_localIp+":8080" : null; }
+function _warnLocalOnly(feature){
+  var link = _localIp ? " · Lokalny panel: http://"+_localIp+":8080/control" : "";
+  toast("⚠️ "+feature+" wymaga sieci lokalnej"+link, "warn");
+}
+
+async function loadStatus(){
+  try {
+    var d = await fbGet("/aquarium/status.json");
+    if(!d){ setOffline("Brak danych w Firebase"); return; }
+    setOnline();
+    // ESP wysyła updatedAt = millis() (czas od startu, nie unix timestamp).
+    // Przechowujemy moment odczytu po stronie przeglądarki.
+    _lastEspTs = Date.now();
+    _lastEspUptimeMs = d.updatedAt || 0;  // millis() z ESP – do info
+
+    // — Températury —
+    var temps = d.temps || [d.temp1||d.temp||null, d.temp2||null, d.temp3||d.water||null];
+    gid("d-t1").innerHTML = fmt1(temps[0])+'<span class="unit">°C</span>';
+    gid("d-t2").innerHTML = fmt1(temps[1])+'<span class="unit">°C</span>';
+    gid("d-tw").innerHTML = fmt1(temps[2])+'<span class="unit">°C</span>';
+
+    // — LUX —
+    var lr = d.luxRoom !== undefined ? d.luxRoom : (d.lux||0);
+    var lw = d.luxNadWoda !== undefined ? d.luxNadWoda : (d.luxWater||0);
+    gid("d-lux-bar") && (gid("d-lux-bar").style.width = Math.min(100, lr/50)+"%"); // settings tab fallback
+
+    // — PWM + moc —
+    var pwm = d.pwm || [0,0,0,0,0];
+    var chW = d.powerNowCh || [0,0,0,0,0];
+    var totW = parseFloat(d.powerW||d.powerNowW||0);
+    var colors = ['#e8f4ff','#7ad4ff','#b0e8ff','#4060ff','#ff4d6d'];
+    var sumPWM=0;
+    for(var i=0;i<5;i++){
+      var v=parseInt(pwm[i]||0), pct=Math.round(v/1023*100);
+      var pb=gid("d-pb"+i); if(pb){ pb.style.width=pct+'%'; pb.style.background=colors[i]; }
+      var pv=gid("d-pv"+i); if(pv) pv.textContent=v+' ('+pct+'%)';
+      var pw=gid("d-pw"+i); if(pw) pw.textContent=parseFloat(chW[i]||0).toFixed(1)+'W';
+      sumPWM+=v;
+    }
+    var avgPWM=Math.round(sumPWM/5), avgPct=Math.round(avgPWM/1023*100);
+    var tp=gid("d-power-now-w"); if(tp) tp.textContent=totW.toFixed(1)+' W';
+    var ep=gid("d-en-pow"); if(ep) ep.textContent=totW.toFixed(1);
+
+    // — Lux obliczenia (identyczne z ESP32) —
+    var luxPPwm  = parseFloat(d.luxPerPwm)  || 13.02;
+    var glassT   = parseFloat(d.glassTransm) || 0.85;
+    var minLuxT  = (d.minLuxEnabled && d.minLuxTarget) ? parseInt(d.minLuxTarget) : 0;
+    var sunRoom  = Math.max(0, parseFloat(lr)||0);
+    var sunAtPlants  = Math.round(sunRoom * glassT);
+    var ledAtPlants  = Math.round(avgPWM * luxPPwm);  // LED nad wodą – bez korekcji szyby bocznej
+    var totalAtPlants = sunAtPlants + ledAtPlants;
+
+    // sensorMode: 0=OFF, 1=Pokój, 2=Pokój+Woda
+    var sensorModeNow = d.sensorMode || 0;
+    var noSensor = (sensorModeNow === 0);
+
+    // Chip SŁOŃCE — gdy czujnik OFF: wyszarz i pokaż "brak czujnika"
+    var spEl=gid("d-sun-pct");
+    if(spEl){
+      if(noSensor){
+        spEl.textContent='—';
+        spEl.style.color='var(--text-dim)';
+      } else {
+        spEl.textContent='~'+sunAtPlants;
+        spEl.style.color='';
+      }
+    }
+    var slEl=gid("d-sun-lux");
+    if(slEl){
+      slEl.textContent = noSensor ? 'czujnik OFF' : Math.round(sunRoom)+' lx pokój';
+      slEl.style.color = noSensor ? 'rgba(255,255,255,0.25)' : '';
+    }
+    // Chip DOŚWIETLANIE
+    var lvEl=gid("d-led-val"); if(lvEl) lvEl.textContent='~'+ledAtPlants;
+    var lrwEl=gid("d-led-pwm-raw"); if(lrwEl) lrwEl.textContent=avgPWM+' PWM ('+avgPct+'%)';
+    // Chip NAD WODĄ
+    var lwEl=gid("d-lux-water"); if(lwEl) lwEl.textContent=Math.round(lw);
+
+    // Skala paska
+    var inWindow = d.inLightingWindow === true || d.inLightingWindow === 'true';
+    var autoLuxScale = Math.round((d.autoPWM||0) * luxPPwm);  // j.w. – skala bez korekcji szyby
+    var barScale;
+    if(inWindow && autoLuxScale>0){ barScale=autoLuxScale; }
+    else if(minLuxT>0){ barScale=minLuxT; }
+    else{ barScale=Math.max(totalAtPlants,500); }
+    var scLabel=gid("d-bar-scale");
+    if(scLabel) scLabel.textContent=(noSensor ? '⚡ szacunek z PWM — ' : '') + 'skala 0–'+barScale.toLocaleString()+' lx (przy roślinach)';
+
+    // Canvas blend bar
+    (function(){
+      var canvas=gid("d-blend-bar"); if(!canvas) return;
+      if(!CanvasRenderingContext2D.prototype.roundRect){
+        CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+          this.beginPath();this.moveTo(x+r,y);this.lineTo(x+w-r,y);this.quadraticCurveTo(x+w,y,x+w,y+r);
+          this.lineTo(x+w,y+h-r);this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+          this.lineTo(x+r,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r);
+          this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);this.closePath();return this;
+        };
+      }
+      var W=canvas.offsetWidth||canvas.parentElement.offsetWidth||300;
+      canvas.width=W; canvas.height=14;
+      var ctx=canvas.getContext('2d');
+      ctx.clearRect(0,0,W,14);
+      ctx.fillStyle='rgba(255,255,255,0.06)';
+      ctx.roundRect(0,0,W,14,7); ctx.fill();
+      // Gdy czujnik OFF: sunAtPlants=0, pasek jest w całości niebieski (tylko LED)
+      var sunPct=Math.min(100, sunAtPlants/barScale*100);
+      var ledPct=Math.min(100, ledAtPlants/barScale*100);
+      var total=sunPct+ledPct; var scale2=total>100?100/total:1;
+      var totalFillPct=(sunPct+ledPct)*scale2;
+      var fillW=Math.min(totalFillPct/100*W, W);
+      if(fillW>2){
+        var sunFrac=(sunPct*scale2)/Math.max(totalFillPct,0.01);
+        sunFrac=Math.min(sunFrac,1);
+        var grd=ctx.createLinearGradient(0,0,fillW,0);
+        if(noSensor){
+          // Brak czujnika: pasek jednolicie niebieski ze stripami (sygnał "szacunek")
+          grd.addColorStop(0,'#0077cc');
+          grd.addColorStop(1,'#00d4f5');
+        } else {
+          grd.addColorStop(0,'#ff8800');
+          grd.addColorStop(Math.max(0,sunFrac-0.08),'#ffcc00');
+          if(sunFrac<1){
+            grd.addColorStop(Math.min(sunFrac+0.08,1),'#0099ff');
+            grd.addColorStop(1,'#00d4f5');
+          }
+        }
+        ctx.fillStyle=grd;
+        // Gdy czujnik OFF: lekka przezroczystość żeby wizualnie odróżnić od "zmierzonego"
+        if(noSensor) ctx.globalAlpha=0.65;
+        ctx.roundRect(0,0,fillW,14,7); ctx.fill();
+        ctx.globalAlpha=1;
+      }
+      var pctEl=gid("d-bar-pct");
+      if(pctEl) pctEl.textContent=(noSensor?'~':'💡')+Math.round(ledPct*scale2)+'%';
+      var sunPctEl=gid("d-bar-sun-pct");
+      if(sunPctEl){ var sp2=Math.round(sunPct*scale2); sunPctEl.textContent=sp2>0?'☀️'+sp2+'%':''; }
+    })();
+
+    // DOCELOWY LUX
+    var mt=gid("d-minlux-target"), ms=gid("d-minlux-state");
+    if(mt) mt.innerHTML=d.minLuxEnabled?'<span style="color:var(--cyan)">'+(d.minLuxTarget||2000)+' lx</span>':'<span style="color:var(--text-dim)">Wył.</span>';
+    if(ms){
+      if(!d.minLuxEnabled){ ms.innerHTML='<span style="color:var(--text-dim)">nieaktywny</span>'; }
+      else if(d.minLuxActive){ ms.innerHTML='<span style="color:#4caf50">● uzupełnia teraz</span>'; }
+      else{ ms.innerHTML='<span style="color:var(--text-dim)">● wystarczy światła</span>'; }
+    }
+
+    // — Status chips —
+    var mode = d.mode || (d.tryb===true||d.tryb==="AUTO"?"AUTO":"MANUAL") || "—";
+    var pwr  = d.power;
+    gid("d-power").innerHTML = pwr?'<span style="color:var(--cyan)">WŁĄCZONE</span>':'<span style="color:var(--red)">WYŁĄCZONE</span>';
+    gid("d-mode").innerHTML  = mode==="AUTO"?'<span style="color:var(--cyan)">AUTO</span>':'<span style="color:var(--warm)">MANUAL</span>';
+    var sm=d.sensorMode||0; var sn=['OFF','Pokój','Pokój+Woda'];
+    var se=gid("d-sensor"); if(se) se.innerHTML='<span style="color:var(--cyan)">'+(sn[sm]||"—")+'</span>';
+    var ae=gid("d-adapt"); if(ae) ae.innerHTML=d.adaptEnabled?'<span style="color:var(--cyan)">Aktywna</span>':'<span style="color:var(--text-dim)">Wyłączona</span>';
+    var at=gid("d-adapt-trans"); if(at) at.innerHTML=d.adaptEnabled&&d.adaptTransmisja?'transmisja <span style="color:var(--cyan)">'+d.adaptTransmisja+'%</span>':'';
+    var pu=gid("d-pump"); if(pu) pu.innerHTML=d.pumpOn?'<span style="color:var(--cyan)">WŁ 💧</span>':'<span style="color:var(--text-dim)">WYŁ</span>';
+    var ra=gid("d-ramp"); if(ra) ra.innerHTML=d.rampActive?'<span style="color:var(--cyan)">▶ aktywna</span>':'<span style="color:var(--text-dim)">—</span>';
+    var pb2=gid("pump-badge"); if(pb2){ pb2.textContent=d.pumpOn?"WŁ":"WYŁ"; pb2.className="badge "+(d.pumpOn?"badge-on":"badge-off"); }
+
+    // — SYS HEADER —
+    gid("sh-wifi").innerHTML = '<div class="sbdot" style="background:#4ade80"></div>WiFi ESP';
+    gid("sh-wifi").className = "sys-badge ok";
+    var bm=gid("sh-mode"); if(bm){ bm.textContent=mode; bm.style.color=mode==="AUTO"?"var(--cyan)":"var(--warm)"; }
+    if(d.localIp){
+      _localIp = d.localIp;
+      var ip=d.localIp, base="http://"+ip+":8080";
+      gid("sh-ip").textContent=ip;
+      ["local-link","local-link-terminal","local-link-wykresy","local-link-logi"].forEach(function(id){
+        var el=gid(id); if(el) el.href=base+"/control";
+      });
+      ["local-ip-terminal","local-ip-wykresy","local-ip-logi"].forEach(function(id){
+        var el=gid(id); if(el) el.textContent=ip;
+      });
+    }
+
+    // — Wiek danych ESP — aktualizowany przez tick() co sekundę
+
+    // — Ustawienia toggle sync —
+    var togP=gid("tog-power"); if(togP) togP.checked=!!pwr;
+    gid("btn-auto").classList.toggle("active",mode==="AUTO");
+    gid("btn-man").classList.toggle("active",mode==="MANUAL");
+    for(var i=0;i<5;i++){
+      var sl=gid("sl"+i);
+      if(sl && sl!==document.activeElement){ sl.value=parseInt(pwm[i]||0); updSlider(i,sl); }
+    }
+
+    // ── SYNC SETTINGS TAB FROM STATUS ──────────────────────────────────────
+    // Czujniki i temp w zakładce Ustawienia
+    var s_t1=gid("s-t1"); if(s_t1) s_t1.innerHTML=fmt1(temps[0])+'<span class="unit">°C</span>';
+    var s_t2=gid("s-t2"); if(s_t2) s_t2.innerHTML=fmt1(temps[1])+'<span class="unit">°C</span>';
+    var s_tw=gid("s-tw"); if(s_tw) s_tw.innerHTML=fmt1(temps[2])+'<span class="unit">°C</span>';
+    var slr=gid("s-lux-room"); if(slr) slr.textContent=Math.round(lr);
+    var slrb=gid("s-lux-room-badge");
+    if(slrb){ slrb.textContent=d.czujnikPokojowyAktywny?"OK":"OFF"; slrb.className="badge "+(d.czujnikPokojowyAktywny?"badge-on":"badge-off"); }
+    var slb=gid("s-lux-bar"); if(slb) slb.style.width=Math.min(100,lr/50)+"%";
+    var slw=gid("s-lux-water"); if(slw) slw.textContent=Math.round(lw);
+    var slwb=gid("s-lux-water-badge");
+    if(slwb){ slwb.textContent=d.czujnikNadWodaAktywny?"OK":"OFF"; slwb.className="badge "+(d.czujnikNadWodaAktywny?"badge-on":"badge-off"); }
+    // Adapt stats box
+    var sap=gid("s-adapt-probki"); if(sap) sap.textContent=d.adaptLiczbaProbek||d.adaptProbki||"—";
+    var sat=gid("s-adapt-trans");  if(sat) sat.textContent=d.adaptTransmisja||"—";
+    var sml=gid("s-minlux-state");
+    if(sml){ sml.textContent=d.minLuxActive||d.minLuxModeActive?"AKTYWNY":"NIEAKTYWNY"; sml.className="badge "+(d.minLuxActive||d.minLuxModeActive?"badge-on":"badge-off"); }
+    // Pump state
+    var sps=gid("s-pump-state"); if(sps){ sps.textContent=d.pumpOn?"WŁ 💧":"WYŁ"; sps.className="badge "+(d.pumpOn?"badge-on":"badge-off"); }
+    // Load pump slots from status
+    // Status Firebase nie zawiera pumpSlots – jako fallback czytamy z config.json
+    if(d.pumpSlots) loadPumpSlotsFromStatus(d.pumpSlots);
+    else loadPumpSlotsFromConfig();
+    // Harmonogram – sync time selectors
+    if(d.schedule){
+      var sc=d.schedule;
+      if(gid("ts-mw")&&gid("ts-mw")._hSel) timeSelFromMin("ts-mw", sc.morningWD);
+      if(gid("ts-me")&&gid("ts-me")._hSel) timeSelFromMin("ts-me", sc.morningWE);
+      if(gid("ts-mo")&&gid("ts-mo")._hSel) timeSelFromMin("ts-mo", sc.middayOff);
+      if(gid("ts-eo")&&gid("ts-eo")._hSel) timeSelFromMin("ts-eo", sc.eveningOff);
+      // evening slider sync
+      var evBefVal = sc.eveningBefore !== undefined ? sc.eveningBefore : 0;
+      var evSlider = gid("cfg-eveningBefore");
+      if(evSlider && evSlider !== document.activeElement){
+        evSlider.value = evBefVal;
+        gid('eveningBefore-label').textContent = evBefVal + ' min';
+      }
+      // sunset info line – sunsetMin leży w d.schedule (sc), nie na poziomie d
+      var sunsetSrc = sc.sunsetMin !== undefined ? sc.sunsetMin : d.sunsetMin;
+      if(sunsetSrc !== undefined){
+        var sunMin = parseInt(sunsetSrc)||0;
+        var ledMin = ((sunMin + evBefVal) + 1440) % 1440;
+        var sEl = gid('ev-sunset-time'); if(sEl) sEl.textContent = minToTime(sunMin);
+        var lEl = gid('ev-led-time');    if(lEl) lEl.textContent = minToTime(ledMin);
+      }
+      syncNumInput("cfg-fadeMinutes",   d.fadeMinutes||30);
+    }
+    // Adaptacja
+    if(d.sensorMode !== undefined){
+      syncCheckbox("cfg-adaptEnabled", !!d.adaptEnabled);
+      syncCheckbox("cfg-learningEnabled", !!d.learningEnabled);
+      syncCheckbox("cfg-minLuxEnabled", !!d.minLuxEnabled);
+      var mlt = d.minLuxDayTarget||1000;
+      var mltEl = gid("cfg-minLuxTarget");
+      if(mltEl && mltEl !== document.activeElement){
+        mltEl.value = mlt;
+        var mltLabel = gid("minLuxTarget-val");
+        if(mltLabel) mltLabel.textContent = mlt + ' lx';
+      }
+      syncNumInput("cfg-minLuxInterval", d.minLuxIntervalSec||30);
+      if(!isFocused("sens-btn-0") && !isFocused("sens-btn-1") && !isFocused("sens-btn-2")){
+        _currentSensorMode = sm;
+        [0,1,2].forEach(function(i){ var b=gid("sens-btn-"+i); if(b) b.classList.toggle("active",i===sm); });
+      }
+    }
+    // Parametry (tylko emaFilter i sensInt)
+    if(d.emaFilterAlpha !== undefined){ syncNumInput("cfg-emaFilter", d.emaFilterAlpha); }
+    if(d.sensIntSec !== undefined){ syncNumInput("cfg-sensInt", d.sensIntSec); }
+    if(d.rampSec !== undefined){ syncNumInput("cfg-rampSec", d.rampSec); }
+
+    // — Energia —
+    _kwhPrice = parseFloat(d.kwhPrice||KWH_PRICE);
+    var eTd = parseFloat(d.energyTodayWh||0);
+    var eTw = parseFloat(d.energyWeekWh||0);
+    var eTm = parseFloat(d.energyMonthWh||0);
+    function wToKwh(wh){ return wh.toFixed(1); }
+    function wToPln(wh){ return (wh/1000*_kwhPrice).toFixed(2); }
+    function ledTime(min){ var h=Math.floor(min/60),m2=min%60; return h+"h "+String(m2).padStart(2,"0")+"m"; }
+    var etEl=gid("d-en-today"); if(etEl) etEl.textContent=wToKwh(eTd);
+    var ectEl=gid("d-en-cost-today"); if(ectEl) ectEl.textContent=wToPln(eTd);
+    var eltEl=gid("d-en-ledtime"); if(eltEl) eltEl.textContent=ledTime(parseInt(d.ledOnMinutesToday||0));
+    var emlEl=gid("d-en-minlux-act"); if(emlEl) emlEl.textContent=(d.minLuxActivToday||0);
+    var epkEl=gid("d-en-peak"); if(epkEl) epkEl.textContent=parseFloat(d.peakPowerWToday||totW).toFixed(1);
+    var elxEl=gid("d-en-lux-hours"); if(elxEl) elxEl.textContent=parseFloat(d.luxHoursTodayWater||0).toFixed(0);
+    var ekwEl=gid("d-en-kwh-price"); if(ekwEl) ekwEl.textContent=parseFloat(d.kwhPrice||_kwhPrice).toFixed(2);
+    var ewEl=gid("d-en-week"); if(ewEl) ewEl.textContent=wToKwh(eTw);
+    var ecwEl=gid("d-en-cost-week"); if(ecwEl) ecwEl.textContent=wToPln(eTw);
+    var eltWEl=gid("d-en-ledtime-week"); if(eltWEl) eltWEl.textContent=ledTime(parseInt(d.ledOnMinutesWeek||0));
+    // — Tydzień: dane pochodne —
+    var dWk=Math.max(1,(new Date().getDay()+6)%7+1);
+    var avgWh=eTw/dWk;
+    var eavEl=gid("d-en-avg"); if(eavEl) eavEl.textContent=wToKwh(avgWh);
+    var ecavEl=gid("d-en-cost-avg"); if(ecavEl) ecavEl.textContent=wToPln(avgWh);
+    var eltAvEl=gid("d-en-ledtime-avg"); if(eltAvEl) eltAvEl.textContent=ledTime(Math.round(parseInt(d.ledOnMinutesWeek||0)/dWk));
+    var derat=parseFloat(d.adaptTransmisja||0);
+    var eswkEl=gid("d-en-saved-week"); if(eswkEl) eswkEl.textContent=(derat>0&&derat<100?(eTw*derat/(100-derat)):0).toFixed(1);
+    var emlaEl=gid("d-en-minlux-avg"); if(emlaEl) emlaEl.textContent=((parseFloat(d.minLuxActivWeek||0)/dWk).toFixed(1));
+    var ecyEl=gid("d-en-cost-year");
+    if(ecyEl&&eTw>0){ ecyEl.textContent=(avgWh*365/1000*_kwhPrice).toFixed(2); }
+    // — Miesiąc —
+    var emEl=gid("d-en-month"); if(emEl) emEl.textContent=wToKwh(eTm);
+    var ecmEl=gid("d-en-cost-month"); if(ecmEl) ecmEl.textContent=wToPln(eTm);
+    var eltMEl=gid("d-en-ledtime-month"); if(eltMEl) eltMEl.textContent=ledTime(parseInt(d.ledOnMinutesMonth||0));
+    var epkMEl=gid("d-en-peak-m"); if(epkMEl) epkMEl.textContent=parseFloat(d.peakPowerWToday||totW).toFixed(1);
+    // Miesiąc: dane pochodne
+    var dMon=new Date().getDate();
+    var daysInMon=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+    var eavmEl=gid("d-en-avg-month"); if(eavmEl) eavmEl.textContent=wToKwh(eTm/Math.max(dMon,1));
+    var forecastWh=dMon>0?(eTm/dMon*daysInMon):eTm;
+    var efcEl=gid("d-en-forecast"); if(efcEl) efcEl.textContent='~'+wToKwh(forecastWh);
+    var ecfcEl=gid("d-en-cost-forecast"); if(ecfcEl) ecfcEl.textContent='~'+wToPln(forecastWh);
+    var savedWhM=(derat>0&&derat<100)?(eTm*derat/(100-derat)):0;
+    var esmEl=gid("d-en-saved-month"); if(esmEl) esmEl.textContent=(savedWhM/1000*_kwhPrice).toFixed(2);
+    var enaEl=gid("d-en-no-adapt"); if(enaEl) enaEl.textContent=(eTm+savedWhM).toFixed(1);
+    var eltTotEl=gid("d-en-ledtime-total"); if(eltTotEl) eltTotEl.textContent=ledTime(parseInt(d.ledOnMinutesMonth||0));
+
+    // — Weekly bars —
+    (function(){
+      var wb=gid("d-week-bars"), wl=gid("d-week-labels");
+      if(!wb) return;
+      var days=['Pn','Wt','Śr','Cz','Pt','Sb','Nd'];
+      var hist=(d.dayHistory&&d.dayHistory.length===7)?d.dayHistory:[0,0,0,0,0,0,0];
+      var isoToday=(new Date().getDay()+6)%7;
+      var vals=[];
+      for(var dd=0;dd<7;dd++){
+        if(dd<isoToday) vals.push(hist[dd]||0);
+        else if(dd===isoToday) vals.push(eTd);
+        else vals.push(0);
+      }
+      var mx=Math.max.apply(null,vals)||1, h='', hl='';
+      vals.forEach(function(v,i){
+        var cls='mb'+(i===isoToday?' today':i<isoToday&&v===mx?' hi':'');
+        var ht=(i<=isoToday&&v>0?(v/mx*100).toFixed(1):'4');
+        h+='<div class="'+cls+'" style="height:'+ht+'%;opacity:'+(i>isoToday?'0.2':'1')+'" title="'+days[i]+': ~'+v.toFixed(1)+' Wh"></div>';
+        hl+='<span>'+days[i]+'</span>';
+      });
+      wb.innerHTML=h; if(wl) wl.innerHTML=hl;
+    })();
+
+    // — Monthly week bars (T1-T4) —
+    (function(){
+      var mb=gid("d-month-bars"), ml=gid("d-month-labels");
+      if(!mb) return;
+      var wHist=(d.weekHistory&&d.weekHistory.length===5)?d.weekHistory:[0,0,0,0,0];
+      var curWkIdx=Math.min(4,Math.max(0,Math.floor((new Date().getDate()-1)/7)));
+      var vals=[
+        curWkIdx>=1?(parseFloat(wHist[0])||0):0,
+        curWkIdx>=2?(parseFloat(wHist[1])||0):0,
+        curWkIdx>=3?(parseFloat(wHist[2])||0):0,
+        eTw  // bieżący tydzień live
+      ];
+      var mx=Math.max.apply(null,vals)||1; var h='',hl='';
+      var lbls=['T1','T2','T3','T4'];
+      vals.forEach(function(v,i){
+        var isLast=(i===3),hasData=(v>0);
+        var cls='mb'+(isLast?' today':(hasData&&v===mx?' hi':''));
+        var ht=(hasData||isLast)?(v/mx*100).toFixed(1):'4';
+        var op=(!hasData&&!isLast)?'opacity:0.2;':'';
+        h+='<div class="'+cls+'" style="height:'+ht+'%;'+op+'" title="'+lbls[i]+': '+(hasData?v.toFixed(1)+' Wh':'—')+'"></div>';
+        hl+='<span>'+lbls[i]+'</span>';
+      });
+      mb.innerHTML=h; mb.style.display='flex'; mb.style.alignItems='flex-end'; mb.style.gap='3px';
+      if(ml) ml.innerHTML=hl;
+    })();
+
+    // — Hourly power bars (last 12h) —
+    (function(){
+      var hb=gid("d-hour-bars"), hl2=gid("d-hour-labels");
+      if(!hb) return;
+      var hourData=(d.hourPowerWh&&d.hourPowerWh.length===24)?d.hourPowerWh:new Array(24).fill(0);
+      var nowH=new Date().getHours();
+      // Ostatnie 12 godzin (włącznie z bieżącą)
+      var slots=[];
+      for(var i=11;i>=0;i--){ slots.unshift((nowH-i+24)%24); }
+      var vals=slots.map(function(h){ return parseFloat(hourData[h])||0; });
+      var mx=Math.max.apply(null,vals)||1;
+      var bars='', labels='';
+      vals.forEach(function(v,i){
+        var hIdx=slots[i];
+        var isCur=(hIdx===nowH);
+        var clr=isCur?'var(--cyan)':'rgba(0,212,245,0.35)';
+        var ht=v>0?(v/mx*100).toFixed(1):2;
+        bars+='<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:'+clr+';height:'+ht+'%;transition:height .4s" title="'+String(hIdx).padStart(2,'0')+':00 – '+v.toFixed(2)+' Wh"></div>';
+        labels+='<span>'+String(hIdx).padStart(2,'0')+'</span>';
+      });
+      hb.innerHTML=bars; hb.style.display='flex'; hb.style.alignItems='flex-end'; hb.style.gap='2px';
+      if(hl2) hl2.innerHTML=labels;
+    })();
+
+    // — Harmonogram —
+    if(d.schedule) renderSchedule(d.schedule, d);
+
+  } catch(e) {
+    setOffline(e.message);
+    console.error("Firebase error:", e);
+  }
+}
+
+// ── HELPERS — sync without touching focused fields ────────────────────────
+function isFocused(id){ return document.activeElement===gid(id); }
+function syncTimeInput(id, minutes){
+  var el=gid(id); if(!el||el===document.activeElement) return;
+  if(minutes !== undefined && minutes !== null) el.value = minToTime(parseInt(minutes));
+}
+function syncNumInput(id, val){
+  var el=gid(id); if(!el||el===document.activeElement) return;
+  if(val !== undefined && val !== null) el.value = parseFloat(val);
+}
+function syncCheckbox(id, val){
+  var el=gid(id); if(!el) return; el.checked = !!val;
+}
+function setCfgStatus(key, live, txt){
+  var dot=gid("cfg-"+key+"-dot"), span=gid("cfg-"+key+"-status-txt");
+  if(dot) dot.className="cfg-status-dot"+(live?" live":"");
+  if(span) span.textContent=txt||"";
+}
+
+function setOnline(){
+  gid("conn-pill").className="status-pill";
+  gid("connlabel").textContent="Połączono";
+  gid("bdot").style.background="var(--cyan)";
+}
+function setOffline(msg){
+  gid("conn-pill").className="status-pill offline";
+  gid("connlabel").textContent="Brak danych";
+  gid("bdot").style.background="var(--red)";
+}
+
+// ── HARMONOGRAM ─────────────────────────────────────
+function renderSchedule(sc, d){
+  var nowMin=(new Date().getHours()*60+new Date().getMinutes());
+  var mWD=sc.morningWD!==undefined?sc.morningWD:7*60;
+  var mWE=sc.morningWE!==undefined?sc.morningWE:8*60;
+  var midOff=sc.middayOff!==undefined?sc.middayOff:11*60;
+  var sunMin=sc.sunsetMin!==undefined?sc.sunsetMin:19*60+32;
+  var evBef=sc.eveningBefore!==undefined?sc.eveningBefore:-60;
+  var evOff=sc.eveningOff!==undefined?sc.eveningOff:21*60+30;
+  var fade=(d&&d.fadeMinutes&&d.fadeMinutes>0)?parseInt(d.fadeMinutes):60;
+  var isWE=(new Date().getDay()===0||(new Date().getDay()===6));
+  var morStart=isWE?mWE:mWD;
+  var evStart=((sunMin+evBef)+1440)%1440;
+  var evOffEnd=evOff+fade;
+
+  function mT(m){m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+  function inPhase(s,e){e=((e%1440)+1440)%1440;s=((s%1440)+1440)%1440;return e>s?(nowMin>=s&&nowMin<e):(nowMin>=s||nowMin<e);}
+
+  // Timeline canvas
+  setTimeout(function(){
+    var c=gid("d-tl-canvas"); if(!c) return;
+    var parent=c.parentElement;
+    var W=parent?parent.offsetWidth:0; if(W<10) W=380;
+    c.width=W; c.height=16;
+    var ctx=c.getContext("2d");
+    function px(m){ return m/1440*W; }
+    if(!CanvasRenderingContext2D.prototype.roundRect){
+      CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+        this.beginPath();this.moveTo(x+r,y);this.lineTo(x+w-r,y);this.quadraticCurveTo(x+w,y,x+w,y+r);
+        this.lineTo(x+w,y+h-r);this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+        this.lineTo(x+r,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r);
+        this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);this.closePath();return this;
+      };
+    }
+    ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.roundRect(0,0,W,16,7); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.roundRect(0,0,W,16,7); ctx.clip();
+    var minLuxColor=(d&&d.minLuxActive)?'#4ade80':'#5a7a99';
+    var segs=[
+      [morStart,    midOff,      '#ff9f43',    0.85],
+      [midOff,      midOff+fade, '#ff9f43',    0.45],
+      [midOff+fade, evStart,     minLuxColor,  0.40],
+      [evStart,     evOff,       '#ffd080',    0.85],
+      [evOff,       evOffEnd,    '#ff4d6d',    0.55]
+    ];
+    segs.forEach(function(sg){
+      var x1=px(sg[0]),x2=px(sg[1]); if(x2<=x1) return;
+      ctx.globalAlpha=sg[3]; ctx.fillStyle=sg[2]; ctx.fillRect(x1,0,x2-x1,16);
+    });
+    ctx.globalAlpha=1; ctx.restore();
+    var tln=gid("d-tl-now"); if(tln) tln.style.left=(nowMin/1440*100).toFixed(2)+'%';
+  },100);
+
+  // Phase list
+  function dotRgba(hex,a){ var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return 'rgba('+r+','+g+','+b+','+a+')'; }
+  var minLuxDot=(d&&d.minLuxActive)?'#4ade80':'#5a7a99';
+  var phases=[
+    {
+      id:1, name:'Rano', dot:'#ff9f43',
+      s:morStart, e:midOff,
+      act:inPhase(morStart,midOff),
+      rampUp:fade, rampDown:null,
+      sub:'<span class="'+(isWE?'ph-wd':'ph-wd-active')+'">PN\u2013PT: '+mT(mWD)+'</span>'
+         +' &middot; <span class="'+(isWE?'ph-we-active':'ph-we')+'">SOB\u2013ND: '+mT(mWE)+'</span>'
+    },
+    {
+      id:2, name:'Po\u0142udnie \u2013 wygaszanie', dot:'#ff9f43',
+      s:midOff, e:midOff+fade,
+      act:inPhase(midOff,midOff+fade),
+      rampUp:null, rampDown:fade,
+      sub:'koniec \u015bwiecenia porannego'
+    },
+    {
+      id:3, name:'Przerwa po\u0142udn.', dot:minLuxDot,
+      s:midOff+fade, e:evStart,
+      act:inPhase(midOff+fade,evStart),
+      rampUp:null, rampDown:null,
+      sub:(function(){
+        var en=(d&&d.minLuxEnabled), act=(d&&d.minLuxActive), tgt=(d&&d.minLuxTarget);
+        if(en&&act)  return '\ud83c\udf31 Tryb lux mini aktywny \u2013 cel: '+(tgt||'?')+' lx';
+        if(en&&!act) return '\ud83c\udf31 Tryb lux mini gotowy \u2013 cel: '+(tgt||'?')+' lx (wystarczy \u015bwiat\u0142a)';
+        return 'LED wy\u0142\u0105czone';
+      })()
+    },
+    {
+      id:4, name:'\u015awiecenie wiecz.', dot:'#ffd080',
+      s:evStart, e:evOff,
+      act:inPhase(evStart,evOff),
+      rampUp:fade, rampDown:null,
+      sub:'offset '+(evBef>=0?'+':'')+evBef+' min od zachodu ('+mT(sunMin)+')'
+    },
+    {
+      id:5, name:'Zach\u00f3d \u2013 wygaszanie', dot:'#ff4d6d',
+      s:evOff, e:evOffEnd,
+      act:inPhase(evOff,evOffEnd),
+      rampUp:null, rampDown:fade,
+      sub:'rampa \u2193 '+fade+' min \u2192 wy\u0142\u0105czenie'
+    }
+  ];
+  var pl=gid("d-phase-list"); if(!pl) return;
+  var activePhase='';
+  var html='';
+  phases.forEach(function(p,i){
+    if(p.act) activePhase=p.name;
+    var typeClass=p.id===3?'ph-type-break':'';
+    var dc=p.dot;
+    var borderCol=dotRgba(dc,p.act?0.9:0.55);
+    var bgCol=dotRgba(dc,p.act?0.1:0.04);
+    var borderEdge=dotRgba(dc,p.act?0.4:0.15);
+    var rowStyle='border-left-color:'+borderCol+';background:'+bgCol+';border-color:'+borderEdge+';border-left-width:3px';
+    if(p.act) rowStyle+=';box-shadow:0 2px 20px '+dotRgba(dc,0.18);
+    html+='<div class="phase-row '+typeClass+(p.act?' ph-active':'')+'" style="'+rowStyle+'">';
+    var dotActive=p.act
+      ?'box-shadow:0 0 7px '+dc+',0 0 14px '+dotRgba(dc,0.5)+';width:10px;height:10px;margin-top:4px'
+      :'box-shadow:0 0 4px '+dotRgba(dc,0.4);
+    html+='<div class="ph-dot'+(p.act?' pulse':'')+'" style="background:'+dc+';'+dotActive+'"></div>';
+    html+='<div class="ph-content">';
+    html+='<div class="ph-name" style="color:'+(p.act?'#fff':dc)+'">'+p.name+'</div>';
+    html+='<div class="ph-sub">'+p.sub+'</div>';
+    if(p.act) html+='<span class="ph-now-tag" style="background:'+dotRgba(dc,0.2)+';color:'+dc+';border-color:'+dotRgba(dc,0.5)+'">TERAZ</span>';
+    html+='</div>';
+    html+='<div class="ph-right">';
+    html+='<div class="ph-times" style="color:'+(p.act?'#fff':dc)+'">'+mT(p.s)+'<span class="td"> \u2013 </span>'+mT(p.e%1440)+'</div>';
+    var rbStyle='background:'+dotRgba(dc,0.18)+';color:'+dc+';border:1px solid '+dotRgba(dc,0.5)+';box-shadow:0 0 8px '+dotRgba(dc,0.2);
+    if(p.rampUp)   html+='<span class="ramp-badge" style="'+rbStyle+'">\u2191 rampa '+p.rampUp+' min</span>';
+    if(p.rampDown) html+='<span class="ramp-badge" style="'+rbStyle+'">\u2193 rampa '+p.rampDown+' min</span>';
+    html+='</div>';
+    html+='</div>';
+    if(i<4) html+='<div class="ph-sep"></div>';
+  });
+  pl.innerHTML=html;
+
+  var bdg=gid("d-sched-badge"), bph=gid("d-sched-phase");
+  if(bdg&&bph){
+    if(activePhase){bph.textContent=activePhase;bdg.style.display='';}
+    else{bdg.style.display='none';}
+  }
+}
+
+// ── SUWAKI ───────────────────────────────────────────
+function updSlider(ch, el){
+  var v=parseInt(el.value), pct=Math.round(v/1023*100);
+  var sv=gid("sv"+ch); if(sv) sv.textContent=v;
+  var sp=gid("sp"+ch); if(sp) sp.textContent=" "+pct+"%";
+  el.style.background="linear-gradient(to right,rgba(0,212,245,.6) 0%,rgba(0,112,255,.4) "+pct+"%, rgba(255,255,255,.08) "+pct+"%)";
+}
+function setAllSlider(el){
+  var v=parseInt(el.value), pct=Math.round(v/1023*100);
+  gid("sv-all").textContent=v; gid("sp-all").textContent=" "+pct+"%";
+  el.style.background="linear-gradient(to right,rgba(0,212,245,.6) 0%,rgba(0,112,255,.4) "+pct+"%, rgba(255,255,255,.08) "+pct+"%)";
+  for(var i=0;i<5;i++){ var sl=gid("sl"+i); if(sl){ sl.value=v; updSlider(i,sl); } }
+}
+
+// ── TABS ────────────────────────────────────────────
+var PAGES=["dash","ustawienia","terminal","wykresy","logi"];
+function showTab(name,el){
+  document.querySelectorAll(".tab").forEach(function(t){ t.classList.remove("active"); });
+  if(el) el.classList.add("active");
+  PAGES.forEach(function(p){ var pg=gid("p-"+p); if(pg) pg.classList.remove("active"); });
+  var t=gid("p-"+name); if(t) t.classList.add("active");
+}
+
+// ── CARD TOGGLE ─────────────────────────────────────
+function toggleCard(h){
+  var b=h.nextElementSibling, c=h.querySelector(".chevron");
+  if(b.classList.contains("hidden")){ b.classList.remove("hidden"); c.classList.add("open"); h.classList.remove("collapsed"); }
+  else{ b.classList.add("hidden"); c.classList.remove("open"); h.classList.add("collapsed"); }
+}
+
+// ── PERIOD TABS ─────────────────────────────────────
+function dSetEPeriod(p, btn){
+  var par=btn.closest(".card-body")||btn.parentElement.parentElement;
+  par.querySelectorAll(".ptab").forEach(function(b){ b.classList.remove("on"); });
+  par.querySelectorAll(".period-panel").forEach(function(pp){ pp.classList.remove("on"); });
+  btn.classList.add("on");
+  var panel=gid("dep-"+p); if(panel) panel.classList.add("on");
+}
+
+// ── TIME-SEL (custom hour:min picker) ───────────────
+function buildTimeSel(containerId) {
+  var c = gid(containerId); if(!c) return;
+  if(c._hSel) return;
+  var hSel = document.createElement('select');
+  var mSel = document.createElement('select');
+  var sep  = document.createElement('span');
+  sep.className = 'time-sel-sep'; sep.textContent = ':';
+  for(var h=0;h<24;h++){ var o=document.createElement('option'); o.value=h; o.text=String(h).padStart(2,'0'); hSel.appendChild(o); }
+  for(var m=0;m<60;m++){ var o2=document.createElement('option'); o2.value=m; o2.text=String(m).padStart(2,'0'); mSel.appendChild(o2); }
+  c.appendChild(hSel); c.appendChild(sep); c.appendChild(mSel);
+  c._hSel=hSel; c._mSel=mSel;
+}
+function setTimeSel(containerId, hhmm2) {
+  var c = gid(containerId); if(!c||!c._hSel) return;
+  var parts = (hhmm2||'00:00').split(':');
+  c._hSel.value = parseInt(parts[0]||0,10);
+  c._mSel.value = parseInt(parts[1]||0,10);
+}
+function getTimeSel(containerId) {
+  var c = gid(containerId); if(!c||!c._hSel) return '00:00';
+  return String(c._hSel.value).padStart(2,'0')+':'+String(c._mSel.value).padStart(2,'0');
+}
+function timeSelFromMin(containerId, minutes) {
+  minutes = ((parseInt(minutes)||0)+1440)%1440;
+  var h = Math.floor(minutes/60), m = minutes%60;
+  setTimeSel(containerId, String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'));
+}
+// Init all time selectors
+(function(){
+  var tsIds = ['ts-mw','ts-me','ts-mo','ts-eo'];
+  tsIds.forEach(function(id){
+    buildTimeSel(id);
+    var c = gid(id);
+    if(c) setTimeSel(id, c.getAttribute('data-val')||'00:00');
+  });
+})();
+
+// ── ZAPISZ DO AUTO (wysyła aktualne PWM jako wartości AUTO) ──────────
+function saveToAutoFb(){
+  var pwms = [];
+  for(var i=0;i<5;i++){
+    var el=gid('sl'+i)||gid('sl'+i);
+    pwms.push(el?parseInt(el.value)||0:0);
+  }
+  if(!confirm('Zapisać aktualne wartości PWM jako tryb AUTO?')) return;
+  fbPatch("/aquarium/config.json", {
+    token:CMD_TOKEN, cfgTs:Date.now(),
+    autoPwm0:pwms[0], autoPwm1:pwms[1], autoPwm2:pwms[2], autoPwm3:pwms[3], autoPwm4:pwms[4],
+    configType:"autoSave"
+  }).then(function(){ toast("⭐ Zapisano do AUTO → Firebase","ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+// ── RAMPA via Firebase ────────────────────────────────
+// UWAGA: ESP parsuje fadeMinutes WYŁĄCZNIE w bloku configType:"schedule"
+// (nie w "params"!) – dlatego zawsze wysyłamy "schedule".
+function saveFadeViaFb(){
+  var v = parseInt(gid("cfg-fadeMinutes").value)||30;
+  if(v<1||v>180){ toast("❌ Rampa: 1–180 min!", "err"); return; }
+  fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), fadeMinutes:v, configType:"schedule"})
+    .then(function(){ toast("⏱ Czas rampy: "+v+" min – wysłano do Firebase", "ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+// ── RampSec via Firebase ──────────────────────────────────────────────
+function saveRampSecViaFb(){
+  var v = parseInt(gid("cfg-rampSec").value)||30;
+  if(v<1||v>600){ toast("❌ Rampa PWM: 1–600s!", "err"); return; }
+  fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), rampSec:v, configType:"params"})
+    .then(function(){ toast("🔁 Czas rampy PWM: "+v+"s – wysłano do Firebase", "ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+// ── EMA filter via Firebase (configType:"params") ────────────────────────────
+function saveEmaViaFb(){
+  var v = parseFloat(gid("cfg-emaFilter").value);
+  if(isNaN(v)||v<0.05||v>0.5){ toast("❌ EMA: 0.05–0.50!", "err"); return; }
+  fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), emaFilter:v, configType:"params"})
+    .then(function(){ toast("🎛 Filtr EMA: "+v.toFixed(2)+" – wysłano do Firebase", "ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+// ── SensInt via Firebase (configType:"params") ────────────────────────────────
+function saveSensIntViaFb(){
+  var v = parseInt(gid("cfg-sensInt").value)||30;
+  if(v<5||v>300){ toast("❌ Interwał: 5–300s!", "err"); return; }
+  fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), sensInt:v, configType:"params"})
+    .then(function(){ toast("📡 Interwał czujnika: "+v+"s – wysłano do Firebase", "ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+
+// ── PUMP SCHEDULE ────────────────────────────────────
+// ── LOAD PUMP SLOTS ──────────────────────────────────
+// Pomocnicza – buduje jeden wiersz slotu i ustawia godziny
+function _renderPumpSlot(startVal, endVal, isMinutes) {
+  var container = gid('pump-slots'); if(!container) return;
+  var i = _pumpSlotCount; if(i >= 6) return;
+  var row = document.createElement('div');
+  row.className = 'pump-slot-row'; row.id = 'psr'+i;
+  row.innerHTML =
+    "<div class='time-field' style='flex:1'><label>Przedział "+(i+1)+" – Start</label>"
+    +"<div class='time-sel' id='ps"+i+"'></div></div>"
+    +"<div class='time-field' style='flex:1'><label>Koniec</label>"
+    +"<div class='time-sel' id='pe"+i+"'></div></div>"
+    +"<button class='pump-rm' onclick='rmPumpSlot("+i+")'>✕</button>";
+  container.appendChild(row);
+  buildTimeSel('ps'+i); buildTimeSel('pe'+i);
+  if(isMinutes) {
+    timeSelFromMin('ps'+i, startVal);
+    timeSelFromMin('pe'+i, endVal);
+  } else {
+    setTimeSel('ps'+i, startVal);
+    setTimeSel('pe'+i, endVal);
+  }
+  _pumpSlotCount++;
+}
+
+// Normalizuje dane Firebase do tablicy – obsługuje array i obiekt {"0":{...}}
+function _fbToArr(slots) {
+  if(!slots) return [];
+  if(Array.isArray(slots)) return slots;
+  if(typeof slots === 'object')
+    return Object.keys(slots).sort(function(a,b){return +a-+b;}).map(function(k){return slots[k];});
+  return [];
+}
+
+// Wczytaj sloty z status.json (ESP wysyła {start,end} w minutach)
+function loadPumpSlotsFromStatus(slots) {
+  var container = gid('pump-slots');
+  if(!container || container.children.length > 0) return;
+  var arr = _fbToArr(slots);
+  if(!arr.length) return;
+  arr.forEach(function(sl) {
+    if(!sl) return;
+    var s = sl.start !== undefined ? sl.start : null;
+    var e = sl.end   !== undefined ? sl.end   : null;
+    if(s === null || e === null) return;
+    _renderPumpSlot(s, e, true); // minuty
+  });
+}
+
+// Wczytaj sloty z config.json (panel Firebase zapisuje {s:"HH:MM", e:"HH:MM"})
+async function loadPumpSlotsFromConfig() {
+  var container = gid('pump-slots');
+  if(!container || container.children.length > 0) return;
+  try {
+    var cfg = await fbGet('/aquarium/config.json');
+    if(!cfg || !cfg.pumpSlots) return;
+    var arr = _fbToArr(cfg.pumpSlots);
+    if(!arr.length) return;
+    arr.forEach(function(sl) {
+      if(!sl) return;
+      // format z panelu Firebase: {s:"09:00", e:"10:00"}
+      var s = sl.s !== undefined ? sl.s : (sl.start !== undefined ? minToTime(sl.start) : null);
+      var e = sl.e !== undefined ? sl.e : (sl.end   !== undefined ? minToTime(sl.end)   : null);
+      if(!s || !e) return;
+      _renderPumpSlot(s, e, false); // HH:MM string
+    });
+  } catch(ex) { /* cicho ignoruj */ }
+}
+
+var _pumpSlotCount = 0;
+function addPumpSlot(){
+  if(_pumpSlotCount>=6){ toast("⚠ Maks. 6 przedziałów","warn"); return; }
+  var i = _pumpSlotCount;
+  var d = document.createElement('div');
+  d.className = 'pump-slot-row'; d.id = 'psr'+i;
+  d.innerHTML = "<div class='time-field' style='flex:1'><label>Przedział "+(i+1)+" – Start</label><div class='time-sel' id='ps"+i+"'></div></div>"
+    +"<div class='time-field' style='flex:1'><label>Koniec</label><div class='time-sel' id='pe"+i+"'></div></div>"
+    +"<button class='pump-rm' onclick='rmPumpSlot("+i+")'>✕</button>";
+  gid('pump-slots').appendChild(d);
+  buildTimeSel('ps'+i); buildTimeSel('pe'+i);
+  _pumpSlotCount++;
+}
+function rmPumpSlot(i){
+  var e = gid('psr'+i); if(e){ e.remove(); _pumpSlotCount--; }
+}
+async function savePumpScheduleViaFb(){
+  var slots = [];
+  document.querySelectorAll('.pump-slot-row').forEach(function(el){
+    var id = el.id.replace('psr','');
+    var sv = getTimeSel('ps'+id), ev = getTimeSel('pe'+id);
+    if(sv&&ev) slots.push({s:sv, e:ev});
+  });
+  if(!slots.length){ toast("⚠ Dodaj co najmniej jeden przedział","warn"); return; }
+  try {
+    await fbPatch("/aquarium/config.json", {
+      token:CMD_TOKEN, cfgTs:Date.now(),
+      pumpSlots: slots, pumpSlotCount: slots.length,
+      configType:"pump"
+    });
+    showPending("pump", true);
+    toast("💧 Pompka zapisana ("+slots.length+" przedziałów) → Firebase","ok");
+  } catch(e){ toast("❌ "+e.message,"err"); }
+}
+
+// ── TELEGRAM via Firebase (configType:"telegram") ────────────────────────────
+function tgMsg(txt, ok){
+  var el=gid("tg-msg"); if(!el)return;
+  el.textContent=txt; el.style.color=ok?'#22d3aa':'#ff4d6d';
+}
+async function tgSaveViaFb(){
+  var tok=(gid("tg-token")||{}).value||'';
+  var cid=(gid("tg-chatid")||{}).value||'';
+  var en=(gid("tg-enabled")||{}).checked||false;
+  if(!tok&&!cid){ tgMsg("Wypełnij token i Chat ID",false); return; }
+  try {
+    await fbPatch("/aquarium/config.json", {
+      token: CMD_TOKEN,
+      cfgTs: Date.now(),
+      tgBotToken: tok,
+      tgChatId: cid,
+      tgEnabled: en,
+      configType: "telegram"
+    });
+    tgMsg("✅ Konfiguracja Telegram wysłana → Firebase. ESP zastosuje za ~30s", true);
+  } catch(e){ tgMsg("❌ "+e.message, false); }
+}
+async function tgLoadStatus(){
+  try {
+    var d = await fbGet("/aquarium/status.json");
+    if(d && d.tgEnabled !== undefined){
+      var ec=gid("tg-enabled"); if(ec) ec.checked=!!d.tgEnabled;
+      tgMsg("Token: "+(d.tgToken||"(ukryty)")+" | ChatId: "+(d.tgChatId||"?")+" | Aktywny: "+(d.tgEnabled?"TAK":"NIE"), true);
+    } else {
+      tgMsg("Brak danych TG w Firebase – sprawdź status ESP", false);
+    }
+  } catch(e){ tgMsg("❌ Błąd odczytu: "+e.message, false); }
+}
+
+// ── INFO PANEL ──────────────────────────────────────
+// info-db-url element usunięty razem z kartą Informacje Firebase
+
+// ── EVENING SLIDER ────────────────────────────────────
+function updateEveningSlider(val) {
+  var n = parseInt(val)||0;
+  var lbl = gid('eveningBefore-label');
+  if(lbl) lbl.textContent = n + ' min';
+  // update info text if sunset known
+  var sunsetEl = gid('ev-sunset-time');
+  if(sunsetEl && sunsetEl.textContent !== '—' && sunsetEl.textContent !== '--:--') {
+    var parts = sunsetEl.textContent.split(':');
+    var sunMin = (parseInt(parts[0])||0)*60 + (parseInt(parts[1])||0);
+    var ledMin = ((sunMin + n) + 1440) % 1440;
+    var ledEl = gid('ev-led-time');
+    if(ledEl) ledEl.textContent = minToTime(ledMin);
+  }
+}
+
+// ── OPEN LOCAL LOGS ───────────────────────────────────
+function openLocalLogs(){
+  var ip = (gid('sh-ip')||{}).textContent||'';
+  if(!ip||ip==='Firebase'){ toast("⚠ Brak adresu ESP – odśwież dane", "warn"); return; }
+  window.open('http://'+ip+'/logi', '_blank');
+}
+
+// ── LUX SIMULATION ────────────────────────────────────
+var _luxSimMode = 'off';
+function luxSimSet(mode){
+  _luxSimMode = mode;
+  var badge = gid('lux-sim-badge');
+  if(!badge) return;
+  if(mode==='off'){
+    badge.textContent='WYŁĄCZONA – hardware';
+    badge.className='badge badge-off';
+  } else if(mode==='const'){
+    badge.textContent='AKTYWNA – tryb stały';
+    badge.className='badge badge-on';
+    luxSimSaveConst();
+  } else if(mode==='auto'){
+    badge.textContent='AKTYWNA – AUTO sinusoida';
+    badge.className='badge badge-on';
+    fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), luxSimMode:'auto', configType:'luxSim'})
+      .then(function(){ toast("🌤 Symulacja AUTO aktywna → Firebase","ok"); })
+      .catch(function(e){ toast("❌ "+e.message,"err"); });
+  }
+  if(mode==='off'){
+    fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), luxSimMode:'off', configType:'luxSim'})
+      .then(function(){ toast("🌤 Symulacja wyłączona (hardware)","ok"); })
+      .catch(function(e){ toast("❌ "+e.message,"err"); });
+  }
+}
+function luxSimSaveConst(){
+  var v = parseInt(gid('lux-sim-const-val').value)||300;
+  fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), luxSimMode:'const', luxSimLux:v, configType:'luxSim'})
+    .then(function(){ toast("🌤 Symulacja stała: "+v+" lx → Firebase","ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+function luxSimSaveAuto(){
+  var mn = parseInt(gid('lux-sim-min').value)||0;
+  var mx = parseInt(gid('lux-sim-max').value)||1500;
+  var pr = parseInt(gid('lux-sim-period').value)||600;
+  if(mn>=mx){ toast("❌ Min lux musi być < Max lux","err"); return; }
+  if(pr<10){ toast("❌ Okres min. 10s","err"); return; }
+  fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), luxSimMode:'auto', luxSimMin:mn, luxSimMax:mx, luxSimPeriod:pr, configType:'luxSim'})
+    .then(function(){ toast("💾 Parametry AUTO zapisane → Firebase","ok"); })
+    .catch(function(e){ toast("❌ "+e.message,"err"); });
+}
+
+// ── INIT ────────────────────────────────────────────
+window.addEventListener("load", function(){
+  loadStatus();
+  setInterval(loadStatus, 10000);
+});
+</script>
+</body>
+</html>
