@@ -24,6 +24,7 @@
 #
 #  0) check_secrets.py: brak sekretów zaszytych w repo (4.7.1, Etap 2).
 # 12) check_panel_cmd.js: komendy zdalne panelu trafiają do kolejki firmware (4.7.1).
+# 13) check_mobile_app.js: aplikacja mobilna panel/mobile (logika, komendy, pola statusu, PWA).
 #
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
@@ -78,7 +79,7 @@ echo "== [7/7] menu Telegrama: JSON, PL_CAP, callbacki, raporty w 1 klik (4.6.0)
 python3 "$HERE/check_tg_menu.py"
 echo
 echo
-echo "== [8/12] testy modułu astro — efemerydy słoneczne (4.7.0, ASan + UBSan) =="
+echo "== [8/13] testy modułu astro — efemerydy słoneczne (4.7.0, ASan + UBSan) =="
 g++ -std=gnu++17 -g -O1 -Wall -Wextra \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -I"$SRC" \
@@ -87,7 +88,7 @@ g++ -std=gnu++17 -g -O1 -Wall -Wextra \
 "${BIN}-astro"
 echo
 echo
-echo "== [9/12] sterownik RTC DS1307/DS3231 (4.7.0, ASan + UBSan) =="
+echo "== [9/13] sterownik RTC DS1307/DS3231 (4.7.0, ASan + UBSan) =="
 g++ -std=gnu++17 -g -O1 -Wall -Wextra \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -I"$SRC" \
@@ -96,18 +97,21 @@ g++ -std=gnu++17 -g -O1 -Wall -Wextra \
 "${BIN}-rtc"
 echo
 echo
-echo "== [10/12] lokalizacja, poranek i RTC z panelu: NVS, /api/location, /api/rtc (4.7.0) =="
+echo "== [10/13] lokalizacja, poranek i RTC z panelu: NVS, /api/location, /api/rtc (4.7.0) =="
 bash "$HERE/check_location.sh"
 echo
 echo
-echo "== [11/12] karta Dzień w panelu (4.7.0, Node) =="
+echo "== [11/13] karta Dzień w panelu (4.7.0, Node) =="
 if command -v node >/dev/null 2>&1; then
   node "$HERE/check_day_card.js"
 else
   echo "POMINIĘTO: brak node (wymagany do check_day_card.js)"
 fi
 echo
-echo "== [12/12] komendy zdalne panelu v14 → kolejka /aquarium/commands (4.7.1, Node) =="
+echo "== [12/13] komendy zdalne panelu v14 → kolejka /aquarium/commands (4.7.1, Node) =="
 node "$HERE/check_panel_cmd.js"
+echo
+echo "== [13/13] aplikacja mobilna panel/mobile: logika, kontrakt z firmware, PWA (4.7.2, Node) =="
+node "$HERE/check_mobile_app.js"
 echo
 echo "OK: wszystkie kontrole hostowe zaliczone."

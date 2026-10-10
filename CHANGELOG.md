@@ -24,7 +24,11 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
   - **Zakres Min LUX w panelu**: panel dopuszczał target 0–8000, a firmware przyjmuje 500–8000 (wartości
     poniżej 500 były cicho odrzucane). Slider i walidacja w panelu dopasowane do firmware.
 - Testy: `check_panel_cmd.js` rozszerzony o wykonanie `saveToAutoFb` (oczekiwane `autosave 10 11 12 13 14`),
-  parsowanie `luxSim` (klucze i payloady panelu), zgodność `configType` z parserem i zakres minLuxTarget. 47 PASS.
+  parsowanie `luxSim` (klucze i payloady panelu), zgodność `configType` z parserem i zakres minLuxTarget. 47 PASS; aplikacja mobilna 122 PASS.
+- **Aplikacja mobilna** (`panel/mobile/`): widok na telefon (PWA, zdalnie przez Firebase): Główna, Światło
+  (PWM, AUTO, LED), Pompa, Energia (kWh, koszt, czas LED, historia), Ustawienia. Komendy i pola statusu zgodne
+  z firmware; tekst z bazy tylko przez `textContent`. Test: `check_mobile_app.js` (krok 13). Zmiana tylko
+  w panelu — firmware bez zmian poza punktami wyżej.
 - Wersja: `v4.7.2+build.272` (zmiana firmware), `version.txt` 4.7.2.
 - Do sprawdzenia na płytce: zapis AUTO z panelu przez LTE → po restarcie wartości AUTO z EEPROM; symulacja LUX
   z panelu (stała i AUTO) → log `SIM-CFG state=APPLIED`, po restarcie `simEnabled=false`.
