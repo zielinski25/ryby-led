@@ -16,16 +16,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -84,15 +89,21 @@ fun RybyApp(vm: AppViewModel = viewModel()) {
             containerColor = Pal.Bg,
             bottomBar = { BottomNav(tab) { tab = it } }
         ) { pad ->
-            Column(Modifier.padding(pad).fillMaxSize()) {
+            Column(
+                Modifier
+                    .padding(pad)
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(Pal.BgTop, Pal.Bg)))
+            ) {
                 TopBar(TAB_TITLES[tab], vm.conn)
+                HorizontalDivider(color = Pal.Cyan.copy(alpha = 0.12f))
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Dimens.pagePad)
-                        .padding(top = 12.dp),
+                        .padding(top = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(Dimens.gap)
                 ) {
                     val err = vm.error
@@ -106,7 +117,7 @@ fun RybyApp(vm: AppViewModel = viewModel()) {
                         3 -> EnergyTab(vm)
                         else -> SettingsTab(vm)
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                 }
             }
         }
@@ -122,11 +133,11 @@ private fun TopBar(title: String, conn: Logic.Conn) {
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Pal.Top, Pal.Top2)))
             .statusBarsPadding()
-            .padding(horizontal = Dimens.pagePad, vertical = 12.dp),
+            .padding(horizontal = Dimens.pagePad, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("RYBY LED", style = Txt.brand)
             Text(title, style = Txt.title)
         }
@@ -149,8 +160,8 @@ private fun Pill(text: String, color: Color) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(Dimens.radiusPill))
-            .background(color.copy(alpha = 0.13f))
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(Dimens.radiusPill))
+            .background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.40f), RoundedCornerShape(Dimens.radiusPill))
             .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
         Text(text, style = Txt.chip, color = color)
@@ -169,7 +180,7 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Pal.Cyan,
                     selectedTextColor = Pal.Cyan,
-                    indicatorColor = Pal.Cyan.copy(alpha = 0.14f),
+                    indicatorColor = Pal.Cyan.copy(alpha = 0.16f),
                     unselectedIconColor = Pal.TextDim2,
                     unselectedTextColor = Pal.TextDim2
                 )
@@ -189,16 +200,29 @@ private fun MainTab(vm: AppViewModel) {
     }
     Hero(st, stale = vm.conn == Logic.Conn.STALE)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
-        Tile("Płytka 2", Logic.fmtTemp(st.temps.getOrNull(1)), Modifier.weight(1f))
-        Tile("Płytka 3", Logic.fmtTemp(st.temps.getOrNull(2)), Modifier.weight(1f))
+        Tile("Płytka 2", Logic.fmtTemp(st.temps.getOrNull(1)), Icons.Filled.Thermostat, Modifier.weight(1f))
+        Tile("Płytka 3", Logic.fmtTemp(st.temps.getOrNull(2)), Icons.Filled.Thermostat, Modifier.weight(1f))
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
-        Tile("Lux pokój", Logic.fmtLux(st.luxRoom), Modifier.weight(1f))
-        Tile("Lux nad wodą", Logic.fmtLux(st.luxNadWoda), Modifier.weight(1f))
+        Tile("Lux pokój", Logic.fmtLux(st.luxRoom), Icons.Filled.WbSunny, Modifier.weight(1f))
+        Tile("Lux nad wodą", Logic.fmtLux(st.luxNadWoda), Icons.Filled.WbSunny, Modifier.weight(1f))
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
-        Tile("Moc LED", st.pct?.let { "${it.roundToInt()} %" } ?: "—", Modifier.weight(1f))
-        Tile("Pobór teraz", Logic.fmtWatts(st.powerNowW), Modifier.weight(1f))
+        Tile(
+            "Moc LED",
+            st.pct?.let { "${it.roundToInt()} %" } ?: "—",
+            Icons.Filled.Lightbulb,
+            Modifier.weight(1f),
+            accent = Pal.Cyan,
+            progress = st.pct?.let { (it / 100.0).toFloat() }
+        )
+        Tile(
+            "Pobór teraz",
+            Logic.fmtWatts(st.powerNowW),
+            Icons.Filled.Bolt,
+            Modifier.weight(1f),
+            accent = Pal.Accent
+        )
     }
     Panel(title = "Sterowanie") {
         SwitchRow("Zasilanie", st.power) { on -> vm.sendPlain(if (on) "power_on" else "power_off") }
@@ -224,15 +248,10 @@ private fun MainTab(vm: AppViewModel) {
 
 @Composable
 private fun Hero(st: RybyStatus, stale: Boolean) {
-    val edge = if (stale) Pal.Warn.copy(alpha = 0.45f) else Pal.Cyan.copy(alpha = 0.22f)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Dimens.radiusTile))
-            .background(Brush.linearGradient(listOf(Pal.HeroA, Pal.HeroB)))
-            .border(1.dp, edge, RoundedCornerShape(Dimens.radiusTile))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+    GlowCard(
+        edge = if (stale) Pal.Warn.copy(alpha = 0.45f) else Pal.Cyan.copy(alpha = 0.25f),
+        glow = if (stale) Pal.Warn else Pal.Cyan,
+        padding = 20.dp
     ) {
         Text("TEMPERATURA · PŁYTKA 1", style = Txt.heroLabel)
         Text(Logic.fmtTemp(st.temps.getOrNull(0)), style = Txt.heroTemp)
@@ -338,22 +357,14 @@ private fun EnergyTab(vm: AppViewModel) {
         Panel { Text("Czekam na pierwszy odczyt z bazy…", style = Txt.note) }
         return
     }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Dimens.radiusTile))
-            .background(Brush.linearGradient(listOf(Pal.HeroA, Pal.HeroB)))
-            .border(1.dp, Pal.Cyan.copy(alpha = 0.22f), RoundedCornerShape(Dimens.radiusTile))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+    GlowCard(edge = Pal.Cyan.copy(alpha = 0.25f), glow = Pal.Cyan, padding = 20.dp) {
         Text("ENERGIA DZIŚ", style = Txt.heroLabel)
         Text(Logic.fmtWh(st.energy.today), style = Txt.heroTemp)
         Text("Koszt: ${Logic.fmtPln(Logic.costPln(st.energy.today, st.kwhPrice))}", style = Txt.note)
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
-        Tile("Tydzień", Logic.fmtWh(st.energy.week), Modifier.weight(1f))
-        Tile("Miesiąc", Logic.fmtWh(st.energy.month), Modifier.weight(1f))
+        Tile("Tydzień", Logic.fmtWh(st.energy.week), Icons.Filled.DateRange, Modifier.weight(1f))
+        Tile("Miesiąc", Logic.fmtWh(st.energy.month), Icons.Filled.DateRange, Modifier.weight(1f))
     }
     Panel(title = "Ostatnie dni") {
         val days = st.dayHistory.takeLast(7)
@@ -433,34 +444,120 @@ private fun SettingsTab(vm: AppViewModel) {
 
 // ── Elementy wspólne ──
 
+/** Karta z gradientem i poblaskiem w kolorze akcentu (jak Piec: hero i kafelki). */
+@Composable
+private fun GlowCard(
+    edge: Color,
+    glow: Color,
+    padding: androidx.compose.ui.unit.Dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Dimens.radiusTile))
+            .background(Brush.linearGradient(listOf(Pal.HeroA, Pal.HeroB)))
+            .border(1.dp, edge, RoundedCornerShape(Dimens.radiusTile))
+    ) {
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .size(180.dp)
+                .background(Brush.radialGradient(listOf(glow.copy(alpha = 0.20f), Color.Transparent)))
+        )
+        Column(
+            modifier = Modifier.padding(padding),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            content = content
+        )
+    }
+}
+
 @Composable
 private fun Panel(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(Dimens.radiusCard))
-            .background(Pal.Surface)
+            .background(Brush.verticalGradient(listOf(Pal.Surface2, Pal.Surface)))
             .border(1.dp, Pal.Border, RoundedCornerShape(Dimens.radiusCard))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (title != null) Text(title.uppercase(), style = Txt.section)
+        if (title != null) SectionTitle(title)
         content()
     }
 }
 
+/** Nagłówek sekcji: krótki cyjanowy pasek + tekst wielkimi literami. */
 @Composable
-private fun Tile(label: String, value: String, modifier: Modifier = Modifier, tone: Color = Pal.Border) {
-    Column(
+private fun SectionTitle(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier
+                .size(width = 3.dp, height = 12.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Pal.Cyan)
+        )
+        Text(text.uppercase(), style = Txt.section)
+    }
+}
+
+@Composable
+private fun Tile(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    accent: Color = Pal.Cyan,
+    progress: Float? = null
+) {
+    Box(
         modifier = modifier
             .clip(RoundedCornerShape(Dimens.radiusTile))
             .background(Brush.linearGradient(listOf(Pal.TileA, Pal.TileB)))
-            .border(1.dp, tone, RoundedCornerShape(Dimens.radiusTile))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .border(1.dp, accent.copy(alpha = 0.22f), RoundedCornerShape(Dimens.radiusTile))
     ) {
-        Text(label, style = Txt.tileTitle)
-        Text(value, style = Txt.tileValue)
+        Box(
+            Modifier
+                .align(Alignment.TopEnd)
+                .size(96.dp)
+                .background(Brush.radialGradient(listOf(accent.copy(alpha = 0.18f), Color.Transparent)))
+        )
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(accent.copy(alpha = 0.14f))
+                    .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+            }
+            Text(label, style = Txt.tileTitle)
+            Text(value, style = Txt.tileValue)
+            if (progress != null) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Pal.Surface3)
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(accent)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -510,7 +607,10 @@ private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> U
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSel) Pal.Cyan else Color.Transparent)
+                    .background(
+                        if (isSel) Brush.verticalGradient(listOf(Pal.Cyan, Color(0xFF00B3D1)))
+                        else Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                    )
                     .clickable { onSelect(i) }
                     .heightIn(min = Dimens.controlH)
                     .padding(vertical = 12.dp),
@@ -530,7 +630,7 @@ private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> U
 private fun BarChart(values: List<Double>) {
     val max = values.maxOrNull() ?: 0.0
     Row(
-        modifier = Modifier.fillMaxWidth().height(130.dp),
+        modifier = Modifier.fillMaxWidth().height(140.dp),
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -542,7 +642,10 @@ private fun BarChart(values: List<Double>) {
                     .weight(1f)
                     .fillMaxHeight(frac)
                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                    .background(if (isToday) Pal.Cyan else Pal.Cyan.copy(alpha = 0.35f))
+                    .background(
+                        if (isToday) Brush.verticalGradient(listOf(Pal.Cyan, Color(0xFF0088A3)))
+                        else Brush.verticalGradient(listOf(Pal.Cyan.copy(alpha = 0.45f), Pal.Cyan.copy(alpha = 0.15f)))
+                    )
             )
         }
     }

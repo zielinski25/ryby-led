@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 object Pal {
     // Tła i powierzchnie (od najciemniejszego)
     val Bg = Color(0xFF060D18)
+    val BgTop = Color(0xFF0B1B30)
     val Top = Color(0xFF071421)
     val Top2 = Color(0xFF0A1928)
     val Nav = Color(0xFF081421)
