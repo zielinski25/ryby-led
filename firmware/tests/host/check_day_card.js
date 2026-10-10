@@ -109,5 +109,13 @@ drawDayCurve(status, '');
 check(els['day-info'].textContent.includes('próbek dziś: 0'), 'pusta historia → 0 próbek');
 check(!els['chart-day'].innerHTML.includes('<path'), 'pusta historia → brak krzywej');
 
+// Tryb świt/wschód (4.7.0 Etap 6): firmware podaje morningEff (efektywny start 06:41 = 401 min)
+// — karta pokazuje go zamiast stałej z harmonogramu WD/WE (360 / 480).
+els['chart-day'].innerHTML = '';
+drawDayCurve({ localTime: '09:30:00', schedule: { morningWD: 360, morningWE: 480, morningEff: 401, sunsetMin: 1079 } }, csv);
+check(/poranek 06:41 \((weekend|dzień rob\.)\)/.test(els['day-info'].textContent),
+      'morningEff: poranek 06:41 z firmware (' + els['day-info'].textContent + ')');
+check(!/poranek 06:00|poranek 08:00/.test(els['day-info'].textContent), 'morningEff: brak starej wartości WD/WE');
+
 console.log('day card: ' + pass + ' PASS, ' + fail + ' FAIL');
 process.exit(fail === 0 ? 0 : 1);

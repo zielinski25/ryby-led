@@ -134,4 +134,16 @@ bool jsonNumber(const char* body, const char* key, double& out) {
   return true;
 }
 
+int morningStartMinutes(int mode, int offsetMin, bool hasEvent, double eventMin, int fallbackMin) {
+  if (mode != kMorningDawn && mode != kMorningSunrise) return fallbackMin;
+  if (!hasEvent || !isfinite(eventMin)) return fallbackMin;
+  if (offsetMin < -180) offsetMin = -180;
+  if (offsetMin > 180) offsetMin = 180;
+  // Zaokrąglenie do pełnej minuty, potem zawinięcie do doby.
+  int base = (int)floor(wrapMinutes(eventMin) + 0.5);
+  int v = (base + offsetMin) % 1440;
+  if (v < 0) v += 1440;
+  return v;
+}
+
 }  // namespace astro

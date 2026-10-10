@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.7.0+build.269"
+#define RYBY_FW_VERSION "v4.7.0+build.270"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -219,6 +219,11 @@ void saveKwhPrice();
 void loadKwhPrice();
 void loadSiteLocation();   // [4.7.0 ASTRO]
 void saveSiteLocation();   // [4.7.0 ASTRO]
+int  morningStartFor(bool weekend);   // [4.7.0 ASTRO]
+void przeliczAstroDzis();             // [4.7.0 ASTRO]
+void przeliczZachodTeraz();           // [4.7.0 ASTRO]
+void rtcRestoreAtBoot();              // [4.7.0 ASTRO]
+void rtcSaveFromSystem();             // [4.7.0 ASTRO]
 void loadMinLuxModeFromEEPROM();
 uint16_t calculateMinLuxPWM();
 void applyMinLuxMode();
@@ -477,6 +482,8 @@ void* psramAllocSafe(size_t size);
 #include "critlog.h"            // [4.4.0 CRIT-LOG] Etap 5 — log_krytyczny.txt
 #include "histlong.h"           // [4.5.0 HIST-LONG] Etap 3 (G8) — historia długa, kubełki 30 min
 #include "astro.h"              // [4.7.0 ASTRO] Etap 6 — efemerydy NOAA (zachód słońca)
+#include "rtc_ds13xx.h"          // [4.7.0 ASTRO] Etap 6 pkt 2 — RTC DS1307/DS3231
+#include <sys/time.h>             // settimeofday: czas z RTC przed NTP
 
 
 /*************************************************************
@@ -1701,6 +1708,14 @@ static constexpr const char* ASTRO_LOC_NVS_NS = "astro_loc";
 double latitude  = 52.1345;
 double longitude = 20.1418;
 volatile bool sunsetRecalcRequested = false;  // ustawia endpoint, czyta loop()
+// [4.7.0 ASTRO] Poranek: tryb startu (0 stała / 1 świt / 2 wschód) i przesunięcie [min].
+int  morningMode = 0;
+int  morningOffsetMin = 0;
+bool astroHasDawn = false, astroHasSunrise = false;
+double astroDawnMin = 0.0, astroSunriseMin = 0.0;
+// [4.7.0 ASTRO] RTC: 0 = wyłączony, 1307 / 3231 (panel, NVS). Domyślnie wyłączony.
+int  rtcChip = 0;
+volatile bool rtcSaveRequested = false;   // ustawia endpoint, zapis robi loop()
 
 /*************************************************************
  *  TERMICZNY DERATING
@@ -3583,7 +3598,7 @@ String buildTelegramScheduleReport() {
   if (!tb) tb = (char*)psramAllocSafe(TB_CAP);
   if (!tb) return "[ERR] Brak pamięci na raport harmonogramu";
   bool isWeekend = (ti.tm_wday == 0 || ti.tm_wday == 6);
-  int32_t morningStart = isWeekend ? MORNING_ON_START_WEEKEND : MORNING_ON_START_WEEKDAY;
+  int32_t morningStart = morningStartFor(isWeekend);
   snprintf(tb, TB_CAP,
     "⏰ <b>Harmonogram świateł</b>  %02d:%02d\n\n"
     "🌅 Start poranny (%s): <b>%02d:%02d</b>\n"
@@ -4409,8 +4424,8 @@ void loadKwhPrice() {
   kwhPrice = v;
 }
 
-// [4.7.0 ASTRO] Lokalizacja do zachodu — NVS (namespace astro_loc).
-// Brak wpisu albo wartość poza zakresem → zostaje domyślna z kodu (52,1345 / 20,1418).
+// [4.7.0 ASTRO] Ustawienia astro/RTC — NVS (namespace astro_loc).
+// Brak wpisu albo wartość poza zakresem → domyślna (52,1345 / 20,1418; tryb stały; RTC wyłączony).
 void loadSiteLocation() {
   Preferences prefs;
   if (!prefs.begin(ASTRO_LOC_NVS_NS, true)) return;
@@ -4422,6 +4437,13 @@ void loadSiteLocation() {
       longitude = (double)lo;
     }
   }
+  int mm = prefs.getInt("mrMode", 0);
+  int mo = prefs.getInt("mrOff", 0);
+  morningMode = (mm == astro::kMorningFixed || mm == astro::kMorningDawn || mm == astro::kMorningSunrise)
+                  ? mm : (int)astro::kMorningFixed;
+  morningOffsetMin = (mo >= -180 && mo <= 180) ? mo : 0;
+  int rc = prefs.getInt("rtcChip", 0);
+  rtcChip = (rc == (int)rtc13::kChipDS1307 || rc == (int)rtc13::kChipDS3231) ? rc : 0;
   prefs.end();
 }
 
@@ -4430,7 +4452,119 @@ void saveSiteLocation() {
   if (!prefs.begin(ASTRO_LOC_NVS_NS, false)) return;
   (void)prefs.putFloat("lat", (float)latitude);
   (void)prefs.putFloat("lon", (float)longitude);
+  (void)prefs.putInt("mrMode", morningMode);
+  (void)prefs.putInt("mrOff", morningOffsetMin);
+  (void)prefs.putInt("rtcChip", rtcChip);
   prefs.end();
+}
+
+// [4.7.0 ASTRO] Efektywny start porannej rampy [min doby]. Jedno źródło dla wszystkich
+// miejsc, które czytają poranek: tryb stały (WD/WE) albo świt/wschód + przesunięcie.
+int morningStartFor(bool weekend) {
+  int fallback = weekend ? (int)MORNING_ON_START_WEEKEND : (int)MORNING_ON_START_WEEKDAY;
+  if (morningMode == (int)astro::kMorningDawn) {
+    return astro::morningStartMinutes(morningMode, morningOffsetMin, astroHasDawn, astroDawnMin, fallback);
+  }
+  if (morningMode == (int)astro::kMorningSunrise) {
+    return astro::morningStartMinutes(morningMode, morningOffsetMin, astroHasSunrise, astroSunriseMin, fallback);
+  }
+  return fallback;
+}
+
+// [4.7.0 ASTRO] Świt i wschód na dziś (minuty lokalne). Po NTP, po zmianie dnia i po zmianie lokalizacji.
+void przeliczAstroDzis() {
+  struct tm ti;
+  if (!getLocalTimePL(&ti)) return;
+  bool dst = isDaylightSaving(time(nullptr));
+  int tz = dst ? timezoneOffsetMinutes : (timezoneOffsetMinutes - 60);
+  astro::Times t{};
+  if (!astro::compute(ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, latitude, longitude, tz, t)) return;
+  astroHasDawn    = t.hasDawn;
+  astroDawnMin    = t.dawnMin;
+  astroHasSunrise = t.hasSunrise;
+  astroSunriseMin = t.sunriseMin;
+}
+
+// [4.7.0 ASTRO] Zachód na dziś z bieżącego czasu systemowego (po starcie z RTC, przed NTP).
+void przeliczZachodTeraz() {
+  struct tm ti;
+  if (!getLocalTimePL(&ti)) return;
+  int zachodUTC = obliczZachodSlonca(ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, latitude, longitude);
+  if (zachodUTC < 0 || zachodUTC > 1440) return;
+  bool dst = isDaylightSaving(time(nullptr));
+  int offset = dst ? timezoneOffsetMinutes : (timezoneOffsetMinutes - 60);
+  sunsetMinutes = (zachodUTC + offset + 1440) % 1440;
+}
+
+// [4.7.0 ASTRO] RTC DS1307/DS3231 na magistrali Wire (SDA 21, SCL 20).
+// Wywoływane TYLKO z loop() (nie z handlerów HTTP) — bez współbieżności z czujnikami.
+namespace rtcglue {
+bool wireWrite(void*, uint8_t addr, const uint8_t* buf, size_t n) {
+  Wire.beginTransmission(addr);
+  Wire.write(buf, n);
+  return Wire.endTransmission() == 0;
+}
+bool wireReadReg(void*, uint8_t addr, uint8_t reg, uint8_t* buf, size_t n) {
+  Wire.beginTransmission(addr);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom((int)addr, (int)n) != (int)n) return false;
+  for (size_t i = 0; i < n; i++) buf[i] = (uint8_t)Wire.read();
+  return true;
+}
+rtc13::Bus bus() {
+  rtc13::Bus b;
+  b.ctx = nullptr;
+  b.write = wireWrite;
+  b.readReg = wireReadReg;
+  return b;
+}
+}  // namespace rtcglue
+
+// Stan RTC widoczny w panelu (tekst bez cudzysłowów). Ustawiany w loop().
+char rtcStatusMsg[48] = "wylaczony";
+
+// [4.7.0 ASTRO] Po starcie: gdy RTC włączony, a czasu systemowego jeszcze nie ma — ustaw z RTC.
+// NTP (gdy zadziała) nadpisze ten czas automatycznie.
+void rtcRestoreAtBoot() {
+  if (rtcChip == 0) return;
+  if (time(nullptr) >= 1700000000L) return;  // czas już poprawny
+  int64_t epoch = 0;
+  if (!rtc13::readUtc(rtcglue::bus(), epoch)) {
+    snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "brak odczytu (modul/zegar)");
+    logPrintf("lvl=WARN tag=RTC msg=\"Brak odczytu RTC przy starcie\" chip=%d\n", rtcChip);
+    return;
+  }
+  if (epoch < 1700000000LL) {
+    snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "czas w RTC nieprawidlowy");
+    logPrintf("lvl=WARN tag=RTC msg=\"Czas w RTC nieprawidlowy (przestarzaly)\"\n");
+    return;
+  }
+  struct timeval tv;
+  tv.tv_sec = (time_t)epoch;
+  tv.tv_usec = 0;
+  settimeofday(&tv, nullptr);
+  przeliczZachodTeraz();
+  przeliczAstroDzis();
+  snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "czas z RTC (bez NTP)");
+  logPrintf("lvl=INFO tag=RTC msg=\"Czas ustawiony z RTC (bez NTP)\" epoch=%lld\n", (long long)epoch);
+}
+
+// [4.7.0 ASTRO] Zapis czasu systemowego do RTC (po NTP albo na żądanie z panelu).
+void rtcSaveFromSystem() {
+  if (rtcChip == 0) return;
+  time_t now = time(nullptr);
+  if (now < 1700000000L) {
+    snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "brak czasu systemowego");
+    return;
+  }
+  if (rtc13::writeUtc(rtcglue::bus(), rtcChip, (int64_t)now)) {
+    snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "zapisano czas do RTC");
+    logPrintf("lvl=INFO tag=RTC msg=\"Czas zapisany do RTC\" chip=%d\n", rtcChip);
+  } else {
+    snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "blad zapisu do RTC (modul?)");
+    logPrintf("lvl=WARN tag=RTC msg=\"Zapis do RTC nieudany\" chip=%d\n", rtcChip);
+  }
 }
 
 void loadMinLuxModeFromEEPROM() {
@@ -4578,7 +4712,7 @@ void applyMinLuxMode() {
     } else {
       _afterEvening = (_nowMin >= _evOffEnd);
     }
-    int _morningStart = isWeekend() ? MORNING_ON_START_WEEKEND : MORNING_ON_START_WEEKDAY;
+    int _morningStart = morningStartFor(isWeekend());
     bool _beforeMorning = (_nowMin < _morningStart);
     bool _isNocna = _afterEvening && _beforeMorning;
 
@@ -5518,8 +5652,7 @@ void onBrightnessCompositeChange() {
   if (tryb) {
     int nowMin = getLocalMinutes();
 
-    int morningStart =
-      isWeekend() ? MORNING_ON_START_WEEKEND : MORNING_ON_START_WEEKDAY;
+    int morningStart = morningStartFor(isWeekend());
 
     // [OK] FIX-v16-WRAP: Użyj tej samej logiki co trybAuto (eveningOffWraps).
     // Poprzedni kod: nowMin >= ((EVENING_OFF_START + fadeMinutes) % 1440)
@@ -5699,7 +5832,7 @@ void onTrybChange() {
     }
     bool isWeekendLocal = (wday == 0 || wday == 6);
     
-    int morningStart = isWeekendLocal ? MORNING_ON_START_WEEKEND : MORNING_ON_START_WEEKDAY;
+    int morningStart = morningStartFor(isWeekendLocal);
     int eveningOnStart = sunsetMinutes + EVENING_ON_BEFORE_SUNSET_MIN;
     if (eveningOnStart < 0) eveningOnStart += 1440;
     if (eveningOnStart > 1440) eveningOnStart -= 1440;
@@ -11315,18 +11448,34 @@ webserialServer.on("/api/log-critical-download", HTTP_GET, [](AsyncWebServerRequ
 });
 
 // ═══════════════════════════════════════════════════════════════
-//  API: LOKALIZACJA DO ZACHODU SŁOŃCA [4.7.0 ASTRO] Etap 6
-//  GET  /api/location → {"ok":true,"lat":..,"lon":..,"sunset":"HH:MM","timeSynced":bool}
-//  POST /api/location  body {"lat":52.1345,"lon":20.1418}
-//       → zapis w NVS (namespace astro_loc); zachód przeliczany w pętli loop().
+//  API: LOKALIZACJA, PORANEK I RTC [4.7.0 ASTRO] Etap 6
+//  GET  /api/location → {"ok","lat","lon","sunset","timeSynced","mrMode","mrOff",
+//                        "morningNow","dawn","sunrise"}
+//  POST /api/location  body {"lat":..,"lon":..,["mrMode":0|1|2],["mrOff":-180..180]}
+//       → zapis w NVS; zachód przeliczany w pętli loop(); świt/wschód od razu.
+//  GET  /api/rtc → {"ok","chip","status","sysSynced"}  (bez I²C w handlerze)
+//  POST /api/rtc body {"chip":0|1307|3231} → zapis w NVS; zapis czasu do RTC w loop().
 // ═══════════════════════════════════════════════════════════════
 webserialServer.on("/api/location", HTTP_GET, [](AsyncWebServerRequest *request) {
-  char buf[160];
+  char buf[400];
   bool ntpOk = time(nullptr) > 1700000000;  // ten sam sens co timeSynced w loop()
+  int morn = morningStartFor(isWeekend());
+  char dawnS[8] = "--:--";
+  char sunS[8]  = "--:--";
+  if (astroHasDawn) {
+    int m = (int)floor(astro::wrapMinutes(astroDawnMin) + 0.5) % 1440;
+    snprintf(dawnS, sizeof(dawnS), "%02d:%02d", m / 60, m % 60);
+  }
+  if (astroHasSunrise) {
+    int m = (int)floor(astro::wrapMinutes(astroSunriseMin) + 0.5) % 1440;
+    snprintf(sunS, sizeof(sunS), "%02d:%02d", m / 60, m % 60);
+  }
   snprintf(buf, sizeof(buf),
-           "{\"ok\":true,\"lat\":%.4f,\"lon\":%.4f,\"sunset\":\"%02d:%02d\",\"timeSynced\":%s}",
+           "{\"ok\":true,\"lat\":%.4f,\"lon\":%.4f,\"sunset\":\"%02d:%02d\",\"timeSynced\":%s,"
+           "\"mrMode\":%d,\"mrOff\":%d,\"morningNow\":\"%02d:%02d\",\"dawn\":\"%s\",\"sunrise\":\"%s\"}",
            latitude, longitude, sunsetMinutes / 60, sunsetMinutes % 60,
-           ntpOk ? "true" : "false");
+           ntpOk ? "true" : "false",
+           morningMode, morningOffsetMin, morn / 60, morn % 60, dawnS, sunS);
   request->send(200, "application/json", buf);
 });
 
@@ -11349,12 +11498,71 @@ webserialServer.on("/api/location", HTTP_POST,
         "{\"ok\":false,\"error\":\"zla lokalizacja (lat -90..90, lon -180..180)\"}");
       return;
     }
+    int newMode = morningMode;
+    int newOff  = morningOffsetMin;
+    if (strstr(body, "\"mrMode\"")) {
+      double v = 0.0;
+      if (!astro::jsonNumber(body, "mrMode", v) || v < 0.0 || v > 2.0 || v != floor(v)) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"zly tryb poranka (0,1,2)\"}");
+        return;
+      }
+      newMode = (int)v;
+    }
+    if (strstr(body, "\"mrOff\"")) {
+      double v = 0.0;
+      if (!astro::jsonNumber(body, "mrOff", v) || v < -180.0 || v > 180.0) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"przesuniecie poza -180..180\"}");
+        return;
+      }
+      newOff = (int)(v < 0 ? v - 0.5 : v + 0.5);
+    }
     latitude  = lat;
     longitude = lon;
+    morningMode = newMode;
+    morningOffsetMin = newOff;
     saveSiteLocation();
+    przeliczAstroDzis();           // świt/wschód od razu (czas systemowy jest w handlerze dostępny)
     sunsetRecalcRequested = true;  // loop() przelicza zachód przy następnym obiegu
-    logPrintf("lvl=INFO tag=ASTRO msg=\"Lokalizacja zmieniona z panelu\" lat=%.4f lon=%.4f\n",
-              lat, lon);
+    logPrintf("lvl=INFO tag=ASTRO msg=\"Lokalizacja/poranek zmienione z panelu\" lat=%.4f lon=%.4f tryb=%d przes=%d\n",
+              lat, lon, morningMode, morningOffsetMin);
+    request->send(200, "application/json", "{\"ok\":true}");
+  }
+);
+
+webserialServer.on("/api/rtc", HTTP_GET, [](AsyncWebServerRequest *request) {
+  char buf[200];
+  bool sysOk = time(nullptr) > 1700000000;
+  snprintf(buf, sizeof(buf),
+           "{\"ok\":true,\"chip\":%d,\"status\":\"%s\",\"sysSynced\":%s}",
+           rtcChip, rtcStatusMsg, sysOk ? "true" : "false");
+  request->send(200, "application/json", buf);
+});
+
+webserialServer.on("/api/rtc", HTTP_POST,
+  [](AsyncWebServerRequest *request){}, NULL,
+  [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+    if (index + len != total) return;
+    if (index != 0 || total >= 128) {
+      request->send(413, "application/json", "{\"ok\":false,\"error\":\"body\"}");
+      return;
+    }
+    char body[128];
+    memcpy(body, data, len);
+    body[len] = '\0';
+    double v = 0.0;
+    if (!astro::jsonNumber(body, "chip", v) || (v != 0.0 && v != 1307.0 && v != 3231.0)) {
+      request->send(400, "application/json", "{\"ok\":false,\"error\":\"chip: 0, 1307 albo 3231\"}");
+      return;
+    }
+    rtcChip = (int)v;
+    if (rtcChip == 0) {
+      snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "wylaczony");
+    } else {
+      snprintf(rtcStatusMsg, sizeof(rtcStatusMsg), "zapis oczekuje na petle");
+    }
+    saveSiteLocation();
+    rtcSaveRequested = (rtcChip != 0);  // loop() zapisze czas systemowy do RTC
+    logPrintf("lvl=INFO tag=RTC msg=\"Ustawienie RTC z panelu\" chip=%d\n", rtcChip);
     request->send(200, "application/json", "{\"ok\":true}");
   }
 );
@@ -11597,7 +11805,7 @@ webserialServer.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
   json += "\"schedMO\":\"" + String(moStr) + "\",";
   json += "\"schedEB\":" + String(EVENING_ON_BEFORE_SUNSET_MIN) + ",";
   json += "\"schedEO\":\"" + String(eoStr) + "\",";
-  json += "\"schedule\":{\"morningWD\":" + String(MORNING_ON_START_WEEKDAY) + ",\"morningWE\":" + String(MORNING_ON_START_WEEKEND) + ",\"middayOff\":" + String(MIDDAY_OFF_LOCAL) + ",\"eveningBefore\":" + String(EVENING_ON_BEFORE_SUNSET_MIN) + ",\"eveningOff\":" + String(EVENING_OFF_START) + ",\"sunsetMin\":" + String(sunsetMinutes) + "},";
+  json += "\"schedule\":{\"morningWD\":" + String(MORNING_ON_START_WEEKDAY) + ",\"morningWE\":" + String(MORNING_ON_START_WEEKEND) + ",\"middayOff\":" + String(MIDDAY_OFF_LOCAL) + ",\"eveningBefore\":" + String(EVENING_ON_BEFORE_SUNSET_MIN) + ",\"eveningOff\":" + String(EVENING_OFF_START) + ",\"sunsetMin\":" + String(sunsetMinutes) + ",\"morningEff\":" + String(morningStartFor(isWeekend())) + "},";
   // Pompka - format z liczbami {start,end} dla loadStatus()
   json += "\"pumpSlots\":" + pumpArrNum + ",";
   // Logi
@@ -13428,6 +13636,11 @@ void loop() {
 
   unsigned long nowMs = millis();
 
+  // [4.7.0 ASTRO] RTC: jednorazowy odczyt po starcie (przed NTP) i zapisy żądane z panelu.
+  static bool rtcBootDone = false;
+  if (!rtcBootDone) { rtcBootDone = true; rtcRestoreAtBoot(); }
+  if (rtcSaveRequested) { rtcSaveRequested = false; rtcSaveFromSystem(); }
+
   LOOP_CP("ntpSync");
   // ======================================================
   // 1️⃣ Synchronizacja czasu NTP + zachód słońca
@@ -13457,6 +13670,8 @@ void loop() {
 
         timeSynced = true;
         lastNtpSync = nowMs;
+        przeliczAstroDzis();   // [4.7.0 ASTRO] świt/wschód na dziś po NTP
+        rtcSaveFromSystem();   // [4.7.0 ASTRO] NTP OK → zapis do RTC (jeśli włączony)
         lastSunsetRecalc = nowMs;  // zsynchronizuj z codziennym przeliczeniem
 
         if (Komentarze) {
@@ -13721,6 +13936,7 @@ void loop() {
   // ======================================================
   if ((nowMs - lastSunsetRecalc >= recalcInterval || sunsetRecalcRequested) && timeSynced) {
     sunsetRecalcRequested = false;  // [4.7.0 ASTRO] zmiana lokalizacji z panelu
+    przeliczAstroDzis();            // [4.7.0 ASTRO] świt/wschód na nowy dzień
 
     struct tm ti;
     if (getLocalTimePL(&ti)) {
@@ -13954,7 +14170,7 @@ void trybAuto(const char* caller) {
 
   int nowMin = getLocalMinutes();
   lastNowMin = nowMin;  // [OK] aktualizuj globalny zegar dla widgetu rampy
-  int morningStart = isWeekend() ? MORNING_ON_START_WEEKEND : MORNING_ON_START_WEEKDAY;
+  int morningStart = morningStartFor(isWeekend());
 
   // =====================================
   // WYLICZENIE GRANIC
@@ -16436,7 +16652,7 @@ void diagScheduleSanity() {
   unsigned long _now = millis();
   if (lastNtpSync == 0 || _now - _lastCheck < 86400000UL) return;
   _lastCheck = _now;
-  int morningStart  = isWeekend() ? (int)MORNING_ON_START_WEEKEND : (int)MORNING_ON_START_WEEKDAY;
+  int morningStart  = morningStartFor(isWeekend());
   int eveningOnStart = (int)sunsetMinutes + (int)EVENING_ON_BEFORE_SUNSET_MIN;
   if (eveningOnStart < 0)    eveningOnStart += 1440;
   if (eveningOnStart >= 1440) eveningOnStart -= 1440;

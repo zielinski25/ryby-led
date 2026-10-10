@@ -142,7 +142,32 @@ static void testJsonNumber() {
   CHECK(!astro::jsonNumber(nullptr, "lat", v), "json: null body");
 }
 
+static void testMorningStart() {
+  const int FB = 7 * 60;  // stała 07:00 z harmonogramu
+  // Tryb stały: zawsze fallback, niezależnie od zdarzeń.
+  CHECK(astro::morningStartMinutes(astro::kMorningFixed, -30, true, 330.0, FB) == FB, "poranek: tryb stały → fallback");
+  // Świt 05:30 − 30 min = 05:00.
+  CHECK(astro::morningStartMinutes(astro::kMorningDawn, -30, true, 330.0, FB) == 300, "poranek: świt 05:30 −30 → 05:00");
+  // Wschód 06:54 + 0 = 06:54.
+  CHECK(astro::morningStartMinutes(astro::kMorningSunrise, 0, true, 414.0, FB) == 414, "poranek: wschód bez przesunięcia");
+  // Zawijanie doby: 00:20 − 60 = 23:20.
+  CHECK(astro::morningStartMinutes(astro::kMorningDawn, -60, true, 20.0, FB) == 1400, "poranek: zawinięcie poniżej 0");
+  // Zdarzenie poza dobą (1500 = 01:00 następnego dnia) → 60.
+  CHECK(astro::morningStartMinutes(astro::kMorningSunrise, 0, true, 1500.0, FB) == 60, "poranek: zdarzenie > 1440 zawinięte");
+  // Zaokrąglenie: 330.4 → 330.
+  CHECK(astro::morningStartMinutes(astro::kMorningDawn, 0, true, 330.4, FB) == 330, "poranek: zaokrąglenie do minuty");
+  // Przesunięcie obcinane do ±180.
+  CHECK(astro::morningStartMinutes(astro::kMorningDawn, 500, true, 300.0, FB) == 480, "poranek: przesunięcie +500 → +180");
+  CHECK(astro::morningStartMinutes(astro::kMorningDawn, -500, true, 600.0, FB) == 420, "poranek: przesunięcie −500 → −180");
+  // Brak zdarzenia (polarna noc) albo NaN → fallback.
+  CHECK(astro::morningStartMinutes(astro::kMorningDawn, 0, false, 0.0, FB) == FB, "poranek: brak świtu → fallback");
+  CHECK(astro::morningStartMinutes(astro::kMorningSunrise, 0, true, NAN, FB) == FB, "poranek: NaN → fallback");
+  // Nieznany tryb → fallback.
+  CHECK(astro::morningStartMinutes(7, 0, true, 300.0, FB) == FB, "poranek: nieznany tryb → fallback");
+}
+
 int main() {
+  testMorningStart();
   testLocationValidation();
   testJsonNumber();
   testReference();

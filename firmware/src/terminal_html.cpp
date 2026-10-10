@@ -642,12 +642,57 @@ extern const uint8_t TERMINAL_HTML[] PROGMEM = R"RAWHTML(<!DOCTYPE html>
             style='width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);padding:8px 12px;font-size:.82rem'>
         </div>
       </div>
+      <div style='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px'>
+        <div>
+          <label style='font-size:.8rem;color:var(--text-dim);display:block;margin-bottom:4px'>Start porannej rampy</label>
+          <select id='loc-mr' onchange='locMorningUi()' style='width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);padding:8px 12px;font-size:.82rem'>
+            <option value='0'>Sta&#322;a godzina (harmonogram WD/WE)</option>
+            <option value='1'>&#346;wit cywilny (&#8722;6&#176;) + przesuni&#281;cie</option>
+            <option value='2'>Wsch&#243;d s&#322;o&#324;ca + przesuni&#281;cie</option>
+          </select>
+        </div>
+        <div>
+          <label style='font-size:.8rem;color:var(--text-dim);display:block;margin-bottom:4px'>Przesuni&#281;cie [min] (&#8722;180&#8230;180)</label>
+          <input id='loc-mroff' type='number' step='1' min='-180' max='180' placeholder='0' disabled
+            style='width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);padding:8px 12px;font-size:.82rem'>
+        </div>
+      </div>
+      <div style='font-size:.82rem;margin-bottom:10px'>Start poranka dzi&#347;: <b id='loc-morning'>&#8212;</b></div>
       <div style='font-size:.82rem;margin-bottom:10px'>Zach&#243;d s&#322;o&#324;ca dzi&#347;: <b id='loc-sunset'>&#8212;</b></div>
       <div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px'>
         <button class='save-btn' style='flex:0 0 auto' onclick='locSave()'>&#128190; Zapisz</button>
         <button class='save-btn' style='flex:0 0 auto;background:rgba(255,255,255,.05)' onclick='locLoad()'>&#128260; Od&#347;wie&#380;</button>
       </div>
       <div id='loc-msg' style='font-size:.78rem;min-height:18px;color:#22d3aa'></div>
+    </div>
+  </div>
+
+  <!-- ZEGAR RTC [4.7.0 ASTRO] Etap 6 pkt 2 -->
+  <div class='card'>
+    <div class='card-header' onclick='toggleCard(this)'>
+      <div class='card-title'><div class='card-icon icon-power'>&#9201;</div>Zegar RTC</div>
+      <span class='chevron'>&#9660;</span>
+    </div>
+    <div class='card-body hidden'>
+      <div style='font-size:.78rem;color:var(--text-dim);margin-bottom:12px'>
+        Opcjonalny zegar DS1307 lub DS3231 na I&#178;C (SDA 21, SCL 20). Po restarcie bez internetu ustawia czas z modu&#322;u,
+        a po synchronizacji NTP zapisuje czas do modu&#322;u. Bez modu&#322;u sterownik pracuje jak dotychczas.
+      </div>
+      <div style='margin-bottom:12px'>
+        <label style='font-size:.8rem;color:var(--text-dim);display:block;margin-bottom:4px'>Modu&#322;</label>
+        <select id='rtc-chip' style='width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);padding:8px 12px;font-size:.82rem'>
+          <option value='0'>Wy&#322;&#261;czony</option>
+          <option value='1307'>DS1307</option>
+          <option value='3231'>DS3231</option>
+        </select>
+      </div>
+      <div style='font-size:.82rem;margin-bottom:6px'>Stan: <b id='rtc-status'>&#8212;</b></div>
+      <div style='font-size:.82rem;margin-bottom:10px'>Czas systemowy ustawiony: <b id='rtc-sys'>&#8212;</b></div>
+      <div style='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px'>
+        <button class='save-btn' style='flex:0 0 auto' onclick='rtcSave()'>&#128190; Zapisz</button>
+        <button class='save-btn' style='flex:0 0 auto;background:rgba(255,255,255,.05)' onclick='rtcLoad()'>&#128260; Od&#347;wie&#380;</button>
+      </div>
+      <div id='rtc-msg' style='font-size:.78rem;min-height:18px;color:#22d3aa'></div>
     </div>
   </div>
 
@@ -1512,7 +1557,7 @@ function drawDayCurve(st, csv){
   var eo=num(sc.eveningOff,1320);
   var wd=new Date().getDay();
   var weekend=(wd===0||wd===6);
-  var morning=num(weekend?sc.morningWE:sc.morningWD,NaN);
+  var morning=num(sc.morningEff,num(weekend?sc.morningWE:sc.morningWD,NaN));
   var mid=num(sc.middayOff,NaN);
   var now=dayMin(st.localTime);
 
@@ -3436,6 +3481,7 @@ window.addEventListener('load', function(){
   loadDash();
   loadCharts();
   locLoad();  // [4.7.0 ASTRO] lokalizacja do zachodu
+  rtcLoad();  // [4.7.0 ASTRO] zegar RTC
   setInterval(function(){
     var d=document.getElementById('p-dash');
     if(d&&d.style.display!=='none') loadDash();
@@ -3446,6 +3492,12 @@ function locMsg(txt,ok){
   var el=document.getElementById('loc-msg');
   if(el){el.textContent=txt;el.style.color=ok?'#22d3aa':'#ff4d6d';}
 }
+// Pole przesuni\u0119cia aktywne tylko dla \u015bwitu/wschodu (tryb 1 i 2).
+function locMorningUi(){
+  var m=document.getElementById('loc-mr');
+  var o=document.getElementById('loc-mroff');
+  if(o) o.disabled=!m||m.value==='0';
+}
 function locLoad(){
   fetch(BASE+'/api/location')
   .then(function(r){return r.json();})
@@ -3453,27 +3505,70 @@ function locLoad(){
     var la=document.getElementById('loc-lat');
     var lo=document.getElementById('loc-lon');
     var sn=document.getElementById('loc-sunset');
+    var mr=document.getElementById('loc-mr');
+    var mo=document.getElementById('loc-mroff');
+    var mn=document.getElementById('loc-morning');
     if(la&&document.activeElement!==la) la.value=Number(d.lat).toFixed(4);
     if(lo&&document.activeElement!==lo) lo.value=Number(d.lon).toFixed(4);
+    if(mr&&document.activeElement!==mr) mr.value=String(d.mrMode);
+    if(mo&&document.activeElement!==mo) mo.value=String(d.mrOff);
+    locMorningUi();
     if(sn) sn.textContent=d.sunset+(d.timeSynced?'':' (brak czasu NTP, warto\u015b\u0107 domy\u015blna)');
+    if(mn) mn.textContent=d.morningNow+' \u00b7 \u015bwit '+d.dawn+' \u00b7 wsch\u00f3d '+d.sunrise;
   })
   .catch(function(){locMsg('Blad polaczenia',false);});
 }
 function locSave(){
   var la=parseFloat((document.getElementById('loc-lat')||{}).value);
   var lo=parseFloat((document.getElementById('loc-lon')||{}).value);
+  var mr=parseInt((document.getElementById('loc-mr')||{}).value,10);
+  var mo=parseInt((document.getElementById('loc-mroff')||{}).value,10);
+  if(isNaN(mr)) mr=0;
+  if(isNaN(mo)) mo=0;
   if(isNaN(la)||isNaN(lo)||la<-90||la>90||lo<-180||lo>180){
     locMsg('Szeroko\u015b\u0107 -90..90, d\u0142ugo\u015b\u0107 -180..180',false);return;
   }
+  if(mo<-180||mo>180){locMsg('Przesuni\u0119cie -180..180 min',false);return;}
   fetch(BASE+'/api/location',{method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({lat:la,lon:lo})})
+    body:JSON.stringify({lat:la,lon:lo,mrMode:mr,mrOff:mo})})
   .then(function(r){return r.json();})
   .then(function(d){
-    locMsg(d.ok?'Zapisano! Zach\u00f3d zostanie przeliczony.':(d.error||'Blad zapisu'),d.ok);
+    locMsg(d.ok?'Zapisano! Zach\u00f3d i poranek zostan\u0105 przeliczone.':(d.error||'Blad zapisu'),d.ok);
     if(d.ok) setTimeout(locLoad,1500);
   })
   .catch(function(){locMsg('Blad polaczenia',false);});
+}
+// \u2500\u2500 ZEGAR RTC [4.7.0 ASTRO] \u2500\u2500
+function rtcMsg(txt,ok){
+  var el=document.getElementById('rtc-msg');
+  if(el){el.textContent=txt;el.style.color=ok?'#22d3aa':'#ff4d6d';}
+}
+function rtcLoad(){
+  fetch(BASE+'/api/rtc')
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var s=document.getElementById('rtc-chip');
+    var st=document.getElementById('rtc-status');
+    var sy=document.getElementById('rtc-sys');
+    if(s&&document.activeElement!==s) s.value=String(d.chip);
+    if(st) st.textContent=d.status;
+    if(sy) sy.textContent=d.sysSynced?'tak':'nie';
+  })
+  .catch(function(){rtcMsg('Blad polaczenia',false);});
+}
+function rtcSave(){
+  var s=document.getElementById('rtc-chip');
+  var chip=parseInt(s?s.value:'0',10);
+  fetch(BASE+'/api/rtc',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chip:chip})})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    rtcMsg(d.ok?'Zapisano. Stan od\u015bwie\u017cy si\u0119 za chwil\u0119.':(d.error||'Blad zapisu'),d.ok);
+    if(d.ok) setTimeout(rtcLoad,1500);
+  })
+  .catch(function(){rtcMsg('Blad polaczenia',false);});
 }
 // ── TELEGRAM ──
 function tgMsg(txt,ok){

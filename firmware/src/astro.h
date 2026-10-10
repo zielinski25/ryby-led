@@ -42,4 +42,15 @@ bool validLocation(double latDeg, double lonDeg);
 // Zwraca false, gdy klucza nie ma, wartość nie jest liczbą albo jest nieskończona.
 bool jsonNumber(const char* body, const char* key, double& out);
 
+// Tryb startu porannej rampy (ustawiany w panelu, trzymany w NVS).
+//   kMorningFixed   — stała godzina z harmonogramu (WD/WE), jak dotąd
+//   kMorningDawn    — świt cywilny (−6°) + przesunięcie
+//   kMorningSunrise — wschód słońca (−0,833°) + przesunięcie
+enum MorningMode : int { kMorningFixed = 0, kMorningDawn = 1, kMorningSunrise = 2 };
+
+// Efektywny start porannej rampy w minutach doby [0,1440).
+// Gdy tryb wymaga zdarzenia, którego dziś nie ma (polarna noc) albo tryb jest
+// nieznany — zwraca fallbackMin (stała godzina z harmonogramu).
+int morningStartMinutes(int mode, int offsetMin, bool hasEvent, double eventMin, int fallbackMin);
+
 }  // namespace astro

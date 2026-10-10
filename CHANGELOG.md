@@ -8,6 +8,35 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.7.0+build.270] ASTRO-2 — 2026-10-10
+
+- Co: Etap 6 planu upgrade, dokończenie: **poranek do wyboru w panelu**, **zegar RTC** (opcjonalny)
+  i karta lokalizacji rozszerzona o tryb poranka.
+- **Rampa poranna — tryb w panelu** (NVS `astro_loc`, klucze `mrMode`, `mrOff`):
+  0 = stała godzina z harmonogramu (WD/WE; domyślnie, jak dotąd),
+  1 = świt cywilny (−6°) + przesunięcie,
+  2 = wschód słońca + przesunięcie (−180…180 min).
+  Tryb dotyczy dnia roboczego i weekendu. Ramp Arbiter i MIN LUX nietknięte: zmienia się
+  tylko źródło wartości startu (`morningStartFor`, sześć dotychczasowych odczytów `MORNING_ON_START_*`).
+  Gdy świt/wschód nie istnieje (polarna noc) albo brak czasu, start wraca do stałej z harmonogramu.
+  `/api/status` → `schedule.morningEff` (efektywny start), karta „Dzień” pokazuje właśnie tę wartość.
+- **Zegar RTC (DS1307 / DS3231)** — sterownik bez zewnętrznych bibliotek (`firmware/src/rtc_ds13xx.h/.cpp`,
+  BCD, czas w UTC, sprawdzanie CH/OSF i zakresu roku). Wybór modułu w panelu (karta „Zegar RTC”),
+  domyślnie wyłączony — bez modułu zachowanie jak dotąd.
+  Po starcie bez NTP czas systemowy jest ustawiany z RTC (tylko gdy odczyt daje epokę ≥ 1700000000, czyli po listopadzie 2023);
+  po udanej synchronizacji NTP i na żądanie z panelu czas jest zapisywany do modułu.
+  I²C: SDA 21, SCL 20 (ta sama magistrala co TSL2561). Odczyt i zapis tylko w `loop()`, nie w handlerach HTTP.
+- **Endpointy:** `GET/POST /api/location` (+ `mrMode`, `mrOff`, `morningNow`, `dawn`, `sunrise`),
+  `GET/POST /api/rtc` (`chip` 0 / 1307 / 3231, `status`, `sysSynced`).
+- Testy: `test_astro.cpp` 197 PASS (w tym `morningStartMinutes`); `test_rtc.cpp` 59 PASS (fałszywa
+  magistrala, ASan+UBSan); `check_location.sh` 92 PASS (NVS, endpointy, poranek, RTC z atrapą DS);
+  `check_day_card.js` 26 PASS. `run_tests.sh`: 11 kroków, EXIT 0.
+- **Nie zrobione w sandboxie:** kompilacja PlatformIO i test na płytce (brak dostępu do rejestru).
+  Patrz `docs/06`, sekcja 5.
+- Wersja: 4.7.0+build.270.
+
+---
+
 ## [4.7.0+build.269] ASTRO — 2026-10-10
 
 - Co: Etap 6 planu upgrade, pkt 1 — **moduł efemeryd słonecznych** (`firmware/src/astro.h/.cpp`):

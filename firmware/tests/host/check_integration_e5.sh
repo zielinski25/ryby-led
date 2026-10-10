@@ -27,7 +27,7 @@ b = ryby.index("void logDailySummary() {", a)
 # 2) Endpointy /api/log-critical-* (do /api/fs-list).
 a = ryby.index('webserialServer.on("/api/log-critical-status"')
 # [4.7.0 ASTRO] sekcja lokalizacji stoi przed /api/fs-list — kończymy przed nią.
-b = ryby.index('//  API: LOKALIZACJA DO ZACHODU', a)
+b = ryby.index('//  API: LOKALIZACJA, PORANEK I RTC', a)
 (out / "endpoints.inc").write_text(ryby[a:b], encoding="utf-8")
 
 # 3) Helper otaCritLine z ota_github.cpp.
