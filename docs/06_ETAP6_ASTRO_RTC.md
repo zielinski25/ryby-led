@@ -48,11 +48,24 @@ temperatury (typowo ±20 ppm); DS3231 ma wbudowany kwarc z kompensacją (±2 ppm
 Obie wersje obsługuje ta sama biblioteka RTClib, więc wybór nie blokuje integracji.
 **Nie zaimplementowano.** Wymaga: identyfikacji modułu, zgody na integrację i wolnego pinu I2C.
 
-## 3. Karta „Dzień” w panelu — NIE ZROBIONE
+## 3. Karta „Dzień” w panelu (4.7.0, GOTOWE w kodzie, test hostowy)
 
-Podgląd krzywej świateł na dziś (harmonogram + adaptacja + MIN LUX na osi czasu).
-Dane: `/history.csv` (dziś, co 5 min) i harmonogram. Wymaga sprawdzenia, czy panel ma
-dostęp do harmonogramu (EEPROM) przez Firebase lub LAN.
+Strona **Wykresy**, karta „Dzień — krzywa świateł i harmonogram” (nad kartą LUX).
+Oś doby 00:00–24:00:
+- krzywa PWM średniego kanałów (żółta) z `/api/history`, tylko „dziś” (próbki po ostatnim
+  przejściu przez północ),
+- paski MIN LUX (góra) i adaptacji (dół) z kolumn 12 i 13 historii,
+- tło: okno rampy wieczornej (od zachodu + `EVENING_ON_BEFORE_SUNSET_MIN` do `EVENING_OFF_START`),
+- pionowe znaczniki: start poranka (WD/WE), przerwa południowa, zachód, koniec rampy, „teraz”
+  (z `localTime` w `/api/status`),
+- pasek pompki z `pumpSlots`.
+Pod wykresem: tekst z godzinami (zachód, rampa, poranek, przerwa, liczba próbek).
+
+Firmware nie wymagał zmian: `/api/status` już zwraca `schedule{}` (w tym `sunsetMin`,
+`eveningBefore`, `eveningOff`) i `pumpSlots`. Test: `check_day_card.js` (24 asercje, Node),
+wyciąga funkcje karty z `terminal_html.cpp` i uruchamia je na atrapie DOM.
+Ograniczenie: poranek pokazany jest jako start harmonogramu, bez długości rampy porannej.
+Dane historii obejmują 24 h; karta pokazuje tylko okres od ostatniej północy.
 
 ## 4. Lokalizacja z panelu (GOTOWE w 4.7.0) i rampy poranne (DO DECYZJI)
 

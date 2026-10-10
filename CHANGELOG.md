@@ -23,6 +23,10 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
   `{"lat":..,"lon":..}`. Walidacja: lat −90..90, lon −180..180; zła wartość → 400, zachowana
   poprzednia. Zmiana → zachód przeliczany w następnym obiegu pętli. Brak wpisu w NVS → domyślne
   52,1345 / 20,1418. Test: `check_location.sh` (27 asercji, endpointy wyciągnięte z Ryby).
+- **Karta „Dzień” w panelu** (Etap 6 pkt 3): strona Wykresy, krzywa PWM doby z historii
+  (tylko dziś), paski MIN LUX i adaptacji, okno rampy wieczornej, znaczniki poranka, przerwy,
+  zachodu i „teraz”, pasek pompki. Dane z `/api/status` (schedule) i `/api/history`.
+  Bez zmian firmware. Test: `check_day_card.js` (24 asercje).
 - **Nie podłączone:** świt i wschód (rampa poranna nadal stała godzina). Ramp Arbiter
   i MIN LUX nietknięte. Decyzje — `docs/06`, sekcja 4.
 - Testy: `test_astro.cpp` (ASan+UBSan, 186 asercji): 22 pary data×miejsce (Kraków, Warszawa,

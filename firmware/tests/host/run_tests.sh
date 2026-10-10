@@ -19,6 +19,7 @@
 #  7) check_tg_menu.py: menu Telegrama (JSON, PL_CAP, callbacki, 1 klik do raportu).
 #  8) test_astro.cpp: efemerydy NOAA (wschód/zachód/świt/zmierzch) vs astral 3.2.
 #  9) check_location.sh: lokalizacja z panelu (NVS, POST/GET /api/location).
+# 10) check_day_card.js: karta „Dzień” w panelu (krzywa doby, harmonogram).
 #
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
@@ -70,7 +71,7 @@ echo "== [7/7] menu Telegrama: JSON, PL_CAP, callbacki, raporty w 1 klik (4.6.0)
 python3 "$HERE/check_tg_menu.py"
 echo
 echo
-echo "== [8/9] testy modułu astro — efemerydy słoneczne (4.7.0, ASan + UBSan) =="
+echo "== [8/10] testy modułu astro — efemerydy słoneczne (4.7.0, ASan + UBSan) =="
 g++ -std=gnu++17 -g -O1 -Wall -Wextra \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -I"$SRC" \
@@ -79,7 +80,15 @@ g++ -std=gnu++17 -g -O1 -Wall -Wextra \
 "${BIN}-astro"
 echo
 echo
-echo "== [9/9] lokalizacja do zachodu z panelu: NVS, POST/GET /api/location (4.7.0) =="
+echo "== [9/10] lokalizacja do zachodu z panelu: NVS, POST/GET /api/location (4.7.0) =="
 bash "$HERE/check_location.sh"
+echo
+echo
+echo "== [10/10] karta Dzień w panelu (4.7.0, Node) =="
+if command -v node >/dev/null 2>&1; then
+  node "$HERE/check_day_card.js"
+else
+  echo "POMINIĘTO: brak node (wymagany do check_day_card.js)"
+fi
 echo
 echo "OK: wszystkie kontrole hostowe zaliczone."

@@ -1245,6 +1245,20 @@ function buildWykresy() {
     "<button onclick='setRange(0)'  id='rb-0'  class='rb' title='Ostatnie 24h'>24h</button>" +
     "</div></div>" +
     "<div class='card'><div class='card-header' onclick='toggleCard(this)'>" +
+    "<div class='card-title'><div class='card-icon icon-power'>&#9728;</div>Dzie&#324; &mdash; krzywa &#347;wiate&#322; i harmonogram</div>" +
+    "<span class='chevron open'>&#9660;</span></div><div class='card-body'>" +
+    "<div id='day-info' style='font-size:.76rem;color:var(--text-dim);margin-bottom:6px;min-height:16px'>Kliknij Od&#347;wie&#380;</div>" +
+    "<div id='chart-day-wrap'><svg id='chart-day' width='100%' height='210' style='display:block'>" +
+    "<text x='50%' y='105' text-anchor='middle' fill='#5a7a99' font-size='13'>Kliknij Od&#347;wie&#380;</text></svg></div>" +
+    "<div style='display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:.72rem'>" +
+    "<span style='color:#ffd32a'>&#9608; PWM &#347;redni %</span>" +
+    "<span style='color:#a855f7'>&#9608; MIN LUX aktywny</span>" +
+    "<span style='color:#00d4f5'>&#9608; Adaptacja</span>" +
+    "<span style='color:#ff9f43'>&#9608; Rampa wiecz.</span>" +
+    "<span style='color:#00d4f5'>&#9608; Pompka</span>" +
+    "<span style='color:#ffffff'>| teraz</span></div>" +
+    "</div></div>" +
+    "<div class='card'><div class='card-header' onclick='toggleCard(this)'>" +
     "<div class='card-title'><div class='card-icon icon-adapt'>&#128200;</div>LUX &mdash; o&#347;wietlenie</div>" +
     "<span class='chevron open'>&#9660;</span></div><div class='card-body'>" +
     "<div id='chart-lux-wrap'><svg id='chart-lux' width='100%' height='160' style='display:block'>" +
@@ -1440,7 +1454,135 @@ function sliceLast(arr, n) {
   return arr.slice(arr.length - n);
 }
 
+// ── KARTA „DZIEŃ” [4.7.0 ASTRO] Etap 6 pkt 3 ──
+// Oś doby 00:00–24:00. Dane: /api/history (PWM, MIN LUX, adaptacja; tylko „dziś”)
+// i /api/status → schedule{} (poranek, przerwa, zachód, rampa wieczorna, koniec) + pompka.
+function dayPad(n){ return (n<10?'0':'')+n; }
+function dayHHMM(m){ m=((m%1440)+1440)%1440; return dayPad(Math.floor(m/60))+':'+dayPad(m%60); }
+function dayMin(hhmm){
+  var p=String(hhmm||'').split(':');
+  var h=parseInt(p[0],10), m=parseInt(p[1],10);
+  return (isNaN(h)||isNaN(m))?NaN:h*60+m;
+}
+function loadDayCurve(){
+  if(!document.getElementById('chart-day')) return;
+  Promise.all([
+    fetch(BASE+'/api/status').then(function(r){return r.json();}),
+    fetch(BASE+'/api/history').then(function(r){return r.text();})
+  ]).then(function(res){
+    drawDayCurve(res[0], res[1]);
+  }).catch(function(){
+    var i=document.getElementById('day-info');
+    if(i) i.textContent='B\u0142\u0105d \u0142adowania danych dnia';
+  });
+}
+function drawDayCurve(st, csv){
+  var el=document.getElementById('chart-day');
+  if(!el) return;
+  var info=document.getElementById('day-info');
+  var W=el.parentElement.clientWidth||340, H=210;
+  el.setAttribute('width',W); el.setAttribute('height',H);
+  var PAD={t:14,r:10,b:26,l:34};
+  var cW=W-PAD.l-PAD.r, cH=H-PAD.t-PAD.b;
+  var X=function(m){return PAD.l+(m/1440)*cW;};
+  var Y=function(p){return PAD.t+cH-(p/100)*cH;};
+
+  // 1) Próbki historii: minuta doby, średnie PWM % (kolumny 6..10), MIN LUX (12), adaptacja (13).
+  var pts=[];
+  (csv||'').trim().split('\n').forEach(function(line){
+    var c=line.split(',');
+    if(c.length<11) return;
+    var m=dayMin(c[0]);
+    if(isNaN(m)) return;
+    var s=0;
+    for(var i=0;i<5;i++) s+=(parseFloat(c[6+i])||0);
+    pts.push({m:m, p:s/5, ml:(c[12]||'').trim()==='1', ad:(c[13]||'').trim()==='1'});
+  });
+  // „Dziś” = próbki po ostatnim przejściu przez północ (historia obejmuje 24 h).
+  var from=0;
+  for(var k=1;k<pts.length;k++) if(pts[k].m<pts[k-1].m) from=k;
+  pts=pts.slice(from);
+
+  // 2) Harmonogram z /api/status (wartości domyślne, gdy firmware ich nie poda).
+  var sc=st.schedule||{};
+  var num=function(v,def){return (typeof v==='number' && !isNaN(v))?v:def;};
+  var sunset=num(sc.sunsetMin,1140);
+  var eb=num(sc.eveningBefore,-60);
+  var rOn=((sunset+eb)%1440+1440)%1440;
+  var eo=num(sc.eveningOff,1320);
+  var wd=new Date().getDay();
+  var weekend=(wd===0||wd===6);
+  var morning=num(weekend?sc.morningWE:sc.morningWD,NaN);
+  var mid=num(sc.middayOff,NaN);
+  var now=dayMin(st.localTime);
+
+  var svg='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="transparent"/>';
+  // Siatka i osie: co 3 h, skala PWM co 25 %.
+  for(var h=0;h<=24;h+=3){
+    var gx=X(h*60);
+    svg+='<line x1="'+gx+'" y1="'+PAD.t+'" x2="'+gx+'" y2="'+(PAD.t+cH)+'" stroke="rgba(255,255,255,.05)" stroke-width="1"/>';
+    svg+='<text x="'+gx+'" y="'+(H-8)+'" text-anchor="middle" fill="#445" font-size="9">'+dayPad(h)+':00</text>';
+  }
+  for(var g=0;g<=4;g++){
+    var gy=Y(g*25);
+    svg+='<text x="'+(PAD.l-4)+'" y="'+(gy+3)+'" text-anchor="end" fill="#445" font-size="9">'+(g*25)+'%</text>';
+  }
+  // Prostokąt na osi czasu; obsługuje przejście przez północ.
+  var band=function(m1,m2,y,hh,fill){
+    var segs=(m2>=m1)?[[m1,m2]]:[[m1,1440],[0,m2]];
+    segs.forEach(function(sg){
+      var x1=X(sg[0]), x2=X(sg[1]);
+      svg+='<rect x="'+x1.toFixed(1)+'" y="'+y+'" width="'+Math.max(0,x2-x1).toFixed(1)+'" height="'+hh+'" fill="'+fill+'"/>';
+    });
+  };
+  // Tło: okno rampy wieczornej (od zachodu + przesunięcie do końca wieczoru).
+  band(rOn, eo, PAD.t, cH, 'rgba(255,159,67,.10)');
+  // Paski: MIN LUX (góra), adaptacja (pod spodem).
+  pts.forEach(function(p,i){
+    var nx=(i+1<pts.length)?pts[i+1].m:Math.min(1440,p.m+5);
+    if(nx<=p.m) nx=Math.min(1440,p.m+5);
+    if(p.ml) band(p.m, nx, PAD.t, 6, 'rgba(168,85,247,.85)');
+    if(p.ad) band(p.m, nx, PAD.t+7, 6, 'rgba(0,212,245,.55)');
+  });
+  // Pompka: sloty z harmonogramu, pasek przy dole.
+  (st.pumpSlots||[]).forEach(function(sl){
+    var a=num(sl.start,NaN), b=num(sl.end,NaN);
+    if(!isNaN(a) && !isNaN(b) && b!==a) band(a, b, PAD.t+cH-5, 5, 'rgba(0,212,245,.7)');
+  });
+  // Krzywa PWM średnia (wypełnienie + linia).
+  if(pts.length){
+    var d='';
+    pts.forEach(function(p,i){ d+=(i?'L':'M')+X(p.m).toFixed(1)+','+Y(p.p).toFixed(1); });
+    var area=d+'L'+X(pts[pts.length-1].m).toFixed(1)+','+Y(0).toFixed(1)
+            +'L'+X(pts[0].m).toFixed(1)+','+Y(0).toFixed(1)+'Z';
+    svg+='<path d="'+area+'" fill="rgba(255,211,42,.16)"/>';
+    svg+='<path d="'+d+'" fill="none" stroke="#ffd32a" stroke-width="1.6"/>';
+  }
+  // Pionowe znaczniki: poranek, przerwa południowa, zachód, koniec rampy, teraz.
+  var vline=function(m,color,dash,label){
+    var x=X(m);
+    svg+='<line x1="'+x.toFixed(1)+'" y1="'+PAD.t+'" x2="'+x.toFixed(1)+'" y2="'+(PAD.t+cH)+'" stroke="'+color+'" stroke-width="1"'+(dash?' stroke-dasharray="4 3"':'')+'/>';
+    if(label) svg+='<text x="'+(x+3).toFixed(1)+'" y="'+(PAD.t+cH-12)+'" fill="'+color+'" font-size="9">'+label+'</text>';
+  };
+  if(!isNaN(morning)) vline(morning,'#7ab8ff',true,'');
+  if(!isNaN(mid)) vline(mid,'#ff4d6d',true,'');
+  vline(rOn,'#ff9f43',true,'');
+  vline(sunset,'#ff9f43',false,'zach. '+dayHHMM(sunset));
+  vline(eo,'#ff9f43',true,'');
+  if(!isNaN(now)) vline(now,'#ffffff',false,'teraz');
+  el.innerHTML=svg;
+
+  if(info){
+    info.textContent='Zach\u00f3d '+dayHHMM(sunset)
+      +' \u00b7 rampa wiecz. '+dayHHMM(rOn)+'\u2013'+dayHHMM(eo)
+      +(isNaN(morning)?'':' \u00b7 poranek '+dayHHMM(morning)+(weekend?' (weekend)':' (dzie\u0144 rob.)'))
+      +(isNaN(mid)?'':' \u00b7 przerwa po\u0142ud. '+dayHHMM(mid))
+      +' \u00b7 pr\u00f3bek dzi\u015b: '+pts.length;
+  }
+}
+
 function loadCharts() {
+  loadDayCurve();  // [4.7.0 ASTRO] karta „Dzień” (no-op poza stroną Wykresy)
   fetch(BASE+'/api/status').then(function(r){return r.json();}).then(function(d){
     _ledMaxW = d.ledMaxW || 90;
   }).catch(function(){});
