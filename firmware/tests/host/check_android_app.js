@@ -88,8 +88,7 @@ check(/getSharedPreferences\("ryby_prefs", Context\.MODE_PRIVATE\)/.test(PREFS),
 check(/sp\.getString\(KEY_SECRET, ""\)/.test(PREFS) && /sp\.getString\(KEY_TOKEN, ""\)/.test(PREFS), "sekrety domyślnie puste (nic w kodzie)");
 check(!/android:allowBackup="true"/.test(MANIFEST), "brak kopii zapasowej danych aplikacji (allowBackup=false)");
 check(!/\bLog\.[divwe]\(/.test(VM + RTDB + PREFS), "brak logowania sekretów (Log.*) w kodzie sieci i ustawień");
-const secretLeak = /AkwPanel|RhKVp49q|Akwarium2026|8709162940:AA/;
-check(!secretLeak.test(LOGIC + STATUS + RTDB + VM + UI + PREFS + MANIFEST + GRADLE_APP), "brak znanych wyciekłych sekretów w kodzie Android");
+// Znane wyciekłe wartości NIE są tu wpisywane (publiczne repo). Pilnuje ich check_secrets.py (krok 0).
 check(!/\bfor\s*\(\s*.*innerHTML/.test(UI), "UI Compose: brak HTML (dane jako Text)");
 
 // ───── 5) wersja i build ─────
