@@ -36,7 +36,7 @@ trwała telemetria, proces wytwórczy).
 - Partycje: dual-OTA (`app0`/`app1` po 3 MB), **coredump 64 KB** (od v113),
   LittleFS/SPIFFS ~9,7 MB.
 - Dwa env-y: USB (`esp32-s3-n16r8`) i **OTA espota** (`esp32-s3-n16r8-ota`,
-  hasło `AkwPanel2026!`, host `ryby-led-s3.local` / IP 192.168.100.108).
+  hasło OTA (w `secrets.h`, nie w repo), host `ryby-led-s3.local` / IP 192.168.100.108).
 
 ### 1.2 Funkcje domenowe (akwarium)
 

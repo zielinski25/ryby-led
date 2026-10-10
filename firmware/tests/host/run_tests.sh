@@ -22,6 +22,8 @@
 # 10) check_location.sh: lokalizacja, poranek i RTC z panelu (NVS, /api/location, /api/rtc).
 # 11) check_day_card.js: karta „Dzień” w panelu (krzywa doby, harmonogram).
 #
+#  0) check_secrets.py: brak sekretów zaszytych w repo (4.7.1, Etap 2).
+#
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
 # ═══════════════════════════════════════════════════════════════════
@@ -31,6 +33,9 @@ SRC="${SRC:-$HERE/../../src}"
 BIN="${TMPDIR:-/tmp}/tspool-test-bin"
 export TSPOOL_FS_ROOT="${TSPOOL_FS_ROOT:-${TMPDIR:-/tmp}/tspool-fakefs}"
 
+echo "== [0] skan sekretów w śledzonych plikach (4.7.1, Etap 2) =="
+python3 "$HERE/check_secrets.py"
+echo
 echo "== [1/6] testy logiki Spool V2 (ASan + UBSan) =="
 g++ -std=gnu++17 -g -O1 -Wall -Wextra \
     -fsanitize=address,undefined -fno-sanitize-recover=undefined \

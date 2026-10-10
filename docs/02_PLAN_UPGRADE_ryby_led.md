@@ -9,7 +9,7 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 |---|---|---|---|
 | 0. Repo + wersjonowanie | ✅ GOTOWY | 4.0.0 | commit `8e4776e`: struktura `firmware/docs/`, CHANGELOG.md, build_gate.ps1, usunięty zip/.pre-v253 |
 | 1. OTA GitHub + release'y | ✅ KOD ZBUDOWANY + RELEASE v4.1.0 OPUBLIKOWANY | 4.1.0 | commity `cb16f00` + `037cd7a` (FIX-ORDER); build po stronie użytkownika OK, release v4.1.0 z `firmware.bin`+`.elf` publiczny; czeka: flash USB w domu + test OTA |
-| 2. Bezpieczeństwo Firebase | 🟡 W TOKU (część 1/2 gotowa) | 4.1.1 | sekrety przeniesione do `src/secrets.h` (poza repo, `.gitignore`); do zrobienia po stronie użytkownika: nowy Database Secret w Firebase Console → wpisać do `secrets.h` → build → flash → **odwołanie starego sekretu**; potem zmiana CMD_TOKEN + hasła espota; część 2 (NVS+UserAuth) później |
+| 2. Bezpieczeństwo Firebase | 🟡 W TOKU (sekrety w `secrets.h` + OTA/TG w 4.7.1; TLS i UserAuth do decyzji) | 4.1.1 / 4.7.1 | sekrety przeniesione do `src/secrets.h` (poza repo, `.gitignore`); do zrobienia po stronie użytkownika: nowy Database Secret w Firebase Console → wpisać do `secrets.h` → build → flash → **odwołanie starego sekretu**; potem zmiana CMD_TOKEN + hasła espota; część 2 (NVS+UserAuth) później |
 | 3. Spool V2 + telemetria | 🟡 KOD + TESTY HOSTOWE GOTOWE | 4.2.0 / 4.5.0 | ring PSRAM + Spool V2 (CRC, commit) + sessionNonce + replay FIFO + `/api/telemetry/status`; 200 testów hostowych OK; DoD na płytce (zanik zasilania w trakcie wysyłki) do wykonania — procedura: `docs/03_ETAP3_SPOOL_V2.md`; **historia długa `/api/history/long` + wykres tygodniowy w panelu: 4.5.0** (KOD + testy hostowe, DoD na płytce: `docs/05`, sekcja 7) |
 | 4. Panel: CORS/CORS-PN + karta OTA + tryb zdalny | 🟡 | 4.3.0+build.265 | KOD GOTOWY: CORS-PNA + OPTIONS, panel v14 (LAN/zdalnie, OTA, skan Wi-Fi). Test z telefonu na LTE do wykonania w domu |
 | 5. Log krytyczny + Telegram | 🟡 | 4.4.0+build.266, menu 4.6.0+build.268 | KOD GOTOWY: critlog (+testy), /log_krytyczny, menu pogrupowane (sekcje + 1 klik do raportu), karta w panelu. Test na płytce wg `docs/04`, sekcja 6 |
@@ -19,13 +19,13 @@ Podstawa: `docs/01_RESEARCH_porownanie_ryby_vs_centrala.md`
 ### ⚠️ PILNE (poza kolejnością) — sekrety w publicznym zipie
 
 W `firmware/src/Ryby_LED_fi_S3.cpp` są na stałe wpisane:
-- `FIREBASE_SECRET "RhKVp49q..."` — **Database Secret: pełny RW na całej bazie
+- `FIREBASE_SECRET` (wartość tylko w `secrets.h`, poza repo) — **Database Secret: pełny RW na całej bazie
   RTDB, nigdy nie wygasa**. Zip z tym kodem wisiał w publicznym repo — każdy mógł
   go pobrać. **Natychmiastowa rotacja w Firebase Console** (Project Settings →
   Service accounts → Database secrets) unieważni stary sekret; firmware po
   rotacji straci łączność Firebase do czasu wpisania nowego sekretu
   (docelowo Etap 2 przenosi sekrety do NVS + UserAuth).
-- `CMD_TOKEN "Akwarium2026!"` i hasło espota `AkwPanel2026!` — również do
+- `CMD_TOKEN` i hasło espota (OTA) — również do
   zmiany przy okazji.
 
 Konwencja: każdy etap ma **cel**, **zakres** (co zmieniamy), **kryterium
@@ -142,7 +142,7 @@ krąży jako zip, a TLS jest nieweryfikowany (`setInsecure()`).
    z odświeżaniem (FirebaseClient już to umie — `getAuth` z UserAuth).
    Zostawić feature-flagę powrotu do LegacyToken na czas przejścia
    (NVSettings), tak jak zrobiła to Centrala.
-4. Hasło espota (`AkwPanel2026!`) — również do NVS/build-secrets poza repo.
+4. Hasło espota (OTA) — ZROBIONE w 4.7.1 (`OTA_PASSWORD` w `secrets.h`, `RYBY_OTA_PASSWORD` w środowisku); token Telegrama też przeniesiony do `secrets.h`.
 
 **DoD:** `git grep FIREBASE_SECRET` = pusto; przechwycony MITM-em ruch TLS
 zostaje odrzucony; konto bez reguł nie zapisuje do `/aquarium/<deviceId>`.

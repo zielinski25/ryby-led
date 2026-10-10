@@ -28,3 +28,12 @@
 // Token dostępu do komend panelu WWW (pole token w panelu HTML).
 // Zmień na własny, trudny do zgadnięcia ciąg.
 #define CMD_TOKEN       "ZMIEN_MNIE"
+
+// Hasło ArduinoOTA (wgrywanie przez WiFi). platformio.ini czyta je z zmiennej
+// środowiskowej RYBY_OTA_PASSWORD — ustaw ją na tę samą wartość.
+#define OTA_PASSWORD    "WSTAW_HASLO_OTA"
+
+// Telegram (opcjonalnie): domyślny token i chat_id po czystym LittleFS.
+// Bez tych linii TG startuje wyłączony i konfigurujesz go w panelu WWW.
+// #define TG_DEFAULT_BOT_TOKEN "123456789:AA..."   // z @BotFather
+// #define TG_DEFAULT_CHAT_ID   "123456789"         // z @myidbot

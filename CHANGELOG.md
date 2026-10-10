@@ -8,6 +8,33 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.7.1+build.271] SECRETS-2 — 2026-10-10
+
+- Co: Etap 2 planu upgrade, dokończenie części sekretów (repo jest publiczne, więc nic z sekretów
+  nie może leżeć w źródłach).
+  - **Hasło OTA** (`ArduinoOTA.setPassword`) przeniesione z kodu do `secrets.h` jako `OTA_PASSWORD`.
+    `platformio.ini` czyta je z zmiennej środowiskowej `RYBY_OTA_PASSWORD` (`--auth=${sysenv.RYBY_OTA_PASSWORD}`).
+  - **Token i chat_id bota Telegrama** (`DEFAULT_TG_BOT_TOKEN`, `DEFAULT_TG_CHAT_ID`) przeniesione do
+    `secrets.h` (opcjonalne: `TG_DEFAULT_BOT_TOKEN`, `TG_DEFAULT_CHAT_ID`). Bez nich TG startuje wyłączony
+    po czystym LittleFS; urządzenie z zapisanym plikiem konfiguracji nie zmienia zachowania.
+  - `secrets.example.h` rozszerzony o nowe pola; brak `OTA_PASSWORD` w `secrets.h` = błąd kompilacji
+    (`#error`), jak przy FIREBASE_SECRET.
+  - Nowy skaner `firmware/tests/host/check_secrets.py` (krok 0 w `run_tests.sh`): szuka znanych
+    wyciekłych wartości i literałów sekretów w śledzonych plikach.
+  - Dokumentacja: usunięte dosłowne wartości haseł z `docs/01` i `docs/02`.
+- **Do zrobienia po stronie właściciela (nie da się z repo):**
+  1. Odwołać stary Database Secret w Firebase Console (już wpisany w historii publicznego repo)
+     i wpisać nowy do `secrets.h`.
+  2. Zmienić hasło OTA i CMD_TOKEN; w `secrets.h` dopisać `OTA_PASSWORD`; w środowisku `RYBY_OTA_PASSWORD`.
+  3. Odwołać token bota Telegrama w @BotFather (`/revoke`) i nowy wpisać do `secrets.h` albo panelu.
+  Historia gita (`d76f552`, wcześniejsze commity) nadal zawiera stare wartości. Ich usunięcie z historii
+  wymaga osobnej decyzji (przepisanie historii `main`), a rotacja i tak jest konieczna.
+- **Nie zrobione (wymagają decyzji i testu na płytce):** weryfikacja TLS (`setInsecure()` dla Firebase
+  i Telegrama) oraz migracja LegacyToken → UserAuth z regułami per urządzenie. Patrz `docs/02`, Etap 2.
+- Wersja: 4.7.1+build.271.
+
+---
+
 ## [4.7.0+build.270] ASTRO-2 — 2026-10-10
 
 - Co: Etap 6 planu upgrade, dokończenie: **poranek do wyboru w panelu**, **zegar RTC** (opcjonalny)

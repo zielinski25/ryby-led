@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.7.0+build.270"
+#define RYBY_FW_VERSION "v4.7.1+build.271"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -386,6 +386,11 @@ static bool sendTelegramCoredumpPlik(const String& path, uint32_t boot, uint32_t
 #endif
 #ifndef CMD_TOKEN
 #error "secrets.h musi definiowac CMD_TOKEN"
+#endif
+// [4.7.1 SECRETS-2] Hasło ArduinoOTA — to samo co zmienna środowiskowa RYBY_OTA_PASSWORD
+// (używana przez platformio.ini przy wgrywaniu OTA). Hasło nie leży już w źródle.
+#ifndef OTA_PASSWORD
+#error "secrets.h musi definiowac OTA_PASSWORD (haslo ArduinoOTA, patrz platformio.ini)"
 #endif
 // ─────────────────────────────────────────────────────────────────────────────
 #include <WiFiClientSecure.h>
@@ -739,9 +744,19 @@ volatile bool      tgBootNotifyPending = true;          // wyślij przy pierwszy
 // Gdy LittleFS jest czysty (zmiana partycji, formatowanie, nowy układ flash),
 // loadTelegramConfig() użyje tych wartości i od razu zapisze plik — TG działa
 // bez żadnej konfiguracji przez panel WWW.
-// Wypełnij TOKEN i CHAT_ID swoimi danymi (token z @BotFather, chatId z @myidbot):
-#define DEFAULT_TG_BOT_TOKEN  "8709162940:AAFJJGoI79XHiBkZYtP_IEZjkXO5yEzhDpo"   // ← wklej token np. "1234567890:AABBccDDeeff..."
-#define DEFAULT_TG_CHAT_ID    "429181594"   // ← wklej chat_id np. "-1001234567890"
+// [4.7.1 SECRETS-2] Token i chat_id bota NIE są w kodzie (repo jest publiczne).
+// Pochodzą z secrets.h: TG_DEFAULT_BOT_TOKEN, TG_DEFAULT_CHAT_ID (opcjonalne).
+// Brak wpisu → puste → TG pozostaje wyłączony, dopóki nie ustawisz go w panelu.
+#ifdef TG_DEFAULT_BOT_TOKEN
+#define DEFAULT_TG_BOT_TOKEN  TG_DEFAULT_BOT_TOKEN
+#else
+#define DEFAULT_TG_BOT_TOKEN  ""
+#endif
+#ifdef TG_DEFAULT_CHAT_ID
+#define DEFAULT_TG_CHAT_ID    TG_DEFAULT_CHAT_ID
+#else
+#define DEFAULT_TG_CHAT_ID    ""
+#endif
 #define DEFAULT_TG_ENABLED    true // ← false = TG domyślnie wyłączony po czystym LittleFS
 
 String  tgBotToken   = "";   // token bota - ustawiany przez panel WWW lub DEFAULT_TG_BOT_TOKEN
@@ -9365,14 +9380,15 @@ void startOtaIfNeeded() {
   // Hasło i hostname muszą zgadzać się z platformio.ini:
   //   upload_protocol = espota
   //   upload_port     = ryby-led-s3.local
-  //   upload_flags    = --auth=AkwPanel2026! --timeout=30
+  //   upload_flags    = --auth=${sysenv.RYBY_OTA_PASSWORD} --timeout=30
+  //   (hasło: OTA_PASSWORD z secrets.h)
   //
   // WDT: firmware 1.7 MB ~17s przy 100 KB/s → przekracza limit 15s.
   // onStart: usuwa task z watchlisty WDT (esp_task_wdt_delete).
   // onError: przywraca WDT jeśli upload nieudany.
   // onEnd:   ESP restartuje automatycznie — WDT nie wraca.
   ArduinoOTA.setHostname("ryby-led-s3");
-  ArduinoOTA.setPassword("AkwPanel2026!");
+  ArduinoOTA.setPassword(OTA_PASSWORD);
   ArduinoOTA.onStart([]() {
     esp_task_wdt_delete(NULL);   // [v98-OTA] wyłącz WDT na czas uploadu (>15s)
     logPrintln("lvl=INFO tag=OTA msg=\"Wgrywanie firmware, WDT wylaczony\"");
