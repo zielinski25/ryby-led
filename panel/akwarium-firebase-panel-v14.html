@@ -1937,12 +1937,9 @@ function saveToAutoFb(){
     pwms.push(el?parseInt(el.value)||0:0);
   }
   if(!confirm('Zapisać aktualne wartości PWM jako tryb AUTO?')) return;
-  fbPatch("/aquarium/config.json", {
-    token:CMD_TOKEN, cfgTs:Date.now(),
-    autoPwm0:pwms[0], autoPwm1:pwms[1], autoPwm2:pwms[2], autoPwm3:pwms[3], autoPwm4:pwms[4],
-    configType:"autoSave"
-  }).then(function(){ toast("⭐ Zapisano do AUTO → Firebase","ok"); })
-    .catch(function(e){ toast("❌ "+e.message,"err"); });
+  // Firmware 4.7.2: komenda "autosave a b c d e" z kolejki /aquarium/commands
+  // (stary typ konfiguracji dla AUTO nie był parsowany przez firmware — zapis z panelu nie działał).
+  sendFireCmd("autosave "+pwms.join(" "));
 }
 // ── RAMPA via Firebase ────────────────────────────────
 // UWAGA: ESP parsuje fadeMinutes WYŁĄCZNIE w bloku configType:"schedule"
@@ -2146,7 +2143,14 @@ function openLocalLogs(){
 
 // ── LUX SIMULATION ────────────────────────────────────
 var _luxSimMode = 'off';
+// Symulacja LUX NIE istnieje w firmware (brak obsługi pola luxSim) — nic nie wysyłamy,
+// żeby panel nie pokazywał fałszywego „AKTYWNA”.
+function luxSimUnsupported(){
+  toast("⚠️ Symulacja LUX nie jest obsługiwana przez firmware — nic nie wysłano","err");
+  return true;
+}
 function luxSimSet(mode){
+  if(luxSimUnsupported()) return;
   _luxSimMode = mode;
   var badge = gid('lux-sim-badge');
   if(!badge) return;
@@ -2171,12 +2175,14 @@ function luxSimSet(mode){
   }
 }
 function luxSimSaveConst(){
+  if(luxSimUnsupported()) return;
   var v = parseInt(gid('lux-sim-const-val').value)||300;
   fbPatch("/aquarium/config.json", {token:CMD_TOKEN, cfgTs:Date.now(), luxSimMode:'const', luxSimLux:v, configType:'luxSim'})
     .then(function(){ toast("🌤 Symulacja stała: "+v+" lx → Firebase","ok"); })
     .catch(function(e){ toast("❌ "+e.message,"err"); });
 }
 function luxSimSaveAuto(){
+  if(luxSimUnsupported()) return;
   var mn = parseInt(gid('lux-sim-min').value)||0;
   var mx = parseInt(gid('lux-sim-max').value)||1500;
   var pr = parseInt(gid('lux-sim-period').value)||600;

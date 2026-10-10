@@ -8,6 +8,21 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.7.2+build.272] PANEL-AUTO-LUX — 2026-10-10
+
+- Co: naprawa dwóch funkcji panelu v14, które wysyłały ustawienia, a firmware ich nie wykonywał.
+  - **Zapis AUTO z panelu zdalnie** (`saveToAutoFb`): panel wysyłał `configType:"autoSave"`, którego
+    parser `/aquarium/config` nie zna — zapis był po cichu ignorowany. Teraz panel wysyła komendę
+    kolejki `autosave a b c d e` (5 wartości PWM, 0–1023); firmware zapisuje je jako tryb AUTO do EEPROM
+    tą samą ścieżką co `/api/save-auto` (nowy typ `AUTO_SAVE_PWM`). Mniej niż 5 wartości = odrzucenie.
+  - **Symulacja LUX z panelu** (`luxSimSet`, `luxSimSaveConst`, `luxSimSaveAuto`): firmware nie ma tej
+    funkcji (brak parsera `luxSim` i logiki). Panel pokazywał „AKTYWNA”, a nic nie docierało do ESP.
+    Teraz funkcje są zablokowane ostrzeżeniem i nic nie wysyłają. Implementacja w firmware to osobna decyzja.
+- Testy: `check_panel_cmd.js` rozszerzony o wykonanie `saveToAutoFb` (oczekiwane `autosave 10 11 12 13 14`),
+  blokadę LUX i zgodność wszystkich `configType` panelu z parserem firmware. 34 PASS.
+- Wersja: `v4.7.2+build.272` (zmiana firmware), `version.txt` 4.7.2.
+- Do sprawdzenia na płytce: zapis AUTO z panelu przez LTE → po restarcie wartości AUTO z EEPROM.
+
 ## [4.7.1+build.271] SECRETS-2 — 2026-10-10
 
 - Co: Etap 2 planu upgrade, dokończenie części sekretów (repo jest publiczne, więc nic z sekretów

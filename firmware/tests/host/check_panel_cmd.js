@@ -88,6 +88,51 @@ const { sendFireCmd } = factory(
   const readsLegacy = /fbDatabase\.get\([^)]*"\/aquarium\/cmd"/.test(fw);
   check(!readsLegacy, 'firmware nie czyta legacy /aquarium/cmd');
 
+  // ── 4) AUTO (4.7.2): panel wysyła "autosave a b c d e", firmware je obsługuje ──
+  check(fw.includes('cmd.startsWith("autosave ")'), 'firmware parsuje komendę "autosave "');
+  check(/case AppCommandType::AUTO_SAVE_PWM:[\s\S]*?saveAutoBrightnessToEEPROM\(\)/.test(fw),
+        'firmware: AUTO_SAVE_PWM zapisuje do EEPROM (jak /api/save-auto)');
+  check(!/configType:\s*"autoSave"/.test(panel), 'panel nie wysyła już configType:"autoSave"');
+  const sa0 = panel.indexOf('function saveToAutoFb(');
+  const saBlock = panel.slice(sa0, panel.indexOf('\n}\n', sa0) + 3);
+  const sentAuto = [];
+  const saFactory = new Function('gid', 'confirm', 'sendFireCmd', 'fbPatch', saBlock + '\nreturn saveToAutoFb;');
+  const saveToAutoFb = saFactory(
+    (id) => ({ value: String(10 + Number(id.slice(2))) }),
+    () => true,
+    async (cmd) => { sentAuto.push(cmd); },
+    async () => { throw new Error('fbPatch nie powinien być wołany'); }
+  );
+  await saveToAutoFb();
+  check(sentAuto.length === 1 && sentAuto[0] === 'autosave 10 11 12 13 14',
+        'saveToAutoFb → sendFireCmd("autosave 10 11 12 13 14") (jest: ' + JSON.stringify(sentAuto) + ')');
+
+  // ── 5) Symulacja LUX: w firmware jej nie ma → panel nic nie wysyła ───────
+  const lsStart = panel.indexOf('function luxSimUnsupported(');
+  const lsEnd = panel.indexOf('// ── [v14] TRYB POŁĄCZENIA');
+  const lsBlock = panel.slice(lsStart, lsEnd);
+  const lsSent = [];
+  const lsFactory = new Function('fbPatch', 'toast', 'gid', 'CMD_TOKEN', 'Date',
+    lsBlock + '\nreturn { luxSimSet, luxSimSaveConst, luxSimSaveAuto };');
+  const ls = lsFactory(
+    async (path, body) => { lsSent.push(body); },
+    () => {},
+    () => ({ value: '300' }),
+    'T', FakeDate
+  );
+  ls.luxSimSet('auto'); ls.luxSimSaveConst(); ls.luxSimSaveAuto();
+  check(lsSent.length === 0, 'symulacja LUX: brak wysyłki do Firebase (jest ' + lsSent.length + ')');
+
+  // ── 6) Wszystkie configType z panelu są parsowane przez firmware ─────────
+  const fwTypes = new Set(['schedule', 'adapt', 'minlux', 'params', 'pump', 'telegram']);
+  const panelTypes = new Set();
+  for (const m of panel.matchAll(/configType\s*:\s*["']([A-Za-z]+)["']/g)) panelTypes.add(m[1]);
+  // luxSim celowo pominięty: zapisy są zablokowane strażnikiem (sekcja 5), więc nie trafiają do firmware
+  panelTypes.delete('luxSim');
+  for (const t of panelTypes) {
+    check(fwTypes.has(t), 'firmware parsuje configType "' + t + '" z panelu');
+  }
+
   console.log('panel cmd: ' + pass + ' PASS, ' + fail + ' FAIL');
   process.exit(fail === 0 ? 0 : 1);
 })();

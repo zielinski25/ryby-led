@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.7.1+build.271"
+#define RYBY_FW_VERSION "v4.7.2+build.272"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -966,7 +966,7 @@ TaskHandle_t  tgTaskHandle = nullptr;  // handle tasku (do diagnostyki)
 // [v250-ARCH] Jedyny kanał wejściowy dla ZEWNĘTRZNYCH zmian sterujących.
 // Callbacki sieciowe (Firebase/HTTP/Telegram/WebSocket) tylko enqueue.
 // Konsumentem i wykonawcą jest loop() na Core 1.
-enum class AppCommandType : uint8_t { POWER_SET, TRYB_SET, POWER_TOGGLE, TRYB_TOGGLE, PUMP_SET, LED_TEST, LED_OFF, RESTART, PWM_SET };
+enum class AppCommandType : uint8_t { POWER_SET, TRYB_SET, POWER_TOGGLE, TRYB_TOGGLE, PUMP_SET, LED_TEST, LED_OFF, RESTART, PWM_SET, AUTO_SAVE_PWM };
 struct AppCommand {
   AppCommandType type = AppCommandType::POWER_SET;
   bool value = false;
@@ -13052,6 +13052,21 @@ static bool wykonajKomendeFirebase(const String& cmd, uint64_t firebaseTs = 0, c
     }
     return enqueueAppCommand(AppCommandType::PWM_SET, false, arr, "firebase", firebaseTs, firebaseKey);
   }
+  // [4.7.2 AUTOSAVE] "autosave a b c d e" — zapis PWM jako tryb AUTO (EEPROM), jak /api/save-auto.
+  // Wymaga dokładnie 5 wartości; mniej → komenda odrzucona (nie kasujemy, log WARN).
+  if (cmd.startsWith("autosave ")) {
+    uint16_t arr[5] = {0,0,0,0,0};
+    String r = cmd.substring(9);
+    for (int i=0;i<5;i++) {
+      r.trim();
+      if (r.length() == 0) return false;
+      int sp = r.indexOf(' ');
+      String tok = (sp < 0) ? r : r.substring(0, sp);
+      arr[i] = constrain(tok.toInt(), 0, 1023);
+      r = (sp < 0) ? String("") : r.substring(sp + 1);
+    }
+    return enqueueAppCommand(AppCommandType::AUTO_SAVE_PWM, false, arr, "firebase", firebaseTs, firebaseKey);
+  }
   if (Komentarze) logPrintf("lvl=WARN tag=FB msg=\"nieznana komenda: %s\"\n", cmd.c_str());
   return false;
 }
@@ -13373,6 +13388,11 @@ static void processAppCommands() {
         restartRequestedAt = millis(); logPrintf("lvl=INFO tag=APP-CMD cmd=RESTART source=%s\n", c.source); break;
       case AppCommandType::PWM_SET:
         commandApplied = zastosujRampeAdaptacyjna(c.pwm, c.source); break;
+      case AppCommandType::AUTO_SAVE_PWM:
+        for (int i=0;i<5;i++) setBrightnessForSection(backupAutoBrightnessComposite, i, c.pwm[i]);
+        saveAutoBrightnessToEEPROM();
+        logPrintf("lvl=INFO tag=APP-CMD cmd=AUTO_SAVE_PWM source=%s\n", c.source);
+        break;
     }
     if (c.firebaseAck && commandApplied) {
       FirebaseAck ack;
