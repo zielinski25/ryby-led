@@ -26,6 +26,7 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 - Testy: `check_panel_cmd.js` rozszerzony o wykonanie `saveToAutoFb` (oczekiwane `autosave 10 11 12 13 14`),
   parsowanie `luxSim` (klucze i payloady panelu), zgodność `configType` z parserem i zakres minLuxTarget. 47 PASS; aplikacja mobilna 122 PASS.
 - **Aplikacja mobilna** (`panel/ryby-mobile.html`, jeden plik jak Piec): widok na telefon (zdalnie przez Firebase): Główna, Światło
+- **Aplikacja Android** (`android/`, Kotlin + Compose, port `ryby-mobile.html` 1:1 w logice i komendach): te same 5 zakładek, sekrety tylko na telefonie. Build w Android Studio; nie kompilowano w sandboxie. Kontrakt: `check_android_app.js` (krok 14).
   (PWM, AUTO, LED), Pompa, Energia (kWh, koszt, czas LED, historia), Ustawienia. Komendy i pola statusu zgodne
   z firmware; tekst z bazy tylko przez `textContent`. Test: `check_mobile_app.js` (krok 13). Zmiana tylko
   w panelu — firmware bez zmian poza punktami wyżej.

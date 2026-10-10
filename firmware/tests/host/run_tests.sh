@@ -25,6 +25,7 @@
 #  0) check_secrets.py: brak sekretów zaszytych w repo (4.7.1, Etap 2).
 # 12) check_panel_cmd.js: komendy zdalne panelu trafiają do kolejki firmware (4.7.1).
 # 13) check_mobile_app.js: aplikacja mobilna panel/ryby-mobile.html (logika, komendy, pola statusu, jeden plik).
+# 14) check_android_app.js: natywna aplikacja Android (android/, Kotlin): kontrakt z firmware, bez kompilacji.
 #
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
@@ -113,5 +114,9 @@ node "$HERE/check_panel_cmd.js"
 echo
 echo "== [13/13] aplikacja mobilna panel/ryby-mobile.html: logika, kontrakt z firmware (4.7.2, Node) =="
 node "$HERE/check_mobile_app.js"
+echo
+echo
+echo "== [14/14] aplikacja Android android/: kontrakt z firmware i HTML (4.7.2, Node, statycznie) =="
+node "$HERE/check_android_app.js"
 echo
 echo "OK: wszystkie kontrole hostowe zaliczone."

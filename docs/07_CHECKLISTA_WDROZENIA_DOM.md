@@ -72,6 +72,7 @@ Procedura: `docs/06_ETAP6_ASTRO_RTC.md`, sekcja 5. Najważniejsze:
 ## Aplikacja na telefon (4.7.2) — procedura
 
 Plik: `panel/ryby-mobile.html` — jeden samodzielny plik HTML (jak Piec), zdalnie przez Firebase.
+Wersja natywna Android: folder `android/` (Android Studio → Build APK, instrukcja w `android/README.md`). Nie zbudowana w sandboxie: pierwszy build i test na telefonie po Twojej stronie.
 
 - [ ] Otwórz adres aplikacji na telefonie (LTE, bez WiFi domowego). Ustawienia → wpisz Database Secret i CMD_TOKEN → „Sprawdź połączenie”.
 - [ ] Główna: pill ONLINE, temperatury i lux zgodne z panelem WWW.
