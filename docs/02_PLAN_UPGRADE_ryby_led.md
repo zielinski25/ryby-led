@@ -196,8 +196,9 @@ jak R250 Centrali); pamięć: pomiar zajętości PSRAM przed/po (budżet!).
    v246? Jeśli istnieje poza repo — dołączyć go do `panel/`.
 
 **Stan po audycie zgodności (4.7.2):**
-- Zgodne z parserem firmware: `schedule`, `params`, `minlux`, `pump`, `telegram`, `adapt`
-  (test `check_panel_cmd.js`, sekcja 6).
+- Zgodne z parserem firmware (klucze i zakresy sprawdzone): `schedule`, `params`, `adapt`,
+  `pump` (`pumpSlots` z `HH:MM`), `telegram`, `minlux` (po korekcie zakresu minLuxTarget 500–8000).
+  Test `check_panel_cmd.js`, sekcje 6–7.
 - `autoSave` (zdalny zapis AUTO) — naprawiony: komenda `autosave` w kolejce (4.7.2).
 - `luxSim` (symulacja LUX) — firmware nie ma tej funkcji. Panel blokuje zapis
   ostrzeżeniem, zamiast pokazywać fałszywe „AKTYWNA”. **Otwarta decyzja:** wdrożyć

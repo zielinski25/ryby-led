@@ -18,8 +18,10 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
   - **Symulacja LUX z panelu** (`luxSimSet`, `luxSimSaveConst`, `luxSimSaveAuto`): firmware nie ma tej
     funkcji (brak parsera `luxSim` i logiki). Panel pokazywał „AKTYWNA”, a nic nie docierało do ESP.
     Teraz funkcje są zablokowane ostrzeżeniem i nic nie wysyłają. Implementacja w firmware to osobna decyzja.
+  - **Zakres Min LUX w panelu**: panel dopuszczał target 0–8000, a firmware przyjmuje 500–8000 (wartości
+    poniżej 500 były cicho odrzucane). Slider i walidacja w panelu dopasowane do firmware.
 - Testy: `check_panel_cmd.js` rozszerzony o wykonanie `saveToAutoFb` (oczekiwane `autosave 10 11 12 13 14`),
-  blokadę LUX i zgodność wszystkich `configType` panelu z parserem firmware. 34 PASS.
+  blokadę LUX, zgodność `configType` panelu z parserem firmware i zakres minLuxTarget. 37 PASS.
 - Wersja: `v4.7.2+build.272` (zmiana firmware), `version.txt` 4.7.2.
 - Do sprawdzenia na płytce: zapis AUTO z panelu przez LTE → po restarcie wartości AUTO z EEPROM.
 

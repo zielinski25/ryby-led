@@ -133,6 +133,11 @@ const { sendFireCmd } = factory(
     check(fwTypes.has(t), 'firmware parsuje configType "' + t + '" z panelu');
   }
 
+  // ── 7) Zakresy minLuxTarget: panel = firmware (500..8000) ────────────────
+  check(/id="cfg-minLuxTarget"\s+min="500"\s+max="8000"/.test(panel), 'panel: slider minLuxTarget min=500 max=8000');
+  check(/target<500\|\|target>8000/.test(panel), 'panel: walidacja minLuxTarget 500..8000');
+  check(/extractFloat\("minLuxTarget", f\) && f >= 500\.0f && f <= 8000\.0f/.test(fw), 'firmware: minLuxTarget 500..8000');
+
   console.log('panel cmd: ' + pass + ' PASS, ' + fail + ' FAIL');
   process.exit(fail === 0 ? 0 : 1);
 })();

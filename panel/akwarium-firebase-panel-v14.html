@@ -636,7 +636,7 @@ input[type="time"].cfg-input{color-scheme:dark}
       <div class="row" style="flex-direction:column;align-items:flex-start;gap:8px">
         <div><div class="row-label">Docelowy LUX</div><div class="row-desc">Wartość LUX utrzymywana w trybie min. LUX</div></div>
         <div style="display:flex;align-items:center;gap:10px;width:100%">
-          <input type="range" id="cfg-minLuxTarget" min="0" max="8000" step="50" value="1000" oninput="gid('minLuxTarget-val').textContent=this.value" style="flex:1">
+          <input type="range" id="cfg-minLuxTarget" min="500" max="8000" step="50" value="1000" oninput="gid('minLuxTarget-val').textContent=this.value" style="flex:1">
           <span id="minLuxTarget-val" style="font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--cyan);min-width:70px;text-align:right">1000 lx</span>
         </div>
       </div>
@@ -1130,7 +1130,7 @@ async function saveAdaptConfig(){
   try {
     var target   = parseInt(gid("cfg-minLuxTarget").value)||1000;
     var interval = parseInt(gid("cfg-minLuxInterval").value)||30;
-    if(target<0||target>8000){ toast("❌ Target LUX: 0–8000!", "err"); return; }
+    if(target<500||target>8000){ toast("❌ Target LUX: 500–8000 (zakres firmware)!", "err"); return; }
     if(interval<5||interval>300){ toast("❌ Interwał: 5–300s!", "err"); return; }
     var now = Date.now();
 
