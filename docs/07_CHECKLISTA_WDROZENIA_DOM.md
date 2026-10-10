@@ -1,4 +1,4 @@
-# Checklista wdrożenia w domu — Etapy 1–6 (build 4.7.1+build.271)
+# Checklista wdrożenia w domu — Etapy 1–6 (build 4.7.2+build.272)
 
 Jedna kolejność kroków na płytce. Szczegóły testów są w dokumentach etapowych;
 tu jest tylko co robić i w jakiej kolejności. Stan repo i testy hostowe:
@@ -23,7 +23,7 @@ Patrz `docs/02`, PILNE, oraz `CHANGELOG.md` wpis 4.7.1.
 - [ ] Nowy CMD_TOKEN wpisz w panelu (pole token).
 - [ ] `python firmware/tests/host/check_secrets.py` → 0 trafień.
 
-## Krok 1 — pierwszy flash przez USB (4.7.1)
+## Krok 1 — pierwszy flash przez USB (4.7.2)
 
 - [ ] `pio run -e esp32-s3-n16r8` → sukces; `firmware.bin` < 3 MB (bramka `build_gate.ps1`).
 - [ ] Wgraj USB, otwórz log: `lvl=INFO` przy starcie, wersja `v4.7.1+build.271`.
@@ -84,6 +84,9 @@ Panel: `panel/akwarium-firebase-panel-v14.html` (LAN albo zdalnie przez Firebase
 - [ ] Karta „Aktualizacja firmware (OTA & GitHub)” pokazuje wersję i listę release.
 - [ ] Karta „Log krytyczny” (Etap 5) pokazuje status i pobiera plik.
 - [ ] Karta Telegram: zapis tokenu działa; `GET /api/telegram/status` zwraca tylko `tokenPrefix` (6 znaków + "...").
+- [ ] Zapis AUTO z panelu (przycisk „ZAPISZ DO AUTO”, zdalnie): toast „Wysłano: autosave …”, w logu `tag=APP-CMD cmd=AUTO_SAVE_PWM`; po restarcie ESP wartości AUTO są takie jak wysłane.
+- [ ] Symulacja LUX z panelu (stała i AUTO-sinusoida): w logu `tag=SIM-CFG state=APPLIED`; po restarcie `simEnabled=false` (symulacja nie jest trwała). **Pamiętaj wyłączyć po testach.**
+- [ ] Zakres Min LUX w panelu: 500–8000 (jak firmware); wartość poniżej 500 nie jest wysyłana.
 
 ### 4.3 Tryb zdalny poza LAN (DoD Etapu 4)
 
@@ -93,7 +96,7 @@ Panel: `panel/akwarium-firebase-panel-v14.html` (LAN albo zdalnie przez Firebase
 
 **Zaliczone, gdy:** 4.1 bez błędów CORS, 4.2 wszystkie karty działają, 4.3 sterowanie z LTE przechodzi przez Firebase.
 
-**Naprawione w 4.7.1:** komendy zdalne panelu v14 trafiają do kolejki `/aquarium/commands` (wcześniej `/aquarium/cmd.json`, którego firmware nie czytał). **Znana luka:** panel v15 (wspomniany w komentarzach v246) nie jest w repo. Czy trzeba go dołączyć, to otwarte pytanie właściciela (`docs/02`, Etap 4 pkt 3).
+**Naprawione w 4.7.1:** komendy zdalne panelu v14 trafiają do kolejki `/aquarium/commands` (wcześniej `/aquarium/cmd.json`, którego firmware nie czytał). **Naprawione w 4.7.2:** zapis AUTO zdalnie (`autosave`), parser symulacji LUX (`luxSim`), zakres Min LUX. Panel v15 nie istnieje — właściciel potwierdził, że źródłem jest panel v14 (`docs/02`, Etap 4).
 
 ---
 
