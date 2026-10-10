@@ -44,10 +44,11 @@ for (const c of kotlinPlain) {
   check(FW.includes(c), "firmware zna komendę: " + c);
 }
 
-const kotlinCmdsUsed = [...(VM + UI).matchAll(/sendPlain\("([a-z_0-9]+)"\)/g)].map((x) => x[1]);
-check(kotlinCmdsUsed.length >= 8, "UI wysyła komendy przez sendPlain (" + kotlinCmdsUsed.length + " wywołań)");
-for (const c of [...new Set(kotlinCmdsUsed)]) {
-  check(kotlinPlain.includes(c), "sendPlain(\"" + c + "\") jest na liście PLAIN_CMDS");
+// Wszystkie literały wyglądające na komendy (także w warunkach typu if (on) "power_on" else "power_off").
+const kotlinCmdsUsed = [...new Set([...(VM + UI).matchAll(/"((?:power|pump|mode|led|restart)_[a-z_0-9]*)"/g)].map((x) => x[1]))];
+check(kotlinCmdsUsed.length >= 8, "UI/ViewModel używa komend firmware (" + kotlinCmdsUsed.length + " różnych)");
+for (const c of kotlinCmdsUsed) {
+  check(kotlinPlain.includes(c), "komenda \"" + c + "\" jest na liście PLAIN_CMDS");
 }
 
 check(/const val STALE_MS = 150_000L/.test(LOGIC), "STALE_MS = 150 s (jak w HTML i firmware)");
@@ -109,7 +110,8 @@ for (const f of [
   path.join(SRC, "java", "com", "rybyled", "panel", "MainActivity.kt"),
   path.join(JAVA, "core", "Rtdb.kt"), path.join(JAVA, "core", "AppPrefs.kt"),
   path.join(JAVA, "ui", "AppViewModel.kt"), path.join(JAVA, "ui", "App.kt"),
-  path.join(SRC, "res", "values", "themes.xml"), path.join(SRC, "res", "drawable", "ic_launcher.xml"),
+  path.join(SRC, "res", "values", "themes.xml"), path.join(SRC, "res", "drawable", "ic_launcher_foreground.xml"),
+  path.join(SRC, "res", "mipmap-anydpi-v26", "ic_launcher.xml"),
 ]) {
   check(fs.existsSync(f), "plik istnieje: " + path.relative(ROOT, f));
 }
@@ -127,6 +129,11 @@ const IMPORT_OF = {
   PasswordVisualTransformation: "androidx.compose.ui.text.input.PasswordVisualTransformation",
   viewModel: "androidx.lifecycle.viewmodel.compose.viewModel",
   roundToInt: "kotlin.math.roundToInt",
+  clip: "androidx.compose.ui.draw.clip",
+  HorizontalDivider: "androidx.compose.material3.HorizontalDivider",
+  SliderDefaults: "androidx.compose.material3.SliderDefaults",
+  ButtonDefaults: "androidx.compose.material3.ButtonDefaults",
+  Icons: "androidx.compose.material.icons.Icons",
 };
 const uiCode = UI.replace(/^import .*$/gm, "");
 for (const [sym, imp] of Object.entries(IMPORT_OF)) {
