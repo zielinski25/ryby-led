@@ -150,6 +150,25 @@ zostaje odrzucony; konto bez reguł nie zapisuje do `/aquarium/<deviceId>`.
 **Ryzyka:** utrata autoryzacji = utrata zdalnego sterowania → feature-flaga
 i procedura awaryjnego powrotu; testować na płytce, nie „na żywo” w nocy.
 
+### Etap 2 — przygotowanie TLS (zrobione w repo, bez zmiany zachowania firmware)
+
+Certyfikaty do przypięcia trzeba pobrać z sieci domowej (sandbox nie ma dostępu do
+`firebaseio.com`, a do `api.telegram.org` połączenie jest zrywane przez proxy).
+Skrypt tylko odczytuje łańcuch i zapisuje PEM **poza repo**:
+
+```
+powershell -ExecutionPolicy Bypass -File .\firmware\scripts\tls_dump_chain.ps1 -HostName firebaseio.com
+powershell -ExecutionPolicy Bypass -File .\firmware\scripts\tls_dump_chain.ps1 -HostName api.telegram.org
+```
+
+Wynik: `%USERPROFILE%\ryby-tls\<host>_<n>.pem`, ostatni element = root. Zapisz odciski
+SHA-256 korzenia. Powtórz z LTE (inne łącze), odciski korzenia muszą się zgadzać.
+
+**Decyzje, których skrypt nie podejmuje (właściciel):**
+- przypinać root czy pośredni (root jest stabilniejszy; pośredni wygasa częściej),
+- TLS za przełącznikiem NVS, domyślnie wyłączonym (zalecane) — bez tego ryzyko utraty zdalnego sterowania,
+- kiedy włączyć: dopiero po teście na płytce (fałszywy serwer musi zostać odrzucony).
+
 ---
 
 ## ETAP 3 — Trwała telemetria: Spool V2 + TelemetryRing + sessionNonce (P1, ~4–6 dni)
