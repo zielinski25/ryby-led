@@ -474,6 +474,7 @@ void* psramAllocSafe(size_t size);
 #include "telemetry_spool.h"  // [4.2.0 SPOOL] Etap 3 — trwała telemetria (Spool V2)
 #include "critlog.h"            // [4.4.0 CRIT-LOG] Etap 5 — log_krytyczny.txt
 #include "histlong.h"           // [4.5.0 HIST-LONG] Etap 3 (G8) — historia długa, kubełki 30 min
+#include "astro.h"              // [4.7.0 ASTRO] Etap 6 — efemerydy NOAA (zachód słońca)
 
 
 /*************************************************************
@@ -15274,46 +15275,14 @@ void emergencyThermalShutdown() {
 
 
 int obliczZachodSlonca(int rok, int miesiac, int dzien, float szerokosc, float dlugosc) {
-  int N = dzien
-        + (153 * (miesiac + 12 * ((14 - miesiac) / 12) - 3) + 2) / 5
-        + 365 * (rok + 4800 - ((14 - miesiac) / 12))
-        + (rok + 4800 - ((14 - miesiac) / 12)) / 4
-        - (rok + 4800 - ((14 - miesiac) / 12)) / 100
-        + (rok + 4800 - ((14 - miesiac) / 12)) / 400
-        - 32045;
-  N -= 2451545;
-
-  float lngHour = dlugosc / 15.0;
-  float t = N + ((18 - lngHour) / 24.0);
-  float M = (0.9856 * t) - 3.289;
-  float L = fmod(M
-               + (1.916 * sin(radians(M)))
-               + (0.020 * sin(radians(2 * M)))
-               + 282.634,
-               360);
-  float RA = fmod(degrees(atan(0.91764 * tan(radians(L)))), 360);
-  float Lquadrant = floor(L / 90) * 90;
-  float RAquadrant = floor(RA / 90) * 90;
-  RA = RA + (Lquadrant - RAquadrant);
-  RA /= 15.0;
-
-  float sinDec = 0.39782 * sin(radians(L));
-  float cosDec = cos(asin(sinDec));
-
-  float cosHraw = (
-    cos(radians(90.833))
-    - sinDec * sin(radians(szerokosc))
-  ) / (cosDec * cos(radians(szerokosc)));
-
-  if (cosHraw < -1.0 || cosHraw > 1.0) return -1; // Słońce nie zachodzi lub nie wschodzi tego dnia
-
-  float H = degrees(acos(cosHraw)) / 15.0;
-  float T = H + RA - (0.06571 * t) - 6.622;
-
-  float UT = fmod((T - lngHour), 24.0);
-  if (UT < 0.0) UT += 24.0;
-
-  return int(UT * 60.0);
+  // [4.7.0 ASTRO] Etap 6 pkt 1: dokładne równania NOAA (astro::compute) zamiast
+  // uproszczonego wzoru, który odchylał się o do ~4,4 min (zima/wiosna).
+  // Kontrakt bez zmian: minuty UTC od północy albo -1, gdy Słońce nie zachodzi.
+  astro::Times t{};
+  if (!astro::compute(rok, miesiac, dzien, szerokosc, dlugosc, 0, t)) return -1;
+  if (!t.hasSunset) return -1;
+  int m = (int)floor(astro::wrapMinutes(t.sunsetMin) + 0.5);
+  return m % 1440;
 }
 
 

@@ -17,6 +17,8 @@ PLACES = [
     ("Gdansk", 54.3520, 18.6466, "Europe/Warsaw", 120),
     ("Tromso", 69.6496, 18.9560, "Europe/Oslo", 120),
     ("Sydney", -33.8688, 151.2093, "Australia/Sydney", 660),
+    # Lokalizacja z kodu Ryby (latitude/longitude w Ryby_LED_fi_S3.cpp):
+    ("Dom", 52.1345, 20.1418, "Europe/Warsaw", 120),
 ]
 DATES = [
     (2026, 10, 10),

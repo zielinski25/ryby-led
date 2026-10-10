@@ -2,24 +2,51 @@
 
 Plan: `docs/02_PLAN_UPGRADE_ryby_led.md`, ETAP 6 (P2). Ten dokument opisuje stan po 4.7.0.
 
-## 1. Astronomia — moduł (4.7.0, GOTOWE i przetestowane hostowo)
+## 0. Co już było w kodzie przed 4.7.0 (ustalone odczytem)
+
+- `obliczZachodSlonca(rok, mies, dzien, szer, dlug)` liczyła zachód uproszczonym wzorem
+  (~0,9856·t, bez poprawek). Porównanie z `astral` 3.2 dla lokalizacji z kodu
+  (52,1345 / 20,1418) pokazało **systematyczne odchylenie do −4,4 min** (zima/wiosna).
+- `sunsetMinutes` jest wyliczane przy starcie i w cyklu dobowym z NTP (dwa miejsca w kodzie),
+  z przesunięciem strefy (`timezoneOffsetMinutes`, zmiana czasu z `isDaylightSaving`).
+  Brak NTP → sztywne 19:00 (jak dotąd).
+- Wieczorna rampa startuje z `eveningOnStart = sunsetMinutes + EVENING_ON_BEFORE_SUNSET_MIN`.
+  Przesunięcie jest już ustawialne w panelu i trzymane w EEPROM (domyślnie −60 min).
+  **Rampa wieczorna jest więc już względna do zachodu.** Nie ma potrzeby nowego trybu.
+- Współrzędne to stałe w kodzie: `latitude = 52.1345`, `longitude = 20.1418`.
+  (Plan wcześniej zakładał Kraków 50,0647 / 19,9450 — to było błędne założenie.)
+
+## 1. Astronomia — moduł i podłączenie zachodu (4.7.0)
 
 - `firmware/src/astro.h/.cpp`: `astro::compute(y, m, d, lat, lon, tzMin, Times&)`.
   Zwraca świt cywilny (−6°), wschód i zachód (−0,833°), zmierzch cywilny, w minutach
   od północy czasu lokalnego. Flagi `has*` mówią, czy zdarzenie istnieje (polarny dzień/noc).
 - Algorytm: NOAA (deklinacja, równanie czasu, 3 iteracje czasu zdarzenia).
-- Test: `test_astro.cpp`, 18 par data×miejsce wobec `astral` 3.2 (`astro_ref_gen.py`),
-  tolerancja 2 min. Wynik: 141 PASS, 0 FAIL (ASan + UBSan).
-- **Nie podłączony.** Moduł nie zmienia zachowania firmware.
+- **Podłączone do zachodu:** `obliczZachodSlonca` wywołuje `astro::compute` (tzMin = 0,
+  wynik w minutach UTC, jak dotąd; `-1` gdy brak zachodu). Sygnatura i kontrakt bez zmian,
+  więc `sunsetMinutes`, strefa, zmiana czasu i rampa wieczorna działają jak wcześniej.
+  Efekt: zachód zgodny z `astral` ±2 min zamiast odchylenia do −4,4 min.
+- Testy:
+  - `test_astro.cpp`: 22 pary data×miejsce wobec `astral` 3.2 (`astro_ref_gen.py`),
+    w tym lokalizacja domowa 52,1345 / 20,1418. Tolerancja 2 min. 169 PASS, 0 FAIL (ASan + UBSan).
+  - `check_integration_hl.sh`: wyciągnięte z pliku Ryby ciało `obliczZachodSlonca` kompiluje się
+    z `astro.cpp` i trafia w wartości UTC z `astral` (±2 min), plus polarna noc → −1.
+- **Świt, wschód i zmierzch nie są podłączone.** Rampa poranna nadal ma stałą godzinę.
+  Ewentualne podłączenie to osobna decyzja (sekcja 4).
 
-## 2. Zegar odporny (RTC) — DECYZJA WŁAŚCICIELA
+## 2. Zegar odporny (RTC) — CZEKA NA IDENTYFIKACJĘ MODUŁU
 
 Dziś harmonogram zależy wyłącznie od NTP. Bez routera i po dłuższym restarcie czas jest
 nieznany. Opcje z planu:
-- **(a) RTC DS3231 na I2C** (~10 zł, jak w Centrali, RTClib). Rekomendowane.
+- **(a) RTC na I2C** (RTClib obsługuje DS1307 i DS3231). Rekomendowane.
 - (b) „ostatni znany czas + drift” z logowaniem niepewności — bez dokupowania.
 
-Nie zaimplementowano. Wymaga zgody na zakup (pytanie 3 w `docs/02`) i wolnego pinu I2C.
+Właściciel ma moduł DS, ale nie wie, czy to DS1307, czy DS3231, i nie jest zamontowany.
+Rozróżnienie: najpewniej po nadruku na układzie RTC (napis „DS1307” lub „DS3231”).
+Parametry z kart katalogowych: DS1307 ma zewnętrzny kwarc 32,768 kHz i bez kompensacji
+temperatury (typowo ±20 ppm); DS3231 ma wbudowany kwarc z kompensacją (±2 ppm).
+Obie wersje obsługuje ta sama biblioteka RTClib, więc wybór nie blokuje integracji.
+**Nie zaimplementowano.** Wymaga: identyfikacji modułu, zgody na integrację i wolnego pinu I2C.
 
 ## 3. Karta „Dzień” w panelu — NIE ZROBIONE
 
@@ -27,23 +54,26 @@ Podgląd krzywej świateł na dziś (harmonogram + adaptacja + MIN LUX na osi cz
 Dane: `/history.csv` (dziś, co 5 min) i harmonogram. Wymaga sprawdzenia, czy panel ma
 dostęp do harmonogramu (EEPROM) przez Firebase lub LAN.
 
-## 4. Podłączenie astronomii do harmonogramu — DO DECYZJI
+## 4. Lokalizacja z panelu i rampy poranne — DO DECYZJI
 
-Rampy start/koniec podążałyby za wschodem/zachodem. To zmienia czasy rampy, więc dotyka
-harmonogramu. Ramp Arbiter (v252) i MIN LUX pozostają nietknięte tylko, jeśli zmiana
-ogranicza się do przesunięcia punktów startu/końca. Do ustalenia:
-1. Czy rampa ma iść według wschodu/zachodu w całości, czy tylko jako przesunięcie
-   względem ustawionej godziny (np. ±N min)?
-2. Skąd szerokość/długość: stała w kodzie (Kraków 50,0647 / 19,9450), konfiguracja w panelu
-   (zapis do NVS/EEPROM) czy z Firebase?
-3. Fallback: przy braku czasu (NTP/RTC) wracać do sztywnego harmonogramu (jak dziś).
+Ustalone: lokalizacja ma być ustawiana w panelu i zapisywana na ESP (NVS, wzorem
+`Preferences` z `FB_STATE_NVS_NS`). Stała w kodzie zostaje jako wartość domyślna.
+Do zrobienia: endpoint zapisu, pole w panelu, przeliczenie `sunsetMinutes` po zmianie
+(bez restartu). Osobny krok — nie robiony w 4.7.0.
 
-## 5. DoD (po podłączeniu, w domu)
+Otwarte pytania:
+1. Rampa poranna: pozostaje stałą godziną, czy też ma startować od świtu/wschodu
+   z przesunięciem (jak wieczorna od zachodu)?
+2. Fallback przy braku czasu: sztywne 19:00 / stała godzina (jak dziś) — potwierdzić.
 
-- Wartości `astro` na płytce zgodne z `astral`/timeanddate dla Krakowa (±2 min).
-- Zmiana szerokości nie wymaga przeflashowania (jeśli wybrano konfigurację w panelu).
-- Brak czasu → zachowanie identyczne jak w 4.6.0.
+## 5. DoD (w domu, po flashu 4.7.0)
+
+- Log `lvl=INFO tag=NTP msg="Zachod slonca lokalnie"` pokazuje godzinę zgodną z `astral`/timeanddate
+  dla 52,1345 / 20,1418 (±2 min) w dniu testu.
+- Zachowanie rampy wieczornej bez zmian poza przesunięciem zachodu o ≤4 min.
+- Brak NTP → 19:00 jak w 4.6.0.
 
 ## 6. Rollback
 
-Moduł `astro` nie jest używany, więc rollback to usunięcie `astro.cpp` (lub wgranie 4.6.0).
+Zachód: przywrócić poprzednią `obliczZachodSlonca` (wzór uproszczony) albo wgrać 4.6.0.
+Moduł `astro` pozostaje w repo jako nieużywany, jeśli rollback jest częściowy.

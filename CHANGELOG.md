@@ -12,12 +12,17 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 - Co: Etap 6 planu upgrade, pkt 1 — **moduł efemeryd słonecznych** (`firmware/src/astro.h/.cpp`):
   wschód, zachód, świt i zmierzch cywilny z równań NOAA dla dowolnej szerokości/długości,
-  offline, bez API. Dokładność ~1 min względem biblioteki `astral` w testach.
-  **Moduł NIE jest podłączony** do harmonogramu ani do rampy (Ramp Arbiter i MIN LUX nietknięte).
-  Podłączenie to osobna decyzja — `docs/06`, sekcja 4.
-- Testy: `test_astro.cpp` (ASan+UBSan, 141 asercji): 18 par data×miejsce (Kraków, Warszawa,
-  Gdańsk, Tromsø, Sydney) z tolerancją 2 min, kolejność zdarzeń, długość dnia, tzMin,
-  polarny dzień/noc (Tromsø), walidacja wejścia. Generator wartości: `astro_ref_gen.py`.
+  offline, bez API.
+- **Zachód słońca podłączony:** `obliczZachodSlonca` (wyliczający `sunsetMinutes` dla rampy
+  wieczornej) używa `astro::compute`. Poprzedni wzór odchylał się do −4,4 min (zima/wiosna);
+  nowy jest zgodny z `astral` ±2 min. Kontrakt bez zmian (minuty UTC, `-1` = brak zachodu),
+  więc strefa, zmiana czasu, `EVENING_ON_BEFORE_SUNSET_MIN` i fallback 19:00 działają jak dotąd.
+- **Nie podłączone:** świt i wschód (rampa poranna nadal stała godzina). Ramp Arbiter
+  i MIN LUX nietknięte. Decyzje — `docs/06`, sekcja 4.
+- Testy: `test_astro.cpp` (ASan+UBSan, 169 asercji): 22 pary data×miejsce (Kraków, Warszawa,
+  Gdańsk, Tromsø, Sydney, dom 52,1345/20,1418) z tolerancją 2 min, kolejność zdarzeń, długość dnia,
+  tzMin, polarny dzień/noc (Tromsø), walidacja wejścia. Generator wartości: `astro_ref_gen.py`.
+  `check_integration_hl.sh`: prawdziwe ciało `obliczZachodSlonca` vs `astral` (±2 min).
 - Wersja: 4.7.0+build.269.
 
 ---
