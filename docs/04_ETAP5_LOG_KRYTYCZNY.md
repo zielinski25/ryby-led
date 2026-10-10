@@ -42,9 +42,22 @@ Jeśli go dodamy, wpisujemy go do tabeli.
 - Komenda `/log_krytyczny` (alias `/krytyczny`): wysyła plik jako dokument (multipart,
   4 KB bloki, osobne połączenie TLS z `Connection: close`). Gdy plik pusty albo go nie ma,
   bot odpisuje komunikatem.
-- Menu: nowe wiersze **🔁 Aktualizacja OTA** (callback `ota`) i **🚨 Log krytyczny**
-  (callback `critlog`). Każdy raport jest 1 klik od menu. Komenda `/update` i `/ota` działa
-  jak dotąd.
+- **Menu pogrupowane (4.6.0+build.268).** Płaska siatka 2-kolumnowa, nagłówki sekcji to przyciski
+  `noop` (klik nic nie robi). Każdy raport jest **1 klik**, bez podmenu (warunek DoD):
+
+  | Sekcja | Przyciski (callback → komenda) |
+  |---|---|
+  | ⚙️ STEROWANIE | 💡 LED (`ledtog`), 🤖 Tryb (`trybtog`), 🔕 Powiad. (`notiftog`), 🔄 Restart ESP (`restart`) |
+  | 📊 STATUS | 📊 Status (`status` → `/status`), ⚡ Energia (`energy`) |
+  | 🌡️ CZUJNIKI | 🌡️ Temperatury (`temp` → `/temp`), 🔆 Lux & Światło (`light` → `/lux`), 🌊 Historia czujników (`sensorhist`) |
+  | ⏰ HARMONOGRAM | ⏰ Harmonogram (`schedule` → `/harmonogram`), 🧠 Adaptacja (`adapt`) |
+  | 🩺 DIAGNOSTYKA | 🚨 Log krytyczny (`critlog` → `/log_krytyczny`) |
+  | 📋 LOGI | 📋 Pobierz logi (`logs`), 🗑️ Wyczyść logi (`clrlogs`) |
+  | 🔁 OTA | 🔁 Aktualizacja OTA (`ota` → `/update`) |
+
+  Sekcja STEROWANIE jest dodatkiem do planu (plan wymienia 6 sekcji raportów); przyciski sterujące
+  nie są raportami, więc nie mieszają się z nimi. `/update` i `/ota` działają jak dotąd.
+  Test formalny: `firmware/tests/host/check_tg_menu.py` (krok 7 `run_tests.sh`).
 
 ## 4. Panel WWW (`panel/akwarium-firebase-panel-v14.html`)
 

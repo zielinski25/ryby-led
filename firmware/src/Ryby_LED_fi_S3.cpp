@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.5.0+build.267"
+#define RYBY_FW_VERSION "v4.6.0+build.268"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -3676,7 +3676,9 @@ bool sendTelegramInlineMenu() {
 
   // FIX-v44: snprintf zamiast ~15 konkatenacji String + - brak tymczasowych obiektów
   static char* _pl = nullptr;
-  const size_t PL_CAP = 1500;   // [4.4.0] +2 wiersze przycisków
+  // [4.5.0] Pogrupowany układ: wiersze-nagłówki (callback "noop") + przyciski 2-kolumnowe.
+  // Każdy raport nadal w JEDNYM kliknięciu (bez podmenu). Limit PSRAM: ~2 KB.
+  const size_t PL_CAP = 2600;
   if (!_pl) _pl = (char*)psramAllocSafe(PL_CAP);
   if (!_pl) { logPrintln("lvl=ERR tag=TG msg=\"inlineMenu blad: brak pamieci (_pl)\""); return false; }
   snprintf(_pl, PL_CAP,
@@ -3684,21 +3686,35 @@ bool sendTelegramInlineMenu() {
     "\"text\":\"%s\","
     "\"parse_mode\":\"HTML\","
     "\"reply_markup\":{\"inline_keyboard\":["
-    "[{\"text\":\"📊 Status\",\"callback_data\":\"status\"}"
-    ",{\"text\":\"🌡️ Temperatury\",\"callback_data\":\"temp\"}],"
-    "[{\"text\":\"⚡ Energia\",\"callback_data\":\"energy\"}"
-    ",{\"text\":\"🔆 Lux & Światło\",\"callback_data\":\"light\"}],"
-    "[{\"text\":\"🧠 Adaptacja\",\"callback_data\":\"adapt\"}"
-    ",{\"text\":\"📋 Pobierz logi\",\"callback_data\":\"logs\"}],"
+    // ⚙️ STEROWANIE
+    "[{\"text\":\"— ⚙️ STEROWANIE —\",\"callback_data\":\"noop\"}],"
     "[{\"text\":\"%s\",\"callback_data\":\"ledtog\"}"
     ",{\"text\":\"%s\",\"callback_data\":\"trybtog\"}],"
-    "[{\"text\":\"🌊 Historia czujników\",\"callback_data\":\"sensorhist\"}"
-    ",{\"text\":\"⏰ Harmonogram\",\"callback_data\":\"schedule\"}],"
     "[{\"text\":\"%s\",\"callback_data\":\"notiftog\"}"
+    ",{\"text\":\"🔄 Restart ESP\",\"callback_data\":\"restart\"}],"
+    // 📊 STATUS
+    "[{\"text\":\"— 📊 STATUS —\",\"callback_data\":\"noop\"}],"
+    "[{\"text\":\"📊 Status\",\"callback_data\":\"status\"}"
+    ",{\"text\":\"⚡ Energia\",\"callback_data\":\"energy\"}],"
+    // 🌡️ CZUJNIKI
+    "[{\"text\":\"— 🌡️ CZUJNIKI —\",\"callback_data\":\"noop\"}],"
+    "[{\"text\":\"🌡️ Temperatury\",\"callback_data\":\"temp\"}"
+    ",{\"text\":\"🔆 Lux & Światło\",\"callback_data\":\"light\"}],"
+    "[{\"text\":\"🌊 Historia czujników\",\"callback_data\":\"sensorhist\"}],"
+    // ⏰ HARMONOGRAM
+    "[{\"text\":\"— ⏰ HARMONOGRAM —\",\"callback_data\":\"noop\"}],"
+    "[{\"text\":\"⏰ Harmonogram\",\"callback_data\":\"schedule\"}"
+    ",{\"text\":\"🧠 Adaptacja\",\"callback_data\":\"adapt\"}],"
+    // 🩺 DIAGNOSTYKA
+    "[{\"text\":\"— 🩺 DIAGNOSTYKA —\",\"callback_data\":\"noop\"}],"
+    "[{\"text\":\"🚨 Log krytyczny\",\"callback_data\":\"critlog\"}],"
+    // 📋 LOGI
+    "[{\"text\":\"— 📋 LOGI —\",\"callback_data\":\"noop\"}],"
+    "[{\"text\":\"📋 Pobierz logi\",\"callback_data\":\"logs\"}"
     ",{\"text\":\"🗑️ Wyczyść logi\",\"callback_data\":\"clrlogs\"}],"
-    "[{\"text\":\"🔁 Aktualizacja OTA\",\"callback_data\":\"ota\"}"
-    ",{\"text\":\"🚨 Log krytyczny\",\"callback_data\":\"critlog\"}],"
-    "[{\"text\":\"🔄 Restart ESP\",\"callback_data\":\"restart\"}]"
+    // 🔁 OTA
+    "[{\"text\":\"— 🔁 OTA —\",\"callback_data\":\"noop\"}],"
+    "[{\"text\":\"🔁 Aktualizacja OTA\",\"callback_data\":\"ota\"}]"
     "]}}",
     tgChatId.c_str(), safeHeader.c_str(),
     ledBtn.c_str(), trybBtn.c_str(), notifBtn.c_str());
@@ -3841,6 +3857,7 @@ void pollTelegramCommands() {
         else if (cbData == "sensorhist") { tgDeferredCmd = TG_SENSOR_HIST; }
         else if (cbData == "schedule")   { tgDeferredCmd = TG_SCHEDULE; }
         else if (cbData == "notiftog")   { tgDeferredCmd = TG_NOTIF_TOGGLE; }
+        else if (cbData == "noop")      { /* [4.5.0] nagłówek sekcji menu — bez akcji (answerTelegramCallback wyżej) */ }
         else                             { tgDeferredCmd = TG_MENU; }
       }
     }

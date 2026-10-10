@@ -16,6 +16,7 @@
 #  5) check_integration_e5.sh: blok CRIT-LOG (Etap 5, 4.4.0) i helper OTA.
 #  6) check_integration_hl.sh: endpoint /api/history/long, hak saveHistoryPoint,
 #     AsyncURIMatcher::exact dla /api/history*.
+#  7) check_tg_menu.py: menu Telegrama (JSON, PL_CAP, callbacki, 1 klik do raportu).
 #
 #  Uruchomienie:  bash firmware/tests/host/run_tests.sh
 #  Wymaga: g++ (C++17), python3. Nie wymaga sieci.
@@ -61,5 +62,9 @@ bash "$HERE/check_integration_e5.sh"
 echo
 echo "== [6/6] kompilacja bloku HIST-LONG (4.5.0) + AsyncURIMatcher::exact =="
 bash "$HERE/check_integration_hl.sh"
+echo
+echo
+echo "== [7/7] menu Telegrama: JSON, PL_CAP, callbacki, raporty w 1 klik (4.6.0) =="
+python3 "$HERE/check_tg_menu.py"
 echo
 echo "OK: wszystkie kontrole hostowe zaliczone."

@@ -8,6 +8,22 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.6.0+build.268] MENU-GROUP — 2026-10-10
+
+- Co: Etap 5 planu upgrade, pkt 2 — **pogrupowane menu Telegrama** (`docs/04`, sekcja 3).
+  - Płaska siatka 2-kolumnowa z nagłówkami sekcji: ⚙️ STEROWANIE, 📊 STATUS, 🌡️ CZUJNIKI,
+    ⏰ HARMONOGRAM, 🩺 DIAGNOSTYKA, 📋 LOGI, 🔁 OTA.
+  - Nagłówki to przyciski `noop` (klik nic nie robi, tylko potwierdza callback).
+  - Każdy raport nadal w **jednym** kliknięciu, bez podmenu (warunek DoD).
+  - `PL_CAP` 1500 → 2600 (menu ~1,3 KB, bufor w PSRAM).
+- Testy: `check_tg_menu.py` (krok 7 w `run_tests.sh`): wyciąga JSON z kodu, podstawia atrapy,
+  sprawdza parsowanie, limit bufora, zgodność callbacków z dispatcherem, brak duplikatów,
+  obecność wszystkich raportów i sekcji. Negatywnie: za mały `PL_CAP` i literówka w callbacku
+  są wykrywane.
+- Wersja: 4.6.0+build.268. Nie testowano w Telegramie na płytce (`docs/04`, sekcja 6).
+
+---
+
 ## [4.5.0+build.267] HIST-LONG — 2026-10-10
 
 - Co: dopięcie Etapu 3 planu upgrade (`docs/02`, pkt 4; gap G8 w `docs/01`), szczegóły w
