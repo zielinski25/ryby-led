@@ -156,7 +156,7 @@
 // Wyświetlana na Dashboardzie (panel WWW) oraz w /api/status, żeby zawsze
 // było widać, jaka wersja jest faktycznie wgrana na płytce.
 // ═══════════════════════════════════════════════════════════
-#define RYBY_FW_VERSION "v4.4.0+build.266"
+#define RYBY_FW_VERSION "v4.5.0+build.267"
 #define FW_VERSION RYBY_FW_VERSION
 
 // ═══════════════════════════════════════════════════════════
@@ -473,6 +473,7 @@ void* psramAllocSafe(size_t size);
 #include "ota_github.h"   // [4.1.0 OTA-GITHUB] Etap 1 planu upgrade — OTA przez GitHub Releases
 #include "telemetry_spool.h"  // [4.2.0 SPOOL] Etap 3 — trwała telemetria (Spool V2)
 #include "critlog.h"            // [4.4.0 CRIT-LOG] Etap 5 — log_krytyczny.txt
+#include "histlong.h"           // [4.5.0 HIST-LONG] Etap 3 (G8) — historia długa, kubełki 30 min
 
 
 /*************************************************************
@@ -9860,6 +9861,7 @@ void setup() {
 
   // [4.4.0 CRIT-LOG] Etap 5 — trwały log krytyczny + zdarzenia startu.
   critlog::init(littlefsReady);
+  histlong::init(littlefsReady);   // [4.5.0 HIST-LONG]
   switch (bootResetReason) {
     case ESP_RST_PANIC:
       logCritical("BOOT", "restart po PANIC/CRASH - sprawdz coredump w logach");
@@ -11134,7 +11136,9 @@ webserialServer.on("/api/wifi/delete", HTTP_POST,
 // ══════════════════════════════════════════════════════════
 //  API: /api/history - historia 24h (CSV)
 // ══════════════════════════════════════════════════════════
-webserialServer.on("/api/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+// [4.5.0 HIST-LONG] AsyncURIMatcher::exact — goły string to prefiks: GET /api/history
+// przykrywał /api/history/clear i /api/history/long.
+webserialServer.on(AsyncURIMatcher::exact("/api/history"), HTTP_GET, [](AsyncWebServerRequest *request) {
   if (!littlefsReady || !LittleFS.exists(HISTORY_FILE)) {
     request->send(200, "text/plain", "");
     return;
@@ -11180,11 +11184,12 @@ webserialServer.on("/api/history", HTTP_GET, [](AsyncWebServerRequest *request) 
 // ══════════════════════════════════════════════════════════
 //  API: /api/history/clear - wyczyść historię
 // ══════════════════════════════════════════════════════════
-webserialServer.on("/api/history/clear", HTTP_POST, [](AsyncWebServerRequest *request) {
+webserialServer.on(AsyncURIMatcher::exact("/api/history/clear"), HTTP_POST, [](AsyncWebServerRequest *request) {
   historyClearPending = true;  // zablokuj saveHistoryPoint na czas usuwania
   if (littlefsReady && LittleFS.exists(HISTORY_FILE)) LittleFS.remove(HISTORY_FILE);
   if (littlefsReady && LittleFS.exists("/history_old.csv")) LittleFS.remove("/history_old.csv");
   if (littlefsReady && LittleFS.exists("/history_tmp.csv")) LittleFS.remove("/history_tmp.csv");
+  if (littlefsReady) histlong::clear();   // [4.5.0 HIST-LONG] /history_long*.csv + bufor kubełka
   histLineCount       = 0;     // [OK] FIX-v33f: reset cache po wyczyszczeniu
   histStartLine       = 0;     // [v87] OPT-B: reset offset po wyczyszczeniu
   compactHistPending  = false; // [v87] OPT-B: anuluj ewentualne kompaktowanie
@@ -11221,6 +11226,24 @@ webserialServer.on("/api/telemetry/status", HTTP_GET, [](AsyncWebServerRequest *
 // ═══════════════════════════════════════════════════════════
 //  API: /api/fs-list - lista plików LittleFS z rozmiarami
 // ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+//  API: /api/history/long - [4.5.0 HIST-LONG] historia długa CSV (kubełki 30 min)
+//  Archiwum + bieżący plik, odpowiedź chunked (bez całości w RAM). Jeden klient naraz.
+//  Nagłówek: ts,t_woda,t_plyta1,t_plyta2,lux_pokoj,lux_woda,pwm0..4,moc_W,tryb,minLux,adapt,probki
+// ══════════════════════════════════════════════════════════
+webserialServer.on(AsyncURIMatcher::exact("/api/history/long"), HTTP_GET, [](AsyncWebServerRequest *request) {
+  if (!histlong::streamBegin(millis())) {
+    request->send(503, "application/json", "{\"error\":\"busy_or_no_fs\"}");
+    return;
+  }
+  AsyncWebServerResponse *resp = request->beginChunkedResponse("text/csv",
+    [](uint8_t *buf, size_t maxLen, size_t) -> size_t {
+      return histlong::streamRead(buf, maxLen, millis());
+    });
+  resp->addHeader("Cache-Control", "no-cache");
+  request->send(resp);
+});
+
 // [4.4.0 CRIT-LOG] Etap 5 — log krytyczny: status i pobieranie (panel WWW, LAN).
 // /api/log-critical-download?old=1 → archiwum poprzedniej rotacji.
 webserialServer.on("/api/log-critical-status", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -12381,6 +12404,26 @@ void saveHistoryPoint() {
   // Aktualizuj szczytową moc dziś
   if (totalPowerW > peakPowerWToday) peakPowerWToday = totalPowerW;
   tsProduceFromHistory(pwmPct, totalPowerW);   // [4.2.0 SPOOL] próbka do TelemetryRing (Etap 3)
+
+  // [4.5.0 HIST-LONG] Etap 3 (G8) — długa historia: średnia z kubełka 30 min (/history_long.csv).
+  // Tylko z poprawnym czasem (NTP): ts unix ma sens dopiero wtedy.
+  {
+    time_t _hlNow = time(nullptr);
+    if (_hlNow > 1700000000) {
+      histlong::Sample _hs;
+      _hs.tWater   = tempWater;
+      _hs.tPlate1  = tempPlate1;
+      _hs.tPlate2  = tempPlate2;
+      _hs.luxRoom  = luxPokojowy;
+      _hs.luxWater = luxNadWoda;
+      for (int _i = 0; _i < 5; _i++) _hs.pwm[_i] = pwmPct[_i];
+      _hs.powerW   = totalPowerW;
+      _hs.autoMode = tryb;
+      _hs.minLux   = minLuxModeActive;
+      _hs.adapt    = regulacjaAdaptacyjnaWlaczona;
+      histlong::addSample((uint32_t)_hlNow, _hs);
+    }
+  }
 
   // ── Wykres godzinowy mocy: akumuluj Wh w bieżącej godzinie ──
   {

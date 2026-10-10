@@ -172,7 +172,7 @@ trwała telemetria, proces wytwórczy).
 | G5 | `log_krytyczny` + `/log_krytyczny` w Telegramie | ✅ | ❌ | P1 |
 | G6 | Dyscyplina CORS na wszystkich endpointach (+OPTIONS) | ✅ | do zweryfikowania/brak | P1 |
 | G7 | Zdalna obsługa panelu przez Firebase poza LAN | ✅ | częściowo (ścieżki `/aquarium/*` są, brak panelu w repo) | P1 |
-| G8 | Historia długoterminowa `/api/history/long` | ✅ | ❌ (tylko `/api/history`) | P2 |
+| G8 | Historia długoterminowa `/api/history/long` | ✅ | ✅ 4.5.0 (kod + testy hostowe; DoD na płytce w `docs/05`) | P2 |
 | G9 | Semver + CHANGELOG.md + build-gate przed release | ✅ | ❌ (vNNN, brak) | P1 |
 | G10 | Release'y z artefaktami: `firmware.bin` **+ `.elf`** (addr2line) + changelog | częściowo | ❌ (ostatni release: 107, czerwiec) | P1 |
 | G11 | Nowoczesne menu/raporty Telegram | ✅ (v3.34) | menu podstawowe | P2 |

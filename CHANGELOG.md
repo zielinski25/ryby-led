@@ -8,6 +8,28 @@ jako nienaruszony zapis historyczny — przeniesione 1:1 z nagłówka
 
 ---
 
+## [4.5.0+build.267] HIST-LONG — 2026-10-10
+
+- Co: dopięcie Etapu 3 planu upgrade (`docs/02`, pkt 4; gap G8 w `docs/01`), szczegóły w
+  `docs/05_ETAP3_HISTORIA_DLUGA.md`: **historia długa** pod wykresy tygodniowe.
+  - Nowy moduł `histlong` (`firmware/src/histlong.h/.cpp`): plik `/history_long.csv`
+    (+ `/history_long_old.csv`), jeden wiersz na kubełek 30 min (średnia z próbek 5-min,
+    `ts` unix, `probki`). Rotacja przy 40 KB. Odczyty poza zakresem (np. −127 z DS18B20)
+    nie wchodzą do średniej. Zapis tylko po NTP.
+  - Endpoint `GET /api/history/long` (`text/csv`, odpowiedź chunked, archiwum + bieżący,
+    nagłówek raz, jeden klient naraz — drugi dostaje 503).
+  - **Naprawa kolizji tras:** `GET /api/history` przykrywał `/api/history/clear`
+    (goły string = prefiks). Trzy trasy `/api/history*` przechodzą na `AsyncURIMatcher::exact`.
+  - `/api/history/clear` kasuje też pliki long.
+  - Panel `akwarium-firebase-panel-v14.html`: zakładka **Wykresy** ma kartę „Historia tygodniowa”
+    (4 wykresy SVG, przełączniki, pobieranie CSV). Tylko w LAN; zdalnie overlay.
+- Testy: `test_histlong.cpp` (47 asercji, ASan+UBSan), `check_integration_hl.sh`
+  (syntax-only endpointu i haka w `Ryby_LED_fi_S3.cpp`, sprawdzenie `exact`), testy jsdom
+  panelu (wykres, CSV, LAN/zdalnie). **Nie testowano na ESP32** — patrz `docs/05`, sekcja 7.
+- Niezmienione: Spool V2 (`telemetry_spool`), Ramp Arbiter, MIN LUX, coredump v240, log krytyczny.
+
+---
+
 ## [4.4.0+build.266] CRIT-LOG — 2026-10-10
 
 - Co: Etap 5 planu upgrade (`docs/02_PLAN_UPGRADE_ryby_led.md`, szczegóły w

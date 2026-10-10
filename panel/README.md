@@ -36,3 +36,8 @@ Bez tego Chrome/Edge blokuje żądania z innego originu do adresu LAN.
 ## Log krytyczny (v14, Etap 5)
 Zakładka **Logi** → karta „Log krytyczny”: rozmiar pliku, pobieranie i archiwum. Działa tylko w LAN
 (zdalnie pokazuje się komunikat, a z Telegrama jest komenda `/log_krytyczny`).
+
+## Wykresy tygodniowe (v14, Etap 3 — historia długa, 4.5.0)
+Zakładka **Wykresy** → karta „Historia tygodniowa (co 30 min)”: cztery wykresy z
+`GET /api/history/long` (kubełki 30 min, ok. 3 tygodnie na ESP). Tylko w LAN; zdalnie pokazuje
+się komunikat „niedostępne przez Firebase”. Przycisk „⬇ CSV” pobiera surowy plik z ESP.

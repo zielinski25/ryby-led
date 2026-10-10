@@ -884,11 +884,33 @@ input[type="time"].cfg-input{color-scheme:dark}
 </div>
 
 <!-- ═══ PAGE: WYKRESY ═══ -->
+<!-- [4.5.0 HIST-LONG] Wykresy tygodniowe: /api/history/long (LAN). Zdalnie — overlay wyk-dis. -->
 <div class="page" id="p-wykresy">
-  <div class="page-disabled">
+  <div class="card">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><div class="card-icon icon-power">📈</div>Historia tygodniowa (co 30 min)</div>
+      <span class="chevron open">▼</span>
+    </div>
+    <div class="card-body">
+      <div class="row" style="padding-top:0">
+        <div><div class="row-label">Stan</div><div class="row-desc" id="wyk-state">—</div></div>
+        <button class="save-btn" style="margin-top:0" onclick="wykRefresh()">↻ Odśwież</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0 10px;font-size:.72rem">
+        <label><input type="checkbox" id="wyk-sel-0" checked onchange="wykToggle(0,this)"> Temp. wody</label>
+        <label><input type="checkbox" id="wyk-sel-1" checked onchange="wykToggle(1,this)"> Lux nad wodą</label>
+        <label><input type="checkbox" id="wyk-sel-2" checked onchange="wykToggle(2,this)"> Moc LED</label>
+        <label><input type="checkbox" id="wyk-sel-3" checked onchange="wykToggle(3,this)"> Temp. płyty 1</label>
+        <a id="wyk-dl" class="save-btn" style="text-decoration:none;margin-top:0;background:var(--navy)" href="#" download="history_long.csv">⬇ CSV</a>
+      </div>
+      <div id="wyk-charts"></div>
+      <div class="row-desc" style="font-size:.66rem">Dwa pliki na ESP (bieżący + archiwum), ok. 10 dni każdy. Punkt = średnia z kubełka 30 min. Puste miejsca = przerwa w danych (brak NTP, błąd czujnika lub restart).</div>
+    </div>
+  </div>
+  <div class="page-disabled" id="wyk-dis">
     <div class="dis-icon">📈</div>
     <h3>Wykresy niedostępne przez Firebase</h3>
-    <p>Wykresy historyczne pobierane są z pliku <code style="font-family:'Space Mono',monospace;color:var(--cyan)">/history.csv</code> bezpośrednio z ESP32. Wymaga lokalnego połączenia.</p>
+    <p>Historia tygodniowa pochodzi z pliku <code style="font-family:'Space Mono',monospace;color:var(--cyan)">/history_long.csv</code> na ESP32 i wymaga lokalnego połączenia.</p>
     <a id="local-link-wykresy" href="#" target="_blank">🔗 Otwórz lokalny panel ESP (Wykresy) →</a>
     <div style="margin-top:20px;font-size:.78rem;color:var(--text-dim)">
       Adres ESP: <span id="local-ip-wykresy" style="color:var(--cyan);font-family:'Space Mono',monospace">pobieranie...</span>
@@ -1718,6 +1740,7 @@ function showTab(name,el){
   PAGES.forEach(function(p){ var pg=gid("p-"+p); if(pg) pg.classList.remove("active"); });
   var t=gid("p-"+name); if(t) t.classList.add("active");
   if(name==="logi") critLogRefresh();
+  if(name==="wykresy") wykRefresh();   // [4.5.0 HIST-LONG]
 }
 
 // ── [v14/E5] LOG KRYTYCZNY (LAN: /api/log-critical-status, /api/log-critical-download) ──
@@ -1740,6 +1763,107 @@ async function critLogRefresh(){
   } catch(e){
     if(st) st.textContent = "błąd odczytu: " + e.message;
   }
+}
+
+// ── [4.5.0 HIST-LONG] WYKRESY TYGODNIOWE (LAN: /api/history/long) ──
+// Wykresy rysowane wyłącznie z liczb (SVG path) — tekst z CSV nie trafia do HTML.
+var WYK_SERIES = [
+  { key: "t_woda",   label: "Temperatura wody",    unit: "°C", dec: 1, color: "#22d3ee" },
+  { key: "lux_woda", label: "Lux nad wodą",        unit: "lx", dec: 0, color: "#facc15" },
+  { key: "moc_W",    label: "Moc LED",             unit: "W",  dec: 0, color: "#f472b6" },
+  { key: "t_plyta1", label: "Temperatura płyty 1", unit: "°C", dec: 1, color: "#34d399" }
+];
+var _wykRows = null;
+function wykParseCsv(text){
+  var lines = String(text || "").split(/\r?\n/).filter(function(l){ return l.length > 0; });
+  if(!lines.length) return { head: [], rows: [] };
+  var head = lines[0].split(",");
+  var rows = [];
+  for(var i = 1; i < lines.length; i++){
+    var f = lines[i].split(",");
+    if(f.length < head.length) continue;          // ucięty wiersz — pomijamy
+    var o = {};
+    for(var j = 0; j < head.length; j++) o[head[j]] = f[j];
+    var ts = Number(o.ts);
+    if(!isFinite(ts) || ts <= 0) continue;        // bez czasu nie ma osi X
+    o._ts = ts;
+    rows.push(o);
+  }
+  rows.sort(function(a, b){ return a._ts - b._ts; });
+  return { head: head, rows: rows };
+}
+function wykSvgPath(rows, key, W, H){
+  var pad = 6;
+  var vals = rows.map(function(r){ var v = r[key]; return (v === "" || v === undefined) ? NaN : Number(v); });
+  var fin = vals.filter(function(v){ return isFinite(v); });
+  if(!fin.length) return null;
+  var min = Math.min.apply(null, fin), max = Math.max.apply(null, fin);
+  if(max - min < 1e-9){ min -= 1; max += 1; }
+  var t0 = rows[0]._ts, span = Math.max(1, rows[rows.length - 1]._ts - t0);
+  var d = "", pen = false;
+  for(var i = 0; i < rows.length; i++){
+    var v = vals[i];
+    if(!isFinite(v)){ pen = false; continue; }   // przerwa w danych
+    var x = pad + (rows[i]._ts - t0) / span * (W - 2 * pad);
+    var y = H - pad - (v - min) / (max - min) * (H - 2 * pad);
+    d += (pen ? " L" : " M") + x.toFixed(1) + " " + y.toFixed(1);
+    pen = true;
+  }
+  return { d: d, min: min, max: max, last: fin[fin.length - 1] };
+}
+function wykRender(parsed){
+  var box = gid("wyk-charts"); if(!box) return;
+  var rows = parsed.rows;
+  if(!rows.length){ box.innerHTML = ""; return; }
+  var W = 1000, H = 120;
+  var fmtTs = function(t){
+    return new Date(t * 1000).toLocaleString("pl-PL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  };
+  var html = "<div class=\"row-desc\" style=\"font-size:.7rem;margin-bottom:6px\">Zakres: " +
+    fmtTs(rows[0]._ts) + " → " + fmtTs(rows[rows.length - 1]._ts) + " · " + rows.length + " pkt</div>";
+  WYK_SERIES.forEach(function(s, idx){
+    var p = wykSvgPath(rows, s.key, W, H);
+    var hidden = gid("wyk-sel-" + idx) && !gid("wyk-sel-" + idx).checked ? " style=\"display:none\"" : "";
+    html += "<div class=\"wyk-series\" data-idx=\"" + idx + "\"" + hidden + " style=\"margin-bottom:12px\">";
+    html += "<div style=\"display:flex;justify-content:space-between;font-size:.72rem;color:var(--text-dim)\">" +
+      "<span>" + s.label + "</span>" +
+      (p ? "<span>ost. " + p.last.toFixed(s.dec) + " " + s.unit + " · min " + p.min.toFixed(s.dec) + " · max " + p.max.toFixed(s.dec) + "</span>" : "<span>brak danych</span>") +
+      "</div>";
+    if(p){
+      html += "<svg viewBox=\"0 0 " + W + " " + H + "\" preserveAspectRatio=\"none\" style=\"width:100%;height:120px;background:rgba(255,255,255,.03);border-radius:6px\">" +
+        "<path d=\"" + p.d + "\" fill=\"none\" stroke=\"" + s.color + "\" stroke-width=\"2\" vector-effect=\"non-scaling-stroke\"/></svg>";
+    }
+    html += "</div>";
+  });
+  box.innerHTML = html;
+}
+function wykToggle(idx, cb){
+  var el = document.querySelector("#wyk-charts .wyk-series[data-idx=\"" + idx + "\"]");
+  if(el) el.style.display = cb.checked ? "" : "none";
+}
+async function wykRefresh(){
+  var st = gid("wyk-state");
+  if(!(await espProbeLan())){
+    if(st) st.textContent = "tylko w sieci lokalnej";
+    var d0 = gid("wyk-dis"); if(d0) d0.style.display = "";
+    return;
+  }
+  var d = gid("wyk-dis"); if(d) d.style.display = "none";
+  var base = espLocalBase();
+  var dl = gid("wyk-dl"); if(dl) dl.href = base + "/api/history/long";
+  var ctrl = new AbortController();
+  var tm = setTimeout(function(){ ctrl.abort(); }, 15000);
+  try {
+    var r = await fetch(base + "/api/history/long", { cache: "no-store", signal: ctrl.signal });
+    if(r.status === 503) throw new Error("ESP zajęty, spróbuj za chwilę");
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    var parsed = wykParseCsv(await r.text());
+    _wykRows = parsed.rows;
+    wykRender(parsed);
+    if(st) st.textContent = parsed.rows.length ? (parsed.rows.length + " wierszy · odświeżono " + new Date().toLocaleTimeString("pl-PL")) : "brak danych (ESP po restarcie albo bez NTP)";
+  } catch(e){
+    if(st) st.textContent = "błąd: " + (e.name === "AbortError" ? "timeout" : e.message);
+  } finally { clearTimeout(tm); }
 }
 
 // ── CARD TOGGLE ─────────────────────────────────────

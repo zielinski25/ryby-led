@@ -111,7 +111,7 @@ Strony `/spool` na FS nie przeszkadzają wersji 4.1.1 (nie są czytane). Firebas
 
 ## 7. Znane ograniczenia (świadome)
 - **Okno utraty przy zaniku zasilania (online):** do 30 min próbek z RAM. Zapisane strony są bezpieczne.
-- **Brak `/api/history/long`** i kanałów wykresów tygodniowych — kolejny krok Etapu 3 (wymaga też panelu, Etap 4).
+- **Historia długa** (`/api/history/long`, wykresy tygodniowe): zrobiona w 4.5.0, patrz `docs/05_ETAP3_HISTORIA_DLUGA.md`.
 - **Retencja RTDB:** `/aquarium/telemetry` rośnie ok. 55 KB/dobę (288 × ~190 B) — czyszczenie starych węzłów do ustalenia.
 - **Opóźnienie wysyłki:** online dane idą partiami przy spill (≈ co 30 min), nie co 5 min.
 - Ring i strony są **per sesja nonce** — rekordy z różnych startów są rozróżnialne, ale nie ma jeszcze
