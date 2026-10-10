@@ -3,6 +3,19 @@
 Natywna wersja `panel/ryby-mobile.html` (ta sama logika, te same komendy i pola statusu).
 Zakładki: Główna, Światło, Pompa, Energia, Ustawienia. Komunikacja tylko z Firebase RTDB przez HTTPS.
 
+## Budowanie z PowerShell (Windows, najprościej)
+
+Skrypt sam sprawdza Javę, pobiera Android SDK, akceptuje licencje, buduje APK i kopiuje go na pulpit.
+Uruchom w PowerShell 5 (z folderu repo albo z rozpakowanego ZIP-a):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\android\build_apk.ps1
+```
+
+Wynik: `ryby-led-4.7.2-debug.apk` na pulpicie. Pierwsze uruchomienie trwa kilkanaście minut (pobieranie SDK i Gradle).
+Jeśli skrypt każe zainstalować Javę, zamknij PowerShell, otwórz go ponownie i uruchom skrypt jeszcze raz.
+Skrypt nie był testowany na Windows w środowisku, w którym powstawał. Jeśli zgłosi błąd, wklej jego treść.
+
 ## Budowanie (Android Studio, Windows)
 
 1. Zainstaluj Android Studio i wybierz w ustawieniach JDK 17–21 (jbr-21 jest w pakiecie).
