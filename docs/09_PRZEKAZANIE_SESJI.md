@@ -188,3 +188,77 @@ Te pliki były w `/tmp` i **nie są w repo**. Nowa sesja może je odtworzyć z o
 3. Zapytać właściciela: rotacja sekretów zrobiona? czy uruchomił najnowszą wersję i jak wygląda?
 4. Uruchomić `bash firmware/tests/host/run_tests.sh` — oczekiwany EXIT 0.
 5. Dopiero potem zmiany. Każdy commit krótko opisać po polsku.
+
+---
+
+## 11. Indeks wszystkich prac (commity na branchu)
+
+Pełna lista: `git log --oneline` na `arena/92c66e20-ryby-led`. Poniżej najważniejsze commity pogrupowane po obszarach.
+
+### 11.1 Badania i plan
+- `36e1dd1` — research porównawczy Ryby vs Centrala Pieca + plan upgrade (etapy 0–7) → `docs/01`, `docs/02`.
+- `3876736` — `RELEASE.md` (proces wydawania) + status etapów 0–1.
+
+### 11.2 Etap 0 — porządek w repo i wersjonowanie
+- `8e4776e` — struktura `firmware/`, `docs/`, `CHANGELOG.md` (semver), `build_gate.ps1`, usunięcie starego zipa.
+
+### 11.3 Etap 1 — OTA przez GitHub Releases
+- `cb16f00` — OTA przez GitHub Releases (port z Centrali Pieca), release **v4.1.0** (tag `v4.1.0`).
+- `037cd7a` — poprawki kompilacji (IDF 5.5, deklaracje w przodzie).
+- Czeka: flash USB w domu i test OTA.
+
+### 11.4 Etap 2 — bezpieczeństwo Firebase
+- `3914604` — sekrety przeniesione do `src/secrets.h` (poza repo), szablon `secrets.example.h`.
+- `6ef7dcd` — OTA i token Telegrama z `secrets.h`, `RYBY_OTA_PASSWORD` w środowisku, skaner sekretów w testach.
+- `3a731a9` — skrypt `firmware/scripts/tls_dump_chain.ps1` (odczyt łańcucha TLS, poza repo).
+- `b7f65ec` — naprawa skanera sekretów w teście Androida (usunięte znane wartości).
+- Otwarte: **rotacja Database Secret** w Firebase, zmiana `CMD_TOKEN` i hasła OTA (§4).
+
+### 11.5 Etap 3 — trwała telemetria
+- `c3fd1c9` — TelemetryRing w PSRAM, Spool V2 (CRC), `sessionNonce`, replay FIFO, `/api/telemetry/status` (wersja 4.2.0).
+- `d5303b9` — historia długa `/api/history/long` (kubełki 30 min) i wykres tygodniowy w panelu (4.5.0).
+- Otwarte: test na płytce (zanik zasilania 5 min w trakcie wysyłki) wg `docs/03`.
+
+### 11.6 Etap 4 — panel WWW (CORS, OTA, tryb zdalny)
+- `4484c6c` — `akwarium-firebase-panel-v13.html` bez sekretów (sekrety z localStorage).
+- `199a803` — CORS-PNA + OPTIONS, panel **v14** (tryb LAN/zdalnie, karta OTA, skan Wi-Fi) (4.3.0).
+- `b9b1ae3` — komendy zdalne panelu do kolejki `/aquarium/commands` (4.7.1).
+- `5a4e5fa` — zapis AUTO zdalnie jako komenda `autosave` (4.7.2).
+- `8bf5596` — zakres `minLuxTarget` 500–8000 zgodny z firmware.
+- `cc851d1` — parser `configType: luxSim` w firmware (symulacja LUX z panelu).
+- `8d3b8bf` — checklista wdrożenia `docs/07`; panel v15 zamknięty, zostaje v14.
+- Otwarte: test z telefonu na LTE (`docs/07`, krok 4).
+
+### 11.7 Etap 5 — log krytyczny i Telegram
+- `9fe22e7` — `log_krytyczny.txt` na LittleFS, `/api/log-critical-download`, komenda `/log_krytyczny`, automatyczny coredump (4.4.0).
+- `bbbb14a` — pogrupowane menu Telegrama (sekcje + 1 klik do raportu) (4.6.0).
+- Otwarte: test na płytce wg `docs/04`, sekcja 6.
+
+### 11.8 Etap 6 — astronomia i RTC
+- `506da8a`, `2f43d79` — moduł `astro` (NOAA, świt/wschód/zachód/zmierzch), 197 asercji, `docs/06`.
+- `9665611` — lokalizacja z panelu (NVS, `GET/POST /api/location`).
+- `4ad2c68` — karta „Dzień” w panelu (krzywa doby, harmonogram).
+- `3fbab63` — poranna rampa (stała / świt / wschód + przesunięcie), zegar RTC DS1307/DS3231 (`rtc13`, 59 asercji), endpointy `/api/rtc` (4.7.0+build.270).
+- Otwarte: identyfikacja modułu RTC (nadruk na płytce), test na płytce wg `docs/06`, sekcja 5.
+
+### 11.9 Aplikacje na telefon
+- `466e0f5` — pierwsza wersja jako PWA z katalogiem `panel/mobile` (test 122 PASS). **Usunięta** w `cf6fa06`.
+- `cf6fa06` — jednoplikowa aplikacja `panel/ryby-mobile.html` (logika między `LOGIC-BEGIN` a `LOGIC-END`, test 116 PASS, E2E 36 PASS).
+- Otwarte dla wersji HTML: adres HTTPS (GitHub Pages) i test na telefonie. **Wybrano wersję Android** (poniżej).
+
+### 11.10 Aplikacja Android (natywna, Kotlin + Compose)
+- `4aacac2` — port `ryby-mobile.html` do Kotlin + Compose (`android/`), test kontraktu `check_android_app.js`.
+- `024f581` — `android/build_apk.ps1` (PowerShell 5, buduje APK bez Android Studio) + README.
+- `e3eea86` — naprawa brakującego importu `rememberSaveable` (błąd z Android Studio).
+- `55ccfbf` — ciemny motyw, nagłówek ze statusem, kafelki, ikona adaptacyjna ryby.
+- `e00cace` — wygląd jak Piec (`ui/Theme.kt`: `Pal`, `Dimens`, `Txt`), test kontrastu WCAG AA (16 par), zależność `material-icons-extended`, `docs/08`.
+- `6f8730c` — dopracowany wygląd: gradienty, poblaski, ikony w kaflach, pasek mocy, nagłówki sekcji.
+- Status: kod gotowy, **kompilacja niesprawdzona** (brak SDK w sandboxie), właściciel jeszcze nie potwierdził wyglądu na telefonie.
+
+### 11.11 Dokumentacja
+- `d166ac0` — `docs/09_PRZEKAZANIE_SESJI.md` (ten plik).
+- `docs/08_DESIGN_APLIKACJI.md` — research wyglądu (Piec, zasady ciemnego motywu, WCAG, decyzje).
+- `docs/02_PLAN_UPGRADE_ryby_led.md` — tabela statusów etapów (do uzupełnienia o aplikację Android).
+
+### 11.12 Gdzie są pliki poza repo
+- Paczka z całym repo i historią: `ryby-led-pelne-2026-10-31.zip` na Dysku Google (ID `10i3hLCw9nQprBhWHV3QOfIo-AxTD9UD2`) i w folderze roboczym sesji. Paczka pochodzi z 2026-10-31, przed tym indeksem.
