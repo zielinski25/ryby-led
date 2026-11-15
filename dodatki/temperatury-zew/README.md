@@ -2,7 +2,7 @@
 
 > **Korekta:** poniższy opis pierwotnej poprawki 0.31.92 dotyczy niechcianych zmian pulpitu. Nie stosuj jej ponownie. Zastępuje ją `android-0.31.92-do-0.31.93-wykresy.patch`: przywraca pulpit aplikacji do 0.31.91 i umieszcza trzy serie w wykresach. Skrypt `buduj-wykresy-0.31.93.ps1` sprawdza poprawkę, buduje i po sukcesie kopiuje APK na pulpit Windows. Szczegóły: `WYKRESY-0.31.93.md`.
 >
-> Przykładowa poprawka firmware 3.57.9 dotyczyła tylko odczytów statusu, **nie zapewnia zapisu ich historii do wykresów**. Nie jest aktualnym rozwiązaniem i nie należy jej wgrywać.
+> Przykładowa poprawka firmware 3.57.9 dotyczyła tylko odczytów statusu, **nie zapewnia zapisu ich historii do wykresów**. Nie jest aktualnym rozwiązaniem i nie należy jej wgrywać. Po potwierdzeniu wersji 3.57.9 przygotowano kandydata obejmującego telemetrię: `CENTRALA-3.57.9-ZEW.md`.
 
 ## Archiwalny opis plików 0.31.92
 

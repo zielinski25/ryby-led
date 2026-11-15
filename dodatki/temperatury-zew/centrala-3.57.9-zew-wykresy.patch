@@ -1,0 +1,198 @@
+--- a/src/main_centrala.cpp
++++ b/src/main_centrala.cpp
+@@ -1,3 +1,7 @@
++// [3.57.9-zew] Temperatury DHT22/BME do statusu i minutowej historii Firebase.
++// Wylacznie diagnostyka; sterowanie i korekta wilgotnosci nadal uzywaja DS18B20.
++// Nowa probka zajmuje dotychczasowe 4 bajty paddingu struktury; znacznik
++// odroznia ja od starych 80-bajtowych rekordow spool. Format lokalnego CSV bez zmian.
+ // FIRMWARE_VERSION v3.57.8 -> v3.57.9 (2026-11-01) — LIMITY SIECI W SEKUNDACH.
+ //
+ // Zgloszenie uzytkownika (1.11): raport nadzoru po restarcie pokazal
+@@ -5754,6 +5758,32 @@
+ // ── [FIX-WDT] Task Watchdog Timer — konfiguracja ─────────────────────────
+ static const uint32_t WDT_TIMEOUT_MS = 15000UL;
+ 
++// Dodatkowe odczyty tylko diagnostyczne; atomowy snapshot między taskami.
++static portMUX_TYPE g_tempDiagMux = portMUX_INITIALIZER_UNLOCKED;
++static float g_tempDhtDiag = NAN, g_tempBmpDiag = NAN;
++static uint64_t g_tempDhtAtUs = 0, g_tempBmpAtUs = 0;
++static bool g_bmpDiagGotowy = false;
++static void zapiszTempDiag(bool dht, float v) {
++  const uint64_t at = (uint64_t)esp_timer_get_time();
++  portENTER_CRITICAL(&g_tempDiagMux);
++  if (dht) { g_tempDhtDiag = v; g_tempDhtAtUs = at; }
++  else { g_tempBmpDiag = v; g_tempBmpAtUs = at; }
++  portEXIT_CRITICAL(&g_tempDiagMux);
++}
++static float czytajTempDiag(bool dht) {
++  float v; uint64_t at;
++  portENTER_CRITICAL(&g_tempDiagMux);
++  if (dht) { v = g_tempDhtDiag; at = g_tempDhtAtUs; }
++  else { v = g_tempBmpDiag; at = g_tempBmpAtUs; }
++  portEXIT_CRITICAL(&g_tempDiagMux);
++  const uint64_t now = (uint64_t)esp_timer_get_time();
++  return isfinite(v) && now >= at && now - at <= 15000000ULL ? v : NAN;
++}
++static String jsonTempDiag(bool dht) {
++  const float v = czytajTempDiag(dht);
++  return isfinite(v) ? String(v, 1) : String("null");
++}
++
+ float cisnienieOdczytane = 0.0;
+ float zmianaCisnienia = 0;
+ bool alarmOgrzewanieWlaczone = false;
+@@ -5954,7 +5984,7 @@
+ // falszywie; tutaj celowo stala kompilacyjna, zeby tego uniknac).
+ // v1.1.0: system logow FS (log_krytyczny.txt, logCircularTrimA, priorytet
+ // log_a/log_b) + interlock AUTO — pelny opis w CHANGELOG na samej gorze pliku.
+-static const char* FIRMWARE_VERSION = "v3.57.9";
++static const char* FIRMWARE_VERSION = "v3.57.9-zew";
+ 
+ // ════════════════════════════════════════════════════════
+ // [PUNKT 6 — Telegram] Bot statusu/sterowania, wzorowany na architekturze
+@@ -21278,7 +21308,22 @@
+   uint32_t qualityBits;
+   uint16_t simulatedBits;
+   uint16_t ageS[TELEMETRY_CH_COUNT];
++  // Wypelnienie bajtow 76..79, dotychczas tylko padding. Nie zmienia ABI.
++  int16_t tDhtDiagX10;
++  int16_t tBmpDiagX10;
+ };
++
++// W kanalach 0..10 zajete sa bity 0..21. Stara produkcyjna probka ma
++// pozostale bity zerowe. Sygnatura chroni przed interpretacja starego paddingu.
++static constexpr uint32_t TEMP_DIAG_MARK_MASK = 0xFFC00000UL;
++static constexpr uint32_t TEMP_DIAG_MARK = 0xD5C00000UL;
++static constexpr int16_t TEMP_DIAG_MISSING = -32768;
++static bool telemetryHasTempDiag(const TelemetrySample &s) {
++  return (s.qualityBits & TEMP_DIAG_MARK_MASK) == TEMP_DIAG_MARK;
++}
++static int16_t encodeTempDiag(float t, float lo, float hi) {
++  return isfinite(t) && t >= lo && t <= hi ? (int16_t)lroundf(t * 10.0f) : TEMP_DIAG_MISSING;
++}
+ 
+ static_assert(TELEMETRY_CH_COUNT == 11, "Telemetry schema V1 requires exactly 11 channels");
+ static_assert(sizeof(TelemetrySample) == 80, "TelemetrySample ABI changed: expected 80 B");
+@@ -21296,6 +21341,8 @@
+ static_assert(offsetof(TelemetrySample, qualityBits) == 48, "TelemetrySample.qualityBits offset changed");
+ static_assert(offsetof(TelemetrySample, simulatedBits) == 52, "TelemetrySample.simulatedBits offset changed");
+ static_assert(offsetof(TelemetrySample, ageS) == 54, "TelemetrySample.ageS offset changed");
++static_assert(offsetof(TelemetrySample, tDhtDiagX10) == 76, "TelemetrySample DHT offset changed");
++static_assert(offsetof(TelemetrySample, tBmpDiagX10) == 78, "TelemetrySample BME offset changed");
+ static void telemetryFormatRecordId(const TelemetrySample &s, char *out, size_t outCap);
+ 
+ // [COMMIT-B] SPSC TelemetryRing: producer = historiaZapiszProbke() / Core 1,
+@@ -23547,6 +23594,9 @@
+       out.simulatedBits |= (uint16_t)(1U << i);
+     }
+   }
++  out.tDhtDiagX10 = encodeTempDiag(czytajTempDiag(true), -40.0f, 80.0f);
++  out.tBmpDiagX10 = encodeTempDiag(czytajTempDiag(false), -40.0f, 85.0f);
++  out.qualityBits |= TEMP_DIAG_MARK;
+   return true;
+ }
+ 
+@@ -28524,6 +28574,8 @@
+   j += F("\"wifi_ssid\":\""); j += (WiFi.status() == WL_CONNECTED ? WiFi.SSID() : ""); j += F("\",");
+   j += F("\"rssi\":"); j += String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0); j += F(",");
+   j += F("\"t_zewn\":"); j += String(temperaturaNaZewnatrz, 1); j += F(",");
++  j += F("\"t_zewn_2\":"); j += jsonTempDiag(true); j += F(",");
++  j += F("\"t_zewn_3\":"); j += jsonTempDiag(false); j += F(",");
+   j += F("\"t_bojler\":"); j += String(temperaturaBojlera, 1); j += F(",");
+   j += F("\"t_ogrz\":"); j += String(temperaturaOgrzewania, 1); j += F(",");
+   j += F("\"t_ogrz_sr\":"); j += String(temperaturaOgrzewaniaSrednia, 1); j += F(",");
+@@ -31258,11 +31310,20 @@
+   bool symCisnieniaTeraz = symulacjaTrwa(symulacjaCisnieniaAktywna, symulacjaCisnieniaDo, "cisnienie");
+   float cisnienieOdczytaneLok;
+   if (symCisnieniaTeraz) {
++    zapiszTempDiag(false, NAN); // symulacja ciśnienia nie jest temperaturą BME
+     cisnienieOdczytaneLok = symulowaneCisnienie;
+     telemetryMarkAccepted(TELEMETRY_CH_PRESSURE, telemetryPressureNowMs, true);
+   } else {
+     telemetryMarkAttempt(TELEMETRY_CH_PRESSURE, telemetryPressureNowMs);
+     cisnienieOdczytaneLok = ((bmp.readPressure() / 100) + 18);
++    // Nie czytaj temperatury niezainicjalizowanego czujnika; błąd ciśnienia
++    // także unieważnia próbkę (I2C potrafi zwrócić pozornie poprawne zero).
++    float tBmp = NAN;
++    if (g_bmpDiagGotowy && isfinite(cisnienieOdczytaneLok) &&
++        cisnienieOdczytaneLok >= 318.0f && cisnienieOdczytaneLok <= 1118.0f) {
++      tBmp = bmp.readTemperature();
++    }
++    zapiszTempDiag(false, isfinite(tBmp) && tBmp >= -40.0f && tBmp <= 85.0f ? tBmp : NAN);
+     if (!isfinite(cisnienieOdczytaneLok)) {
+       telemetryMarkInvalid(TELEMETRY_CH_PRESSURE);
+     } else {
+@@ -31305,18 +31366,20 @@
+   // [FIX DHT-IWDT] dht.readHumidity() (Adafruit, blokujace przerwania)
+   // zastapione read_dht() z dhtESP32-rmt (odczyt sprzetowy przez RMT, bez
+   // noInterrupts()) — patrz uzasadnienie przy #include "dhtESP32-rmt.h"
+-  // wyzej w pliku. Temperatura z DHT22 jest tu celowo ignorowana (pomijana)
+-  // — temperaturaNaZewnatrz pochodzi wylacznie z DS18B20 (Czujnik_DS(),
+-  // patrz komentarz FIX nizej), wiec liczy sie tylko wilgotnosc.
+-  float dhtTempPomijana;
++  // wyzej w pliku. Temperatura DHT jest tylko diagnostyczna; sterowanie
++  // i obliczenia wilgotnosci nadal korzystaja z DS18B20.
++  float dhtTempPomijana = NAN;
+   float wilgotnoscOdczytanaLok;
+   const uint64_t telemetryRhNowMs = telemetryMonotonicMs();
+   if (symulacjaTrwa(symulacjaWilgotnosciAktywna, symulacjaWilgotnosciDo, "wilgotnosc")) {
++    zapiszTempDiag(true, NAN); // symulowana wilgotnosc nie jest temperatura
+     wilgotnoscOdczytanaLok = symulowanaWilgotnosc;
+     telemetryMarkAccepted(TELEMETRY_CH_RH, telemetryRhNowMs, true);
+   } else {
+     telemetryMarkAttempt(TELEMETRY_CH_RH, telemetryRhNowMs);
+     uint8_t dhtErr = read_dht(dhtTempPomijana, wilgotnoscOdczytanaLok, DHT_PIN, DHT22);
++    zapiszTempDiag(true, dhtErr == DHT_OK && isfinite(dhtTempPomijana) &&
++        dhtTempPomijana >= -40.0f && dhtTempPomijana <= 80.0f ? dhtTempPomijana : NAN);
+     // [v3.57.4] 0,0 % z DHT22 to odczyt smieciowy, nie pomiar - traktujemy go
+     // jak blad (zostaje poprzednia dobra wartosc). W kotlowni nie ma 0 %.
+     if (dhtErr != DHT_OK || !isfinite(wilgotnoscOdczytanaLok) || wilgotnoscOdczytanaLok <= 0.1f) {
+@@ -40294,8 +40357,21 @@
+   telemetryJsonAppend(buf, cap, used, "\"k\":%u,\"s\":%u,",
+                       (unsigned)s.klapaDeg, (unsigned)s.syberkoDeg);
+   telemetryJsonAppend(buf, cap, used, "\"state\":%u,\"q\":%lu,\"sim\":%u,",
+-                      (unsigned)s.stateBits, (unsigned long)s.qualityBits,
++                      (unsigned)s.stateBits,
++                      (unsigned long)(telemetryHasTempDiag(s) ? (s.qualityBits & ~TEMP_DIAG_MARK_MASK) : s.qualityBits),
+                       (unsigned)s.simulatedBits);
++  if (telemetryHasTempDiag(s)) {
++    // Liczby w stopniach C, bez uzycia float printf i z zachowaniem -0.1.
++    auto dodajTemp = [&](const char *key, int16_t value, int16_t lo, int16_t hi) {
++      if (value < lo || value > hi) return; // w tym TEMP_DIAG_MISSING
++      const int v = value;
++      const unsigned mag = (unsigned)(v < 0 ? -v : v);
++      telemetryJsonAppend(buf, cap, used, "\"%s\":%s%u.%u,", key,
++                          v < 0 ? "-" : "", mag / 10U, mag % 10U);
++    };
++    dodajTemp("t_zewn_2", s.tDhtDiagX10, -400, 800);
++    dodajTemp("t_zewn_3", s.tBmpDiagX10, -400, 850);
++  }
+   telemetryJsonAppend(buf, cap, used, "\"age\":[");
+   for (uint8_t i = 0; i < TELEMETRY_CH_COUNT; ++i) {
+     if (i) telemetryJsonAppend(buf, cap, used, ",");
+@@ -42822,6 +42898,8 @@
+   ja("\"wifi_ssid\":\""); ja(WiFi.status() == WL_CONNECTED ? WiFi.SSID() : ""); ja("\",");
+   ja("\"wifi_rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",");
+   ja("\"t_zewn\":" + String(temperaturaNaZewnatrz, 1) + ",");
++  ja("\"t_zewn_2\":" + jsonTempDiag(true) + ",");
++  ja("\"t_zewn_3\":" + jsonTempDiag(false) + ",");
+   ja("\"t_bojler\":" + String(temperaturaBojlera, 1) + ",");
+   ja("\"t_ogrz\":" + String(temperaturaOgrzewania, 1) + ",");
+   ja("\"t_ogrz_sr\":" + String(temperaturaOgrzewaniaSrednia, 1) + ",");
+@@ -43048,7 +43126,7 @@
+   // [v3.31.26 FB-SYMULACJA] 1536 -> 2048: dolozone 25 pol (symulacja_*/_min
+   // x10 czujnikow + 3x *_override_min + mieszadlo + dym_... juz byly) to
+   // ~+600B w najgorszym razie; 2048 zostawia ten sam zapas co dotad.
+-  const size_t FB_JSON_CAP = 3072;   // [v3.47.0 LAN-API] bylo 2048 przy JSON ~1.9 KB — zapas na nowe pola
++  const size_t FB_JSON_CAP = 4096;   // [v3.47.0 LAN-API] bylo 2048 przy JSON ~1.9 KB — zapas na nowe pola
+   char* jb = (char*)psramAllocSafe(FB_JSON_CAP);
+   size_t jLen = 0;
+   bool jPsram = (jb != nullptr);
+@@ -47402,6 +47480,7 @@
+       delay(HARDENING_OPOZNIENIE_MS * proba);
+     }
+   }
++  g_bmpDiagGotowy = bmpOk;
+   if (bmpOk) {
+     bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2,
+                      Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16,

@@ -6,7 +6,7 @@ Nie ma zmian w sterowaniu piecem. Prawdziwe 0°C jest pomiarem; brak, null, bł�
 
 ## Co działa, a czego brakuje
 
-Ta poprawka przygotowuje aplikację, ale **nie tworzy historycznych odczytów centrali**. Przykładowa stara poprawka centrali 3.57.9 dodaje tylko status bieżący i nie zapisuje nowych temperatur do telemetrii; nie wystarcza do historii wykresów. W dostępnej paczce 3.58.6 sprawdzono, że struktura zapisu próbek ma sztywny format trwały 80 bajtów, więc dopisywanie pól wymaga zaprojektowania kompatybilnej migracji i testów. Nie należy podmieniać nowszej centrali wersją 3.57.9 ani 3.58.6. Najpierw trzeba potwierdzić wersję faktycznie wgraną w ESP i pozyskać jej źródła. Na liście plików z komputera użytkownika znajdował się `Centrala-v3.58.18-serwis-OTA-test.zip`, ale jego obecność nie dowodzi zainstalowanej wersji.
+Sama poprawka aplikacji **nie tworzy historycznych odczytów centrali**. Użytkownik potwierdził wersję ESP 3.57.9; powstał kandydat `centrala-3.57.9-zew-wykresy.patch` z odczytem i zapisem do telemetrii Firebase. Szczegóły, ograniczenia i stan testów: `CENTRALA-3.57.9-ZEW.md`. Wcześniejsza przykładowa poprawka `centrala-3.57.9-PRZYKLAD.patch` dodaje tylko status bieżący — nie używaj jej. Nie ma możliwości odtworzenia niezapisanych dawniej danych.
 
 ## Budowanie na Windows
 
