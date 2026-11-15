@@ -1,6 +1,10 @@
 # Zew 1, Zew 2 i Zew 3
 
-## Co zawierają pliki
+> **Korekta:** poniższy opis pierwotnej poprawki 0.31.92 dotyczy niechcianych zmian pulpitu. Nie stosuj jej ponownie. Zastępuje ją `android-0.31.92-do-0.31.93-wykresy.patch`: przywraca pulpit aplikacji do 0.31.91 i umieszcza trzy serie w wykresach. Skrypt `buduj-wykresy-0.31.93.ps1` sprawdza poprawkę, buduje i po sukcesie kopiuje APK na pulpit Windows. Szczegóły: `WYKRESY-0.31.93.md`.
+>
+> Przykładowa poprawka firmware 3.57.9 dotyczyła tylko odczytów statusu, **nie zapewnia zapisu ich historii do wykresów**. Nie jest aktualnym rozwiązaniem i nie należy jej wgrywać.
+
+## Archiwalny opis plików 0.31.92
 
 - `android-0.31.91-do-0.31.92.patch` — zmiany dla otrzymanego projektu Android 0.31.91: Zew 1 = dotychczasowy DS18B20 (`t_zewn`), Zew 2 = temperatura DHT22 (`t_zewn_2`), Zew 3 = temperatura czujnika ciśnienia (`t_zewn_3`). Nowe kafelki są diagnostyczne, nie sterują piecem. Brak lub błędny pomiar jest pokazywany jako brak danych, a prawdziwe 0°C pozostaje prawidłowym wynikiem. Nowe kafelki dodają się także do zapisanego układu użytkownika; późniejsze ręczne ukrycie jest zapamiętane. Wersja projektu po zmianie: 0.31.92 / 31092.
 - `centrala-3.57.9-PRZYKLAD.patch` — **wyłącznie propozycja do źródeł centrali v3.57.9**. Wersja faktycznie wgrana w centralę nie została potwierdzona; nie wgrywaj tej wersji do pieca. Po otrzymaniu aktualnych źródeł trzeba dostosować zmianę i osobno przetestować firmware. Paczka v3.57.9, którą dysponujemy, nie jest kompletnym projektem PlatformIO.

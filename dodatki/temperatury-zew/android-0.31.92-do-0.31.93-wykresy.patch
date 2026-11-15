@@ -1,0 +1,339 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31092
+-        versionName = "0.31.92"
++        versionCode = 31093
++        versionName = "0.31.93"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -1510,6 +1510,9 @@
+         val p = TelemPoint(
+             ts = lastFetchTs, seq = chartLive.size.toLong() + 1,
+             t_zewn = value("t_zewn", "zewn", 0, S.t_zewn),
++            // Dodatkowe temperatury są niezależne od symulacji Zew 1.
++            t_zewn_2 = S.t_zewn_2.takeIf { S.hasData("t_zewn_2") && it.isFinite() },
++            t_zewn_3 = S.t_zewn_3.takeIf { S.hasData("t_zewn_3") && it.isFinite() },
+             t_bojler = value("t_bojler", "bojler", 1, S.t_bojler),
+             t_ogrz = value("t_ogrz", "ogrz", 2, S.t_ogrz),
+             t_ogrz_sr = value("t_ogrz_sr", "ogrz", 3, S.t_ogrz_sr),
+@@ -1765,14 +1768,6 @@
+             for (i in 0 until stored.length()) {
+                 stored.optString(i).takeIf { it in allowed }?.let(selected::add)
+             }
+-            // Migracja tylko raz: nowe kafelki są widoczne po aktualizacji,
+-            // ale późniejsze ręczne ukrycie zostaje zapamiętane.
+-            if (prefs.get("piec_zewn_2_3_migracja_v1") != "1") {
+-                selected.add("zewn_2")
+-                selected.add("zewn_3")
+-                prefs.set(Prefs.K_DASH_WIDGETS, JSONArray(selected.toList()).toString())
+-                prefs.set("piec_zewn_2_3_migracja_v1", "1")
+-            }
+             dashboardWidgets = selected
+         } catch (e: Exception) {
+             dashboardWidgets = TileDefs.DEFAULT_VISIBLE_IDS
+@@ -1802,7 +1797,6 @@
+ 
+     fun setDashboardWidgetEnabled(id: String, enabled: Boolean) {
+         if (TileDefs.TILES.none { it.id == id }) return
+-        prefs.set("piec_zewn_2_3_migracja_v1", "1")
+         val next = dashboardWidgets.toMutableSet()
+         if (enabled) next.add(id) else next.remove(id)
+         dashboardWidgets = next
+--- a/app/src/main/java/com/sterownikco/pro/core/RtdbClient.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/RtdbClient.kt
+@@ -561,7 +561,10 @@
+             id = id, seq = obj.optLong("seq", 0), ts = obj.optLong("ts", 0), mono = obj.optLong("mono", 0),
+             a = a, k = obj.optLong("k", -1), s = obj.optLong("s", -1),
+             state = state, q = obj.optLong("q", 0), sim = simMask, simulated = rowSimulated,
+-            stateKnown = stateKnown
++            stateKnown = stateKnown,
++            // Opcjonalne pola w °C; stare rekordy ich nie mają.
++            t_zewn_2 = (obj.opt("t_zewn_2") as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..80.0 },
++            t_zewn_3 = (obj.opt("t_zewn_3") as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..85.0 }
+         )
+     }
+ 
+--- a/app/src/main/java/com/sterownikco/pro/core/Telemetry.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/Telemetry.kt
+@@ -17,7 +17,9 @@
+     /** Jawny znacznik całego rekordu (`is_sim` / `simulated`). */
+     val simulated: Boolean = false,
+     /** Czy pole `state` było obecne i poprawne; starsze rekordy bez stanu pozostają nieznane. */
+-    val stateKnown: Boolean = false
++    val stateKnown: Boolean = false,
++    /** Opcjonalne diagnostyczne temperatury w °C, tylko z nowego formatu. */
++    val t_zewn_2: Double? = null, val t_zewn_3: Double? = null
+ )
+ 
+ /** Rekord po mapowaniu kanałów; bitmapa zachowuje odczyty z aktywnych symulacji. */
+@@ -36,11 +38,12 @@
+     /** Stan pompy z bitu 0 `state`; null oznacza brak wiarygodnego pola stanu. */
+     val pumpOn: Boolean? = null,
+     /** Id rekordu RTDB, używane do deduplikacji nakładających się odczytów archiwum. */
+-    val sourceId: String = ""
++    val sourceId: String = "",
++    val t_zewn_2: Double? = null, val t_zewn_3: Double? = null
+ ) {
+     fun hasValues(): Boolean = pumpOn != null || listOf(
+         t_zewn, t_bojler, t_ogrz, t_ogrz_sr, t_powrot, t_panel, t_pokoj, t_trociny,
+-        wilgotnosc, cisnienie, dym, klapa, syberka
++        wilgotnosc, cisnienie, dym, klapa, syberka, t_zewn_2, t_zewn_3
+     ).any { it != null && it.isFinite() }
+ 
+     fun isSimulated(key: String): Boolean {
+@@ -205,7 +208,10 @@
+         syberka = getServoVal(s, 90.0, 12),
+         sim = sim, simulated = simulated,
+         pumpOn = if (stateKnown) (state and PUMP_ON_STATE_BIT) != 0L else null,
+-        sourceId = id
++        sourceId = id,
++        // Diagnostyka ma osobne opcjonalne pola, nie przepisuje kanałów V1.
++        t_zewn_2 = t_zewn_2?.takeIf { !simulated && it.isFinite() && it in -40.0..80.0 },
++        t_zewn_3 = t_zewn_3?.takeIf { !simulated && it.isFinite() && it in -40.0..85.0 }
+     )
+ }
+ 
+@@ -233,7 +239,9 @@
+         SeriesDef("ogrz", "Ogrz.", "t_ogrz", 2, 2, "°C", "temp", "#ff5f78", "255,95,120", true),
+         SeriesDef("ogrzsr", "Ogrz. śr.", "t_ogrz_sr", 3, 3, "°C", "temp", "#ffd166", "255,209,102", true),
+         SeriesDef("bojler", "Bojler", "t_bojler", 1, 1, "°C", "temp", "#ffb04a", "255,176,74", true),
+-        SeriesDef("zewn", "Zewn.", "t_zewn", 0, 0, "°C", "temp", "#55d7ff", "85,215,255", true),
++        SeriesDef("zewn", "Zew 1", "t_zewn", 0, 0, "°C", "temp", "#55d7ff", "85,215,255", true),
++        SeriesDef("zewn_2", "Zew 2", "t_zewn_2", -1, -1, "°C", "temp", "#69e6ad", "105,230,173", false),
++        SeriesDef("zewn_3", "Zew 3", "t_zewn_3", -1, -1, "°C", "temp", "#ff87cc", "255,135,204", false),
+         SeriesDef("powrot", "Powrót", "t_powrot", 4, 4, "°C", "temp", "#a879ff", "168,121,255", false),
+         SeriesDef("panel", "Panel", "t_panel", 5, 5, "°C", "temp", "#ffd32a", "255,211,42", false),
+         SeriesDef("pokoj", "Pokój", "t_pokoj", 6, 6, "°C", "temp", "#c084fc", "192,132,252", false),
+@@ -254,13 +262,13 @@
+     val BOUNDS = mapOf(
+         "t_ogrz" to (0.0 to 99.0), "t_ogrz_sr" to (0.0 to 99.0), "t_bojler" to (0.0 to 95.0),
+         "t_powrot" to (0.0 to 95.0), "t_panel" to (-10.0 to 140.0), "t_trociny" to (0.0 to 90.0),
+-        "t_pokoj" to (8.0 to 45.0), "t_zewn" to (-25.0 to 45.0), "wilgotnosc" to (10.0 to 100.0),
++        "t_pokoj" to (8.0 to 45.0), "t_zewn" to (-25.0 to 45.0), "t_zewn_2" to (-40.0 to 80.0), "t_zewn_3" to (-40.0 to 85.0), "wilgotnosc" to (10.0 to 100.0),
+         "cisnienie" to (900.0 to 1100.0), "dym" to (0.0 to 4095.0), "klapa" to (0.0 to 100.0),
+         "syberka" to (0.0 to 100.0), "pompa" to (0.0 to 100.0)
+     )
+ 
+     fun value(p: TelemPoint, key: String): Double? = when (key) {
+-        "t_zewn" -> p.t_zewn; "t_bojler" -> p.t_bojler; "t_ogrz" -> p.t_ogrz; "t_ogrz_sr" -> p.t_ogrz_sr
++        "t_zewn" -> p.t_zewn; "t_zewn_2" -> p.t_zewn_2; "t_zewn_3" -> p.t_zewn_3; "t_bojler" -> p.t_bojler; "t_ogrz" -> p.t_ogrz; "t_ogrz_sr" -> p.t_ogrz_sr
+         "t_powrot" -> p.t_powrot; "t_panel" -> p.t_panel; "t_pokoj" -> p.t_pokoj; "t_trociny" -> p.t_trociny
+         "wilgotnosc" -> p.wilgotnosc; "cisnienie" -> p.cisnienie; "dym" -> p.dym
+         "klapa" -> p.klapa; "syberka" -> p.syberka
+--- a/app/src/main/java/com/sterownikco/pro/core/TelemetryCache.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TelemetryCache.kt
+@@ -351,7 +351,8 @@
+         }
+         val ch = listOf(
+             p.t_zewn, p.t_bojler, p.t_ogrz, p.t_ogrz_sr, p.t_powrot, p.t_panel,
+-            p.t_pokoj, p.t_trociny, p.wilgotnosc, p.cisnienie, p.dym, p.klapa, p.syberka
++            p.t_pokoj, p.t_trociny, p.wilgotnosc, p.cisnienie, p.dym, p.klapa, p.syberka,
++            p.t_zewn_2, p.t_zewn_3
+         )
+         ch.forEach { v ->
+             sb.append(';')
+@@ -365,7 +366,7 @@
+         if (c.size < 4 + CHANNELS) return null
+         val ts = c[0].toLongOrNull() ?: return null
+         if (ts <= 0L) return null
+-        fun num(i: Int): Double? = c[i].trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it.isFinite() }
++        fun num(i: Int): Double? = c.getOrNull(i)?.trim()?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it.isFinite() }
+         val pump = when (c[3].trim()) {
+             "1" -> true
+             "0" -> false
+@@ -390,7 +391,9 @@
+             sim = c[2].toLongOrNull() ?: 0L,
+             simulated = false,
+             isLive = false,
+-            pumpOn = pump
++            pumpOn = pump,
++            t_zewn_2 = num(17)?.takeIf { it in -40.0..80.0 },
++            t_zewn_3 = num(18)?.takeIf { it in -40.0..85.0 }
+         )
+     }
+ }
+--- a/app/src/main/java/com/sterownikco/pro/core/TelemetryDayCache.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TelemetryDayCache.kt
+@@ -161,6 +161,8 @@
+         out.put(r.sim)
+         out.put(if (r.simulated) 1 else 0)
+         out.put(if (r.stateKnown) 1 else 0)
++        out.put(r.t_zewn_2?.takeIf { it.isFinite() } ?: JSONObject.NULL)
++        out.put(r.t_zewn_3?.takeIf { it.isFinite() } ?: JSONObject.NULL)
+         return out
+     }
+ 
+@@ -188,7 +190,9 @@
+             q = arr.optLong(8, 0L),
+             sim = arr.optLong(9, 0L),
+             simulated = arr.optInt(10, 0) != 0,
+-            stateKnown = arr.optInt(11, 0) != 0
++            stateKnown = arr.optInt(11, 0) != 0,
++            t_zewn_2 = (arr.opt(12) as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..80.0 },
++            t_zewn_3 = (arr.opt(13) as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..85.0 }
+         )
+     }
+ 
+--- a/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
+@@ -67,9 +67,7 @@
+ 
+ object TileDefs {
+     val TILES = listOf(
+-        DashboardTileDef("zewn", "Zew 1", 1, "Temperatura DS18B20", true),
+-        DashboardTileDef("zewn_2", "Zew 2", 1, "Temperatura DHT22 — diagnostyka", true),
+-        DashboardTileDef("zewn_3", "Zew 3", 1, "Temperatura czujnika ciśnienia — diagnostyka", true),
++        DashboardTileDef("zewn", "Zewnętrzna", 1, "Temperatura na zewnątrz", true),
+         DashboardTileDef("ogrz", "Piec C.O.", 1, "Bieżąca temperatura pieca", true),
+         DashboardTileDef("bojler", "Bojler", 1, "Temperatura wody w bojlerze", true),
+         DashboardTileDef("panel", "Panel słoneczny", 1, "Temperatura kolektora", true),
+@@ -138,7 +136,7 @@
+     val tz = S.valOf("zewn", "t_zewn")
+     out.add(
+         TileSpec(
+-            id = "zewn", title = "Zew 1", grid = 1, value = fmt1(tz), unit = "°C",
++            id = "zewn", title = "Zewnętrzna", grid = 1, value = fmt1(tz), unit = "°C",
+             cls = if (!tz.isFinite()) "c-none" else if (tz < 0) "c-flame2" else if (tz > 15) "c-ember" else "c-flame",
+             frac = norm(tz, -25.0, 45.0),
+             desc = symDesc("zewn", if (!tz.isFinite()) "oczekiwanie na odczyt" else if (tz < 0) "mróz" else if (tz > 25) "upał" else "odczyt stabilny"),
+@@ -147,23 +145,6 @@
+             sim = S.symAktywna("zewn"), stale = stale, artKey = "zewn"
+         )
+     )
+-
+-    // Nowe pomiary nie korzystają z symulacji DS18B20 ani nie sterują piecem.
+-    fun diagnosticTemperature(id: String, title: String, key: String, sensorName: String, max: Double) {
+-        val v = S.valOf(id, key)
+-        val status = badge(id, key)
+-        out.add(TileSpec(
+-            id = id, title = title, grid = 1, value = fmt1(v), unit = "°C",
+-            cls = if (!v.isFinite()) "c-none" else if (v < 0) "c-flame2" else if (v > 15) "c-ember" else "c-flame",
+-            frac = norm(v, -40.0, max),
+-            desc = "$sensorName · diagnostyka",
+-            vcol = if (v < 0) "#7dd3fc" else if (v > 15) "#ffb86b" else "",
+-            badge = status?.first ?: "LIVE", badgeCls = status?.second ?: "live",
+-            stale = stale, artKey = "zewn"
+-        ))
+-    }
+-    diagnosticTemperature("zewn_2", "Zew 2", "t_zewn_2", "DHT22", 80.0)
+-    diagnosticTemperature("zewn_3", "Zew 3", "t_zewn_3", "BME/BMP", 85.0)
+ 
+     // ── ogrz ────────────────────────────────────────────────────────────────
+     val to = S.valOf("ogrz", "t_ogrz")
+--- a/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
++++ b/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
+@@ -1,47 +1,77 @@
+ package com.sterownikco.pro.core
+ 
++import com.sterownikco.pro.ui.chart.buildChartView
+ import org.json.JSONObject
+ import org.junit.Assert.*
+ import org.junit.Test
++import java.nio.file.Files
+ 
+ class OutdoorDiagnosticTemperatureTest {
+-    @Test fun validValuesIncludingZeroAndNegativeAreIndependent() {
++    private fun row(t2: Double? = null, t3: Double? = null, simulated: Boolean = false) = TelemRow(
++        id = "test", seq = 1, ts = 1_700_000_000, mono = 0,
++        a = listOf(60.0), k = 0, s = 0, state = 0, q = 0, sim = 0,
++        simulated = simulated, stateKnown = true, t_zewn_2 = t2, t_zewn_3 = t3
++    )
++
++    @Test fun chartsHaveThreeSeparatelySelectableSeriesAndDashboardIsOriginal() {
++        val defs = ChartSeries.TEMP.associateBy { it.id }
++        assertEquals("Zew 1", defs.getValue("zewn").label)
++        assertEquals("Zew 2", defs.getValue("zewn_2").label)
++        assertEquals("Zew 3", defs.getValue("zewn_3").label)
++        assertEquals("Zewnętrzna", TileDefs.TILES.first { it.id == "zewn" }.title)
++        assertFalse(TileDefs.TILES.any { it.id == "zewn_2" || it.id == "zewn_3" })
++    }
++
++    @Test fun liveStatusRejectsInvalidAndDoesNotConfuseZeroWithMissing() {
+         val s = PiecState()
+         s.applyIncomingData(JSONObject("""{"t_zewn":12.5,"t_zewn_2":0,"t_zewn_3":-12.3}"""))
+-        assertEquals(12.5, s.valOf("zewn", "t_zewn"), 0.0)
+-        assertEquals(0.0, s.valOf("zewn_2", "t_zewn_2"), 0.0)
+-        assertEquals(-12.3, s.valOf("zewn_3", "t_zewn_3"), 0.0)
+-        assertTrue(s.hasData("t_zewn_2"))
+-        assertTrue(s.hasData("t_zewn_3"))
++        assertEquals(0.0, s.t_zewn_2, 0.0)
++        assertEquals(-12.3, s.t_zewn_3, 0.0)
++        s.applyIncomingData(JSONObject("""{"t_zewn_2":null,"t_zewn_3":"15"}"""))
++        assertFalse(s.hasData("t_zewn_2"))
++        assertFalse(s.hasData("t_zewn_3"))
++        assertTrue(s.t_zewn_2.isNaN())
++        assertTrue(s.t_zewn_3.isNaN())
+     }
+ 
+-    @Test fun missingNullWrongTypeAndOutOfRangeAreNotZeroOrOldValues() {
+-        val s = PiecState()
+-        s.applyIncomingData(JSONObject("""{"t_zewn_2":15,"t_zewn_3":16}"""))
+-        for (payload in listOf("{}", """{"t_zewn_2":null,"t_zewn_3":null}""", """{"t_zewn_2":"15","t_zewn_3":true}""", """{"t_zewn_2":-40.1,"t_zewn_3":85.1}""")) {
+-            s.applyIncomingData(JSONObject(payload))
+-            assertFalse(s.hasData("t_zewn_2"))
+-            assertFalse(s.hasData("t_zewn_3"))
+-            assertTrue(s.t_zewn_2.isNaN())
+-            assertTrue(s.t_zewn_3.isNaN())
+-        }
++    @Test fun historyHandlesOldValidInvalidAndSimulatedSamples() {
++        val old = row().toPoint()
++        assertNull(ChartSeries.value(old, "t_zewn_2"))
++        assertNull(ChartSeries.value(old, "t_zewn_3"))
++        val valid = row(0.0, -12.3).toPoint()
++        assertEquals(0.0, ChartSeries.value(valid, "t_zewn_2")!!, 0.0)
++        assertEquals(-12.3, ChartSeries.value(valid, "t_zewn_3")!!, 0.0)
++        assertNull(row(-40.1, 85.1).toPoint().t_zewn_2)
++        assertNull(row(Double.NaN, 85.1).toPoint().t_zewn_3)
++        assertNull(row(10.0, 20.0, simulated = true).toPoint().t_zewn_2)
+     }
+ 
+-    @Test fun boundariesAndOlderFirmwareAreSupported() {
+-        val s = PiecState()
+-        s.applyIncomingData(JSONObject("""{"t_zewn_2":-40,"t_zewn_3":85}"""))
+-        assertTrue(s.hasAllData("t_zewn_2", "t_zewn_3"))
+-        s.applyIncomingData(JSONObject("""{"t_zewn":20}"""))
+-        assertTrue(s.hasData("t_zewn"))
+-        assertFalse(s.hasData("t_zewn_2"))
+-        assertFalse(s.hasData("t_zewn_3"))
++    @Test fun chartBuildsDistinctSelectedLinesWithoutInventingValues() {
++        val first = row(0.0, null).toPoint()
++        val second = row(1.0, -2.0).toPoint().copy(ts = first.ts + 60_000)
++        val series = ChartSeries.TEMP.filter { it.id in setOf("zewn", "zewn_2", "zewn_3") }
++            .map { it.copy(on = true) }
++        val view = buildChartView(listOf(first, second), series, 1f, 1f, "COMMON", false)
++        assertEquals(listOf(6.0, 6.0), view.values["zewn"])
++        assertEquals(listOf(0.0, 1.0), view.values["zewn_2"])
++        assertEquals(listOf(null, -2.0), view.values["zewn_3"])
+     }
+ 
+-    @Test fun dashboardHasDistinctDefaultTiles() {
+-        val tiles = TileDefs.TILES.associateBy { it.id }
+-        assertEquals("Zew 1", tiles.getValue("zewn").title)
+-        assertEquals("Zew 2", tiles.getValue("zewn_2").title)
+-        assertEquals("Zew 3", tiles.getValue("zewn_3").title)
+-        assertTrue(TileDefs.DEFAULT_VISIBLE_IDS.containsAll(listOf("zewn_2", "zewn_3")))
++    @Test fun dayCacheRoundTripPreservesNewValuesAndReadsOldRows() {
++        val dir = Files.createTempDirectory("outdoor-chart").toFile()
++        try {
++            val cache = TelemetryDayCache(dir)
++            cache.write("2026-11-15", listOf(row(0.0, -12.3)))
++            val restored = cache.read("2026-11-15")!!.rows.single()
++            assertEquals(0.0, restored.t_zewn_2!!, 0.0)
++            assertEquals(-12.3, restored.t_zewn_3!!, 0.0)
++            // Format v1 sprzed dodania dwóch opcjonalnych pól.
++            java.io.File(dir, "2026-11-14.json").writeText(
++                """{"v":1,"saved":1,"rows":[["old",1,1700000000,0,[60],0,0,0,0,0,0,1]]}"""
++            )
++            val old = cache.read("2026-11-14")!!.rows.single()
++            assertNull(old.t_zewn_2)
++            assertNull(old.t_zewn_3)
++        } finally { dir.deleteRecursively() }
+     }
+ }
