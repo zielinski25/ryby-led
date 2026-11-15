@@ -1,3 +1,5 @@
+> Nowszy kandydat z wersją liczbową: [CENTRALA-3.57.10-ZEW.md](CENTRALA-3.57.10-ZEW.md). Ten dokument opisuje poprzedni kandydat.
+
 # Centrala ESP32 — kandydat v3.57.9-zew
 
 Podstawa: źródło centrali v3.57.9 z paczki `SterownikCO-v3.57.9-LIMITY-SIECI.zip`; użytkownik potwierdził `/version: v3.57.9`. Poprawka dotyczy tej wersji. Nie zakładaj zgodności z innymi źródłami, nawet jeśli pokazują taki sam numer wersji.

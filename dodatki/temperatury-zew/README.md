@@ -1,3 +1,5 @@
+> Nowszy kandydat centrali o liczbowej wersji `v3.57.10`: [CENTRALA-3.57.10-ZEW.md](CENTRALA-3.57.10-ZEW.md). Nie wgrywać do pracującego kotła.
+
 # Zew 1, Zew 2 i Zew 3
 
 > **Korekta:** poniższy opis pierwotnej poprawki 0.31.92 dotyczy niechcianych zmian pulpitu. Nie stosuj jej ponownie. Zastępuje ją `android-0.31.92-do-0.31.93-wykresy.patch`: przywraca pulpit aplikacji do 0.31.91 i umieszcza trzy serie w wykresach. Skrypt `buduj-wykresy-0.31.93.ps1` sprawdza poprawkę, buduje i po sukcesie kopiuje APK na pulpit Windows. Szczegóły: `WYKRESY-0.31.93.md`.
