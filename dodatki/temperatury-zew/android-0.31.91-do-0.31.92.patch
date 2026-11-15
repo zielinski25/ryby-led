@@ -1,0 +1,181 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31091
+-        versionName = "0.31.91"
++        versionCode = 31092
++        versionName = "0.31.92"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+--- a/app/src/main/java/com/sterownikco/pro/core/PiecState.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/PiecState.kt
+@@ -18,6 +18,8 @@
+     var online = false
+     var night = false
+     var t_zewn = Double.NaN
++    var t_zewn_2 = Double.NaN // DHT22 — wyłącznie diagnostyka
++    var t_zewn_3 = Double.NaN // BME/BMP — wyłącznie diagnostyka
+     var t_ogrz = Double.NaN
+     var t_ogrz_sr = Double.NaN
+     var t_bojler = Double.NaN
+@@ -142,6 +144,8 @@
+ 
+     fun valOf(@Suppress("UNUSED_PARAMETER") pole: String, key: String): Double = if (!hasData(key)) Double.NaN else when (key) {
+         "t_zewn" -> t_zewn
++        "t_zewn_2" -> t_zewn_2
++        "t_zewn_3" -> t_zewn_3
+         "t_ogrz" -> t_ogrz
+         "t_ogrz_sr" -> t_ogrz_sr
+         "t_bojler" -> t_bojler
+@@ -159,6 +163,8 @@
+         receivedFields.remove(key)
+         when (key) {
+             "t_zewn" -> t_zewn = Double.NaN
++            "t_zewn_2" -> t_zewn_2 = Double.NaN
++            "t_zewn_3" -> t_zewn_3 = Double.NaN
+             "t_ogrz" -> t_ogrz = Double.NaN
+             "t_ogrz_sr" -> t_ogrz_sr = Double.NaN
+             "t_bojler" -> t_bojler = Double.NaN
+@@ -211,7 +217,7 @@
+ 
+         // Każdy snapshot jest nowym obrazem statusu. Brak pola ma oznaczać
+         // BRAK DANYCH, a nie zachowanie poprzedniego odczytu jako świeżego.
+-        listOf("t_ogrz", "t_ogrz_sr", "t_bojler", "t_zewn", "t_panel", "t_pokoj", "t_powrot", "t_trociny", "cisnienie", "wilgotnosc", "dym")
++        listOf("t_ogrz", "t_ogrz_sr", "t_bojler", "t_zewn", "t_zewn_2", "t_zewn_3", "t_panel", "t_pokoj", "t_powrot", "t_trociny", "cisnienie", "wilgotnosc", "dym")
+             .forEach { clearSensorValue(it) }
+         online = false; night = false
+         dym_wlaczony = false; dym_swiezy = false; dym_alarm = false
+@@ -302,6 +308,8 @@
+         sensor("t_ogrz_sr", 0.0, 99.0) { t_ogrz_sr = it }
+         sensor("t_bojler", 0.0, 95.0) { t_bojler = it }
+         sensor("t_zewn", -25.0, 45.0) { t_zewn = it }
++        sensor("t_zewn_2", -40.0, 80.0) { t_zewn_2 = it }
++        sensor("t_zewn_3", -40.0, 85.0) { t_zewn_3 = it }
+         sensor("t_panel", -10.0, 140.0) { t_panel = it }
+         sensor("t_pokoj", 8.0, 45.0) { t_pokoj = it }
+         sensor("t_powrot", 0.0, 95.0) { t_powrot = it }
+--- a/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
+@@ -67,7 +67,9 @@
+ 
+ object TileDefs {
+     val TILES = listOf(
+-        DashboardTileDef("zewn", "Zewnętrzna", 1, "Temperatura na zewnątrz", true),
++        DashboardTileDef("zewn", "Zew 1", 1, "Temperatura DS18B20", true),
++        DashboardTileDef("zewn_2", "Zew 2", 1, "Temperatura DHT22 — diagnostyka", true),
++        DashboardTileDef("zewn_3", "Zew 3", 1, "Temperatura czujnika ciśnienia — diagnostyka", true),
+         DashboardTileDef("ogrz", "Piec C.O.", 1, "Bieżąca temperatura pieca", true),
+         DashboardTileDef("bojler", "Bojler", 1, "Temperatura wody w bojlerze", true),
+         DashboardTileDef("panel", "Panel słoneczny", 1, "Temperatura kolektora", true),
+@@ -136,7 +138,7 @@
+     val tz = S.valOf("zewn", "t_zewn")
+     out.add(
+         TileSpec(
+-            id = "zewn", title = "Zewnętrzna", grid = 1, value = fmt1(tz), unit = "°C",
++            id = "zewn", title = "Zew 1", grid = 1, value = fmt1(tz), unit = "°C",
+             cls = if (!tz.isFinite()) "c-none" else if (tz < 0) "c-flame2" else if (tz > 15) "c-ember" else "c-flame",
+             frac = norm(tz, -25.0, 45.0),
+             desc = symDesc("zewn", if (!tz.isFinite()) "oczekiwanie na odczyt" else if (tz < 0) "mróz" else if (tz > 25) "upał" else "odczyt stabilny"),
+@@ -145,6 +147,23 @@
+             sim = S.symAktywna("zewn"), stale = stale, artKey = "zewn"
+         )
+     )
++
++    // Nowe pomiary nie korzystają z symulacji DS18B20 ani nie sterują piecem.
++    fun diagnosticTemperature(id: String, title: String, key: String, sensorName: String, max: Double) {
++        val v = S.valOf(id, key)
++        val status = badge(id, key)
++        out.add(TileSpec(
++            id = id, title = title, grid = 1, value = fmt1(v), unit = "°C",
++            cls = if (!v.isFinite()) "c-none" else if (v < 0) "c-flame2" else if (v > 15) "c-ember" else "c-flame",
++            frac = norm(v, -40.0, max),
++            desc = "$sensorName · diagnostyka",
++            vcol = if (v < 0) "#7dd3fc" else if (v > 15) "#ffb86b" else "",
++            badge = status?.first ?: "LIVE", badgeCls = status?.second ?: "live",
++            stale = stale, artKey = "zewn"
++        ))
++    }
++    diagnosticTemperature("zewn_2", "Zew 2", "t_zewn_2", "DHT22", 80.0)
++    diagnosticTemperature("zewn_3", "Zew 3", "t_zewn_3", "BME/BMP", 85.0)
+ 
+     // ── ogrz ────────────────────────────────────────────────────────────────
+     val to = S.valOf("ogrz", "t_ogrz")
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -1765,6 +1765,14 @@
+             for (i in 0 until stored.length()) {
+                 stored.optString(i).takeIf { it in allowed }?.let(selected::add)
+             }
++            // Migracja tylko raz: nowe kafelki są widoczne po aktualizacji,
++            // ale późniejsze ręczne ukrycie zostaje zapamiętane.
++            if (prefs.get("piec_zewn_2_3_migracja_v1") != "1") {
++                selected.add("zewn_2")
++                selected.add("zewn_3")
++                prefs.set(Prefs.K_DASH_WIDGETS, JSONArray(selected.toList()).toString())
++                prefs.set("piec_zewn_2_3_migracja_v1", "1")
++            }
+             dashboardWidgets = selected
+         } catch (e: Exception) {
+             dashboardWidgets = TileDefs.DEFAULT_VISIBLE_IDS
+@@ -1794,6 +1802,7 @@
+ 
+     fun setDashboardWidgetEnabled(id: String, enabled: Boolean) {
+         if (TileDefs.TILES.none { it.id == id }) return
++        prefs.set("piec_zewn_2_3_migracja_v1", "1")
+         val next = dashboardWidgets.toMutableSet()
+         if (enabled) next.add(id) else next.remove(id)
+         dashboardWidgets = next
+--- /dev/null
++++ b/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
+@@ -0,0 +1,47 @@
++package com.sterownikco.pro.core
++
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.Test
++
++class OutdoorDiagnosticTemperatureTest {
++    @Test fun validValuesIncludingZeroAndNegativeAreIndependent() {
++        val s = PiecState()
++        s.applyIncomingData(JSONObject("""{"t_zewn":12.5,"t_zewn_2":0,"t_zewn_3":-12.3}"""))
++        assertEquals(12.5, s.valOf("zewn", "t_zewn"), 0.0)
++        assertEquals(0.0, s.valOf("zewn_2", "t_zewn_2"), 0.0)
++        assertEquals(-12.3, s.valOf("zewn_3", "t_zewn_3"), 0.0)
++        assertTrue(s.hasData("t_zewn_2"))
++        assertTrue(s.hasData("t_zewn_3"))
++    }
++
++    @Test fun missingNullWrongTypeAndOutOfRangeAreNotZeroOrOldValues() {
++        val s = PiecState()
++        s.applyIncomingData(JSONObject("""{"t_zewn_2":15,"t_zewn_3":16}"""))
++        for (payload in listOf("{}", """{"t_zewn_2":null,"t_zewn_3":null}""", """{"t_zewn_2":"15","t_zewn_3":true}""", """{"t_zewn_2":-40.1,"t_zewn_3":85.1}""")) {
++            s.applyIncomingData(JSONObject(payload))
++            assertFalse(s.hasData("t_zewn_2"))
++            assertFalse(s.hasData("t_zewn_3"))
++            assertTrue(s.t_zewn_2.isNaN())
++            assertTrue(s.t_zewn_3.isNaN())
++        }
++    }
++
++    @Test fun boundariesAndOlderFirmwareAreSupported() {
++        val s = PiecState()
++        s.applyIncomingData(JSONObject("""{"t_zewn_2":-40,"t_zewn_3":85}"""))
++        assertTrue(s.hasAllData("t_zewn_2", "t_zewn_3"))
++        s.applyIncomingData(JSONObject("""{"t_zewn":20}"""))
++        assertTrue(s.hasData("t_zewn"))
++        assertFalse(s.hasData("t_zewn_2"))
++        assertFalse(s.hasData("t_zewn_3"))
++    }
++
++    @Test fun dashboardHasDistinctDefaultTiles() {
++        val tiles = TileDefs.TILES.associateBy { it.id }
++        assertEquals("Zew 1", tiles.getValue("zewn").title)
++        assertEquals("Zew 2", tiles.getValue("zewn_2").title)
++        assertEquals("Zew 3", tiles.getValue("zewn_3").title)
++        assertTrue(TileDefs.DEFAULT_VISIBLE_IDS.containsAll(listOf("zewn_2", "zewn_3")))
++    }
++}

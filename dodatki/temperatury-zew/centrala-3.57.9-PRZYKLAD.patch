@@ -1,0 +1,110 @@
+--- a/src/main_centrala.cpp
++++ b/src/main_centrala.cpp
+@@ -5754,6 +5754,26 @@
+ // ── [FIX-WDT] Task Watchdog Timer — konfiguracja ─────────────────────────
+ static const uint32_t WDT_TIMEOUT_MS = 15000UL;
+ 
++// Dodatkowe odczyty tylko diagnostyczne; atomowy snapshot między taskami.
++static portMUX_TYPE g_tempDiagMux = portMUX_INITIALIZER_UNLOCKED;
++static float g_tempDhtDiag = NAN, g_tempBmpDiag = NAN;
++static uint32_t g_tempDhtAt = 0, g_tempBmpAt = 0;
++static bool g_bmpDiagGotowy = false;
++static void zapiszTempDiag(bool dht, float v) {
++  portENTER_CRITICAL(&g_tempDiagMux);
++  if (dht) { g_tempDhtDiag = v; g_tempDhtAt = millis(); }
++  else { g_tempBmpDiag = v; g_tempBmpAt = millis(); }
++  portEXIT_CRITICAL(&g_tempDiagMux);
++}
++static String jsonTempDiag(bool dht) {
++  float v; uint32_t at;
++  portENTER_CRITICAL(&g_tempDiagMux);
++  if (dht) { v = g_tempDhtDiag; at = g_tempDhtAt; }
++  else { v = g_tempBmpDiag; at = g_tempBmpAt; }
++  portEXIT_CRITICAL(&g_tempDiagMux);
++  return isfinite(v) && (uint32_t)(millis() - at) <= 15000UL ? String(v, 1) : String("null");
++}
++
+ float cisnienieOdczytane = 0.0;
+ float zmianaCisnienia = 0;
+ bool alarmOgrzewanieWlaczone = false;
+@@ -28524,6 +28544,8 @@
+   j += F("\"wifi_ssid\":\""); j += (WiFi.status() == WL_CONNECTED ? WiFi.SSID() : ""); j += F("\",");
+   j += F("\"rssi\":"); j += String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0); j += F(",");
+   j += F("\"t_zewn\":"); j += String(temperaturaNaZewnatrz, 1); j += F(",");
++  j += F("\"t_zewn_2\":"); j += jsonTempDiag(true); j += F(",");
++  j += F("\"t_zewn_3\":"); j += jsonTempDiag(false); j += F(",");
+   j += F("\"t_bojler\":"); j += String(temperaturaBojlera, 1); j += F(",");
+   j += F("\"t_ogrz\":"); j += String(temperaturaOgrzewania, 1); j += F(",");
+   j += F("\"t_ogrz_sr\":"); j += String(temperaturaOgrzewaniaSrednia, 1); j += F(",");
+@@ -31258,11 +31280,20 @@
+   bool symCisnieniaTeraz = symulacjaTrwa(symulacjaCisnieniaAktywna, symulacjaCisnieniaDo, "cisnienie");
+   float cisnienieOdczytaneLok;
+   if (symCisnieniaTeraz) {
++    zapiszTempDiag(false, NAN); // symulacja ciśnienia nie jest temperaturą BME
+     cisnienieOdczytaneLok = symulowaneCisnienie;
+     telemetryMarkAccepted(TELEMETRY_CH_PRESSURE, telemetryPressureNowMs, true);
+   } else {
+     telemetryMarkAttempt(TELEMETRY_CH_PRESSURE, telemetryPressureNowMs);
+     cisnienieOdczytaneLok = ((bmp.readPressure() / 100) + 18);
++    // Nie czytaj temperatury niezainicjalizowanego czujnika; błąd ciśnienia
++    // także unieważnia próbkę (I2C potrafi zwrócić pozornie poprawne zero).
++    float tBmp = NAN;
++    if (g_bmpDiagGotowy && isfinite(cisnienieOdczytaneLok) &&
++        cisnienieOdczytaneLok >= 318.0f && cisnienieOdczytaneLok <= 1118.0f) {
++      tBmp = bmp.readTemperature();
++    }
++    zapiszTempDiag(false, isfinite(tBmp) && tBmp >= -40.0f && tBmp <= 85.0f ? tBmp : NAN);
+     if (!isfinite(cisnienieOdczytaneLok)) {
+       telemetryMarkInvalid(TELEMETRY_CH_PRESSURE);
+     } else {
+@@ -31305,18 +31336,20 @@
+   // [FIX DHT-IWDT] dht.readHumidity() (Adafruit, blokujace przerwania)
+   // zastapione read_dht() z dhtESP32-rmt (odczyt sprzetowy przez RMT, bez
+   // noInterrupts()) — patrz uzasadnienie przy #include "dhtESP32-rmt.h"
+-  // wyzej w pliku. Temperatura z DHT22 jest tu celowo ignorowana (pomijana)
+-  // — temperaturaNaZewnatrz pochodzi wylacznie z DS18B20 (Czujnik_DS(),
+-  // patrz komentarz FIX nizej), wiec liczy sie tylko wilgotnosc.
+-  float dhtTempPomijana;
++  // wyzej w pliku. Temperatura DHT jest tylko diagnostyczna; sterowanie
++  // i obliczenia wilgotnosci nadal korzystaja z DS18B20.
++  float dhtTempPomijana = NAN;
+   float wilgotnoscOdczytanaLok;
+   const uint64_t telemetryRhNowMs = telemetryMonotonicMs();
+   if (symulacjaTrwa(symulacjaWilgotnosciAktywna, symulacjaWilgotnosciDo, "wilgotnosc")) {
++    zapiszTempDiag(true, NAN); // symulowana wilgotnosc nie jest temperatura
+     wilgotnoscOdczytanaLok = symulowanaWilgotnosc;
+     telemetryMarkAccepted(TELEMETRY_CH_RH, telemetryRhNowMs, true);
+   } else {
+     telemetryMarkAttempt(TELEMETRY_CH_RH, telemetryRhNowMs);
+     uint8_t dhtErr = read_dht(dhtTempPomijana, wilgotnoscOdczytanaLok, DHT_PIN, DHT22);
++    zapiszTempDiag(true, dhtErr == DHT_OK && isfinite(dhtTempPomijana) &&
++        dhtTempPomijana >= -40.0f && dhtTempPomijana <= 80.0f ? dhtTempPomijana : NAN);
+     // [v3.57.4] 0,0 % z DHT22 to odczyt smieciowy, nie pomiar - traktujemy go
+     // jak blad (zostaje poprzednia dobra wartosc). W kotlowni nie ma 0 %.
+     if (dhtErr != DHT_OK || !isfinite(wilgotnoscOdczytanaLok) || wilgotnoscOdczytanaLok <= 0.1f) {
+@@ -42822,6 +42855,8 @@
+   ja("\"wifi_ssid\":\""); ja(WiFi.status() == WL_CONNECTED ? WiFi.SSID() : ""); ja("\",");
+   ja("\"wifi_rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",");
+   ja("\"t_zewn\":" + String(temperaturaNaZewnatrz, 1) + ",");
++  ja("\"t_zewn_2\":" + jsonTempDiag(true) + ",");
++  ja("\"t_zewn_3\":" + jsonTempDiag(false) + ",");
+   ja("\"t_bojler\":" + String(temperaturaBojlera, 1) + ",");
+   ja("\"t_ogrz\":" + String(temperaturaOgrzewania, 1) + ",");
+   ja("\"t_ogrz_sr\":" + String(temperaturaOgrzewaniaSrednia, 1) + ",");
+@@ -43048,7 +43083,7 @@
+   // [v3.31.26 FB-SYMULACJA] 1536 -> 2048: dolozone 25 pol (symulacja_*/_min
+   // x10 czujnikow + 3x *_override_min + mieszadlo + dym_... juz byly) to
+   // ~+600B w najgorszym razie; 2048 zostawia ten sam zapas co dotad.
+-  const size_t FB_JSON_CAP = 3072;   // [v3.47.0 LAN-API] bylo 2048 przy JSON ~1.9 KB — zapas na nowe pola
++  const size_t FB_JSON_CAP = 4096;   // [v3.47.0 LAN-API] bylo 2048 przy JSON ~1.9 KB — zapas na nowe pola
+   char* jb = (char*)psramAllocSafe(FB_JSON_CAP);
+   size_t jLen = 0;
+   bool jPsram = (jb != nullptr);
+@@ -47402,6 +47437,7 @@
+       delay(HARDENING_OPOZNIENIE_MS * proba);
+     }
+   }
++  g_bmpDiagGotowy = bmpOk;
+   if (bmpOk) {
+     bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2,
+                      Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16,
