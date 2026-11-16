@@ -1,0 +1,217 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 8fd3951..eb34485 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@ android {
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31095
+-        versionName = "0.31.95"
++        versionCode = 31096
++        versionName = "0.31.96"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+index 32a9783..c6bb0b6 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -154,6 +154,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     private val servoModeCommandMutex = Mutex()
+     private var servoModeRequestId = 0L
+     private val weatherMutex = Mutex()
++    private val weatherRefreshGate = WeatherRefreshGate()
+     private val terminalCommandMutex = Mutex()
+ 
+     // ── stan połączenia ─────────────────────────────────────────────────────
+@@ -224,6 +225,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     var weather by mutableStateOf<WeatherData?>(null)
+     var weatherDays by mutableStateOf(7)
+     var weatherBusy by mutableStateOf(false)
++    var weatherRefreshFailed by mutableStateOf(false)
+ 
+     // ── wykresy ─────────────────────────────────────────────────────────────
+     var telemetry by mutableStateOf<List<TelemPoint>>(emptyList())
+@@ -396,7 +398,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     fun onResume() {
+         restoreRuntimeState()
+         bgJob?.cancel(); bgJob = null
+-        poll(); refreshWeather(false)
++        poll(); refreshWeather(true)
+         // [0.31.61] Pamięć historii czytamy z dysku od razu po wejściu do aplikacji,
+         // a nie dopiero przy otwarciu Wykresów — pierwsze wejście na wykresy nie
+         // płaci wtedy za rozpakowanie pliku.
+@@ -1242,25 +1244,44 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+ 
+     // ── pogoda ──────────────────────────────────────────────────────────────
+     // ── pogoda (TYLKO prawdziwe Open-Meteo — zero symulacji) ────────────────
+-    fun refreshWeather(force: Boolean, announce: Boolean = false) = scope.launch {
+-        weatherMutex.withLock {
+-            // Init + onResume can request the initial forecast back-to-back; coalesce the duplicate.
+-            if (!force && weather != null) return@withLock
+-            if (weather == null || force) weatherBusy = true
+-            val lat = prefs.get(Prefs.K_LAT) ?: "51.066389"
+-            val lon = prefs.get(Prefs.K_LON) ?: "21.509167"
+-            val real = Weather.fetch(http, lat, lon, weatherDays)
+-            if (real != null) {
+-                weather = real; S.bump()
+-                if (announce) showToast("Pogoda", "Dane pogodowe zaktualizowane", "ok")
+-            } else if (weather == null) {
+-                // Pierwsze pobranie padlo: uczciwy brak danych, zadnych wymyslonych.
+-                if (announce) showToast("Pogoda", "Brak połączenia z Open-Meteo", "err")
+-            } else if (announce) {
+-                showToast("Pogoda", "Brak połączenia — pokazuję ostatnie dane", "err")
++    private fun currentWeatherKey() = WeatherRequestKey(
++        prefs.get(Prefs.K_LAT) ?: "51.066389",
++        prefs.get(Prefs.K_LON) ?: "21.509167",
++        weatherDays
++    )
++
++    fun refreshWeather(force: Boolean, announce: Boolean = false): Job {
++        // Wywołania podczas tego samego pobierania mogą skorzystać z jego wyniku.
++        val observedCount = weatherRefreshGate.completedCount
++        return scope.launch {
++            weatherMutex.withLock {
++                val key = currentWeatherKey()
++                if (weatherRefreshGate.completedForSince(key, observedCount)) {
++                    if (announce) {
++                        if (weatherRefreshGate.lastSuccess) showToast("Pogoda", "Dane pogodowe zaktualizowane", "ok")
++                        else showToast("Pogoda", if (weather == null) "Brak połączenia z Open-Meteo" else "Brak połączenia — pokazuję ostatnie dane", "err")
++                    }
++                    return@withLock
++                }
++                if (!force && weather != null) return@withLock
++                weatherBusy = true
++                try {
++                    val real = Weather.fetch(http, key.lat, key.lon, key.days)
++                    weatherRefreshGate.complete(key, real != null)
++                    // Nie nadpisuj pogody danymi poprzedniej lokalizacji / zakresu.
++                    if (key != currentWeatherKey()) return@withLock
++                    weatherRefreshFailed = real == null
++                    if (real != null) {
++                        weather = real; S.bump()
++                        if (announce) showToast("Pogoda", "Dane pogodowe zaktualizowane", "ok")
++                    } else if (announce) {
++                        showToast("Pogoda", if (weather == null) "Brak połączenia z Open-Meteo" else "Brak połączenia — pokazuję ostatnie dane", "err")
++                    }
++                    solar.estimateForecastGain(weather?.hourly ?: emptyList())
++                } finally {
++                    weatherBusy = false
++                }
+             }
+-            weatherBusy = false
+-            solar.estimateForecastGain(weather?.hourly ?: emptyList())
+         }
+     }
+ 
+@@ -2740,9 +2761,9 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+         }
+     }
+ 
+-    /** Odświeżenie zakładki Pogoda (pobranie prognozy, gdy jeszcze nie ma danych). */
++    /** Każde wejście na zakładkę próbuje pobrać aktualną prognozę. */
+     fun refreshWeatherTab() {
+-        if (weather == null) refreshWeather(true) else refreshWeather(false)
++        refreshWeather(true)
+     }
+ 
+     // ─────────────────────────  mapowanie UI (PULPIT → arkusze) ─────────────────────────
+diff --git a/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt b/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt
+new file mode 100644
+index 0000000..452ac14
+--- /dev/null
++++ b/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt
+@@ -0,0 +1,21 @@
++package com.sterownikco.pro.core
++
++/** Used on the model's main coroutine dispatcher, protected during fetch by weatherMutex. */
++internal data class WeatherRequestKey(val lat: String, val lon: String, val days: Int)
++
++internal class WeatherRefreshGate {
++    var completedCount: Long = 0
++        private set
++    private var lastKey: WeatherRequestKey? = null
++    var lastSuccess: Boolean = false
++        private set
++
++    fun completedForSince(key: WeatherRequestKey, observedCount: Long): Boolean =
++        completedCount != observedCount && lastKey == key
++
++    fun complete(key: WeatherRequestKey, success: Boolean) {
++        lastKey = key
++        lastSuccess = success
++        completedCount++
++    }
++}
+diff --git a/app/src/main/java/com/sterownikco/pro/ui/screens/Weather.kt b/app/src/main/java/com/sterownikco/pro/ui/screens/Weather.kt
+index a153d33..4e76ef1 100644
+--- a/app/src/main/java/com/sterownikco/pro/ui/screens/Weather.kt
++++ b/app/src/main/java/com/sterownikco/pro/ui/screens/Weather.kt
+@@ -146,6 +146,13 @@ fun WeatherPage(m: AppModel) {
+             IconBtn("refresh", "Odśwież dane meteo", onClick = { m.refreshWeather(true, true) })
+         }
+ 
++        if (m.weatherBusy) {
++            Text("Aktualizowanie pogody…", fontSize = 11.sp, color = Pal.TextDim)
++        } else if (m.weatherRefreshFailed) {
++            Text(if (w == null) "Nie udało się pobrać pogody. Sprawdź połączenie." else "Nie udało się odświeżyć pogody — pokazuję ostatnie dane.",
++                fontSize = 11.sp, color = Color(0xFFFFB454))
++        }
++
+         // `.weather-hero`: gradient hero, subtle cyan glow, weather art and min/max pill.
+         val heroShape = RoundedCornerShape(22.dp)
+         Box(
+diff --git a/app/src/test/java/com/sterownikco/pro/core/WeatherRefreshGateTest.kt b/app/src/test/java/com/sterownikco/pro/core/WeatherRefreshGateTest.kt
+new file mode 100644
+index 0000000..ded12c7
+--- /dev/null
++++ b/app/src/test/java/com/sterownikco/pro/core/WeatherRefreshGateTest.kt
+@@ -0,0 +1,47 @@
++package com.sterownikco.pro.core
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class WeatherRefreshGateTest {
++    private val a = WeatherRequestKey("51", "21", 7)
++    private val otherLocation = WeatherRequestKey("52", "21", 7)
++    private val otherDays = WeatherRequestKey("51", "21", 14)
++
++    @Test fun pendingRefreshesShareOnlyTheSameCompletedRequest() {
++        val gate = WeatherRefreshGate()
++        val resume = gate.completedCount
++        val tabEntry = gate.completedCount
++        assertFalse(gate.completedForSince(a, resume))
++        gate.complete(a, true)
++        assertTrue(gate.completedForSince(a, resume))
++        assertTrue(gate.completedForSince(a, tabEntry))
++        assertTrue(gate.lastSuccess)
++        assertFalse(gate.completedForSince(otherLocation, tabEntry))
++        assertFalse(gate.completedForSince(otherDays, tabEntry))
++        // A later resume/entry requests again even with previously cached data.
++        assertFalse(gate.completedForSince(a, gate.completedCount))
++    }
++
++    @Test fun failureCanBeSharedButLaterEntryRetries() {
++        val gate = WeatherRefreshGate()
++        val whileLoading = gate.completedCount
++        gate.complete(a, false)
++        assertFalse(gate.lastSuccess)
++        assertTrue(gate.completedForSince(a, whileLoading))
++        assertFalse(gate.completedForSince(a, gate.completedCount))
++        gate.complete(a, true)
++        assertTrue(gate.lastSuccess)
++    }
++
++    @Test fun changedLocationOrRangeStartsFreshRequest() {
++        val gate = WeatherRefreshGate()
++        val waiting = gate.completedCount
++        gate.complete(a, true)
++        assertFalse(gate.completedForSince(otherLocation, waiting))
++        assertFalse(gate.completedForSince(otherDays, waiting))
++        gate.complete(otherLocation, true)
++        assertTrue(gate.completedForSince(otherLocation, waiting))
++        assertFalse(gate.completedForSince(a, waiting))
++    }
++}
