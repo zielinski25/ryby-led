@@ -1,3 +1,5 @@
+> **Ważne:** 0.31.97 ma błąd kompilacji. Po zastosowaniu użyj [poprawki 0.31.98](KAFELEK-0.31.98.md).
+
 # Wybór źródła kafelka „Zewnętrzna” — Android 0.31.97
 
 Po dotknięciu kafelka Zewnętrzna w aplikacji, w otwartym arkuszu są przyciski **Zew 1 · DS18B20** i **Zew 2 · DHT22**. Wybrane źródło jest wyświetlane na kafelku i zapisywane w ustawieniach aplikacji; domyślnie Zew 1. Zachowany jest dotychczasowy arkusz szczegółów Zew 1 i jego symulacja. Dopisek w arkuszu wyjaśnia, że symulacja dotyczy sterownika i Zew 1, a nie DHT.

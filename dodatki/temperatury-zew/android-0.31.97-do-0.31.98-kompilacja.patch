@@ -1,0 +1,41 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 93a4341..6446bb4 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@ android {
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31097
+-        versionName = "0.31.97"
++        versionCode = 31098
++        versionName = "0.31.98"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+index ad541eb..19e1541 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -172,7 +172,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     var outdoorTileSource by mutableIntStateOf(if (prefs.getInt(Prefs.K_OUTDOOR_TILE_SOURCE, 1) == 2) 2 else 1)
+         private set
+ 
+-    fun setOutdoorTileSource(source: Int) {
++    fun chooseOutdoorTileSource(source: Int) {
+         if (source != 1 && source != 2) return
+         outdoorTileSource = source
+         prefs.setInt(Prefs.K_OUTDOOR_TILE_SOURCE, source)
+diff --git a/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt b/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
+index bb4f578..6a012a3 100644
+--- a/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
++++ b/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
+@@ -240,7 +240,7 @@ fun SensorModal(m: AppModel, sen: SensorDef) {
+     if (sen.id == "zewn") {
+         SectionHeader("Źródło kafelka Zewnętrzna")
+         Seg(listOf(1 to "Zew 1 · DS18B20", 2 to "Zew 2 · DHT22"), current = m.outdoorTileSource) { source ->
+-            m.setOutdoorTileSource(source)
++            m.chooseOutdoorTileSource(source)
+         }
+         Note("Wybór zmienia tylko wartość na kafelku. Sterowanie i symulacja poniżej dotyczą Zew 1 (DS18B20). Przy braku Zew 2 kafelek pokaże brak danych.")
+     }
