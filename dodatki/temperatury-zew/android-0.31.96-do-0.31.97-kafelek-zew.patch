@@ -1,0 +1,196 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index eb34485..93a4341 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@ android {
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31096
+-        versionName = "0.31.96"
++        versionCode = 31097
++        versionName = "0.31.97"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+index c6bb0b6..ad541eb 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -169,6 +169,14 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     private var pendingSyberkaPosition by mutableStateOf<ServoPositionPreview?>(null)
+     var dashboardWidgets by mutableStateOf(TileDefs.DEFAULT_VISIBLE_IDS)
+     var dashboardWidgetOrder by mutableStateOf(TileDefs.TILES.map { it.id })
++    var outdoorTileSource by mutableIntStateOf(if (prefs.getInt(Prefs.K_OUTDOOR_TILE_SOURCE, 1) == 2) 2 else 1)
++        private set
++
++    fun setOutdoorTileSource(source: Int) {
++        if (source != 1 && source != 2) return
++        outdoorTileSource = source
++        prefs.setInt(Prefs.K_OUTDOOR_TILE_SOURCE, source)
++    }
+     var authOpen by mutableStateOf(false)
+     /** Okienko alarmu w aplikacji (gdy system nie odpali FSI na pierwszym planie). */
+     var alarmPopup by mutableStateOf<AlarmInfo?>(null)
+diff --git a/app/src/main/java/com/sterownikco/pro/core/Prefs.kt b/app/src/main/java/com/sterownikco/pro/core/Prefs.kt
+index a396166..5e28322 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/Prefs.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/Prefs.kt
+@@ -321,6 +321,7 @@ class Prefs(ctx: Context) : AlarmPrefsStore {
+         const val K_REMEMBER_CREDS = "piec_fb_remember_credentials"
+         const val K_CMD_TOKEN = "piec_cmd_token"
+         const val K_DASH_WIDGETS = "piec_dashboard_widgets_v1"
++        const val K_OUTDOOR_TILE_SOURCE = "piec_dashboard_outdoor_source_v1"
+         const val K_DASH_WIDGET_ORDER = "piec_dashboard_widget_order_v1"
+         const val K_ID_TOKEN = "piec_fb_token"
+         const val K_REF_TOKEN = "piec_fb_ref_token"
+diff --git a/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt b/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
+index 5d6e2dd..2e84250 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TileSpecs.kt
+@@ -113,6 +113,36 @@ internal fun reorderTileWithinSection(
+     }
+ }
+ 
++/** Kafelek diagnostyczny: wybór źródła nigdy nie modyfikuje stanu sterownika. */
++internal fun outdoorTemperatureTile(
++    source: Int, ds: Double, dht: Double, dsSimulated: Boolean, dsSimMinutes: Int, stale: Boolean
++): TileSpec {
++    val useDht = source == 2
++    val value = if (useDht) dht else ds
++    val simulated = !useDht && dsSimulated
++    val readingText = if (value.isFinite()) String.format(java.util.Locale.US, "%.1f", value) else "—"
++    val condition = if (!value.isFinite()) "oczekiwanie na odczyt" else if (value < 0) "mróz" else if (value > 25) "upał" else "odczyt stabilny"
++    val description = (if (useDht) "Zew 2" else "Zew 1") + " · " +
++        if (simulated) "symulacja ($dsSimMinutes min)" else condition
++    val status = when {
++        simulated -> ("SYMULACJA ${dsSimMinutes}M" to "sim")
++        !value.isFinite() -> ("BRAK DANYCH" to "stale")
++        stale -> ("NIEAKTUALNE" to "stale")
++        else -> ("LIVE" to "live")
++    }
++    val min = if (useDht) -40.0 else -25.0
++    val max = if (useDht) 80.0 else 45.0
++    val fraction = if (value.isFinite()) ((value - min) / (max - min)).coerceIn(0.0, 1.0) else 0.0
++    return TileSpec(
++        id = "zewn", title = "Zewnętrzna", grid = 1, value = readingText, unit = "°C",
++        cls = if (!value.isFinite()) "c-none" else if (value < 0) "c-flame2" else if (value > 15) "c-ember" else "c-flame",
++        frac = fraction, desc = description,
++        vcol = if (value < 0) "#7dd3fc" else if (value > 15) "#ffb86b" else "",
++        badge = status.first, badgeCls = status.second,
++        sim = simulated, stale = stale, artKey = "zewn"
++    )
++}
++
+ fun buildTiles(m: AppModel, weatherCode: Int, isDay: Boolean): List<TileSpec> {
+     val S = m.S
+     fun fmt1(v: Double) = if (v.isFinite()) String.format(java.util.Locale.US, "%.1f", v) else "—"
+@@ -132,19 +162,15 @@ fun buildTiles(m: AppModel, weatherCode: Int, isDay: Boolean): List<TileSpec> {
+     val out = ArrayList<TileSpec>()
+     val stale = !S.online || !m.isFbFresh
+ 
+-    // ── zewn ────────────────────────────────────────────────────────────────
+-    val tz = S.valOf("zewn", "t_zewn")
+-    out.add(
+-        TileSpec(
+-            id = "zewn", title = "Zewnętrzna", grid = 1, value = fmt1(tz), unit = "°C",
+-            cls = if (!tz.isFinite()) "c-none" else if (tz < 0) "c-flame2" else if (tz > 15) "c-ember" else "c-flame",
+-            frac = norm(tz, -25.0, 45.0),
+-            desc = symDesc("zewn", if (!tz.isFinite()) "oczekiwanie na odczyt" else if (tz < 0) "mróz" else if (tz > 25) "upał" else "odczyt stabilny"),
+-            vcol = if (tz < 0) "#7dd3fc" else if (tz > 15) "#ffb86b" else "",
+-            badge = badge("zewn")?.first ?: "LIVE", badgeCls = badge("zewn")?.second ?: "live",
+-            sim = S.symAktywna("zewn"), stale = stale, artKey = "zewn"
+-        )
+-    )
++    // Wybór działa wyłącznie na kafelku; DHT nie przejmuje symulacji DS.
++    out.add(outdoorTemperatureTile(
++        source = m.outdoorTileSource,
++        ds = S.valOf("zewn", "t_zewn"),
++        dht = S.valOf("zewn_2", "t_zewn_2"),
++        dsSimulated = S.symAktywna("zewn"),
++        dsSimMinutes = S.sym["zewn"]?.min ?: 0,
++        stale = stale
++    ))
+ 
+     // ── ogrz ────────────────────────────────────────────────────────────────
+     val to = S.valOf("ogrz", "t_ogrz")
+diff --git a/app/src/main/java/com/sterownikco/pro/ui/screens/Dashboard.kt b/app/src/main/java/com/sterownikco/pro/ui/screens/Dashboard.kt
+index d4be114..e623c91 100644
+--- a/app/src/main/java/com/sterownikco/pro/ui/screens/Dashboard.kt
++++ b/app/src/main/java/com/sterownikco/pro/ui/screens/Dashboard.kt
+@@ -86,7 +86,7 @@ fun Dashboard(m: AppModel) {
+         val reported = S.art(weatherCode, isDay, servoMode)
+         flapPreview?.let { reported.copy(klapa = it.targetDegrees.toFloat(), klapaKnown = true) } ?: reported
+     }
+-    val tiles = remember(rev, servoMode, weatherCode, isDay, m.weather, m.weatherBusy, flapPreview, syberkaPreview) {
++    val tiles = remember(rev, servoMode, weatherCode, isDay, m.weather, m.weatherBusy, flapPreview, syberkaPreview, m.outdoorTileSource) {
+         buildTiles(m, weatherCode, isDay)
+     }
+     val orderIndex = m.dashboardWidgetOrder.withIndex().associate { it.value to it.index }
+diff --git a/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt b/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
+index c761dc5..bb4f578 100644
+--- a/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
++++ b/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
+@@ -237,6 +237,13 @@ fun SensorFullCard(m: AppModel, sen: SensorDef, listStyle: Boolean, onClickHeade
+ /** `sensorModalContent(sen)` — karta telemetryczna + sekcja symulacji. */
+ @Composable
+ fun SensorModal(m: AppModel, sen: SensorDef) {
++    if (sen.id == "zewn") {
++        SectionHeader("Źródło kafelka Zewnętrzna")
++        Seg(listOf(1 to "Zew 1 · DS18B20", 2 to "Zew 2 · DHT22"), current = m.outdoorTileSource) { source ->
++            m.setOutdoorTileSource(source)
++        }
++        Note("Wybór zmienia tylko wartość na kafelku. Sterowanie i symulacja poniżej dotyczą Zew 1 (DS18B20). Przy braku Zew 2 kafelek pokaże brak danych.")
++    }
+     SensorFullCard(m, sen, listStyle = false)
+     if (sen.id == "panel") SolarMetricsCard(m)
+     SymUnit(m, sen.id, sen.name, sen.unit, sen.min, sen.max, sen.step, sen.key)
+diff --git a/app/src/test/java/com/sterownikco/pro/core/OutdoorTileSourceTest.kt b/app/src/test/java/com/sterownikco/pro/core/OutdoorTileSourceTest.kt
+new file mode 100644
+index 0000000..f70784d
+--- /dev/null
++++ b/app/src/test/java/com/sterownikco/pro/core/OutdoorTileSourceTest.kt
+@@ -0,0 +1,43 @@
++package com.sterownikco.pro.core
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class OutdoorTileSourceTest {
++    private fun tile(source: Int, ds: Double = 12.0, dht: Double = 8.5, simulated: Boolean = false, stale: Boolean = false) =
++        outdoorTemperatureTile(source, ds, dht, simulated, 5, stale)
++
++    @Test fun eachSourceDisplaysItsOwnReadingAndName() {
++        val ds = tile(1)
++        val dht = tile(2)
++        assertEquals("Zewnętrzna", ds.title)
++        assertEquals("12.0", ds.value)
++        assertEquals("8.5", dht.value)
++        assertTrue(ds.desc.startsWith("Zew 1"))
++        assertTrue(dht.desc.startsWith("Zew 2"))
++        assertEquals("LIVE", dht.badge)
++    }
++
++    @Test fun noFallbackAndZeroIsNotMissing() {
++        val missing = tile(2, ds = 12.0, dht = Double.NaN)
++        assertEquals("—", missing.value)
++        assertEquals("BRAK DANYCH", missing.badge)
++        assertEquals("0.0", tile(2, dht = 0.0).value)
++        assertEquals("-12.5", tile(2, dht = -12.5).value)
++    }
++
++    @Test fun dsSimulationDoesNotMarkDhtSimulated() {
++        val ds = tile(1, simulated = true)
++        val dht = tile(2, simulated = true)
++        assertTrue(ds.sim)
++        assertEquals("SYMULACJA 5M", ds.badge)
++        assertFalse(dht.sim)
++        assertEquals("LIVE", dht.badge)
++    }
++
++    @Test fun staleDataAndInvalidSelectionAreHandled() {
++        assertEquals("NIEAKTUALNE", tile(2, stale = true).badge)
++        assertTrue(tile(2, stale = true).stale)
++        assertEquals("12.0", tile(99).value)
++    }
++}
