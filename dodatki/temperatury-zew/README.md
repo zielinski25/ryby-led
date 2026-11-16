@@ -1,3 +1,5 @@
+> **Nieaktualne:** Zew 3 usunięto w nowych kandydatach. Aktualne informacje: [BEZ-ZEW-3.md](BEZ-ZEW-3.md). Poniżej historia poprzedniej wersji.
+
 > Nowszy kandydat centrali o liczbowej wersji `v3.57.10`: [CENTRALA-3.57.10-ZEW.md](CENTRALA-3.57.10-ZEW.md). Nie wgrywać do pracującego kotła.
 
 # Zew 1, Zew 2 i Zew 3

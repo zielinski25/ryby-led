@@ -1,0 +1,156 @@
+diff --git a/src/main_centrala.cpp b/src/main_centrala.cpp
+index 55057a3..5e852eb 100644
+--- a/src/main_centrala.cpp
++++ b/src/main_centrala.cpp
+@@ -1,3 +1,4 @@
++// FIRMWARE_VERSION v3.57.10 -> v3.57.11 — usuwa diagnostyczny Zew 3; zachowuje Zew 2 i cisnienie.
+ // FIRMWARE_VERSION v3.57.9 -> v3.57.10 (2026-11-15) — KANDYDAT: temperatury Zew 2 i Zew 3.
+ // Wylacznie diagnostyka; sterowanie i korekta wilgotnosci nadal uzywaja DS18B20.
+ // Nowa probka zajmuje dotychczasowe 4 bajty paddingu struktury; znacznik
+@@ -5771,27 +5772,24 @@ static const uint32_t WDT_TIMEOUT_MS = 15000UL;
+ 
+ // Dodatkowe odczyty tylko diagnostyczne; atomowy snapshot między taskami.
+ static portMUX_TYPE g_tempDiagMux = portMUX_INITIALIZER_UNLOCKED;
+-static float g_tempDhtDiag = NAN, g_tempBmpDiag = NAN;
+-static uint64_t g_tempDhtAtUs = 0, g_tempBmpAtUs = 0;
+-static bool g_bmpDiagGotowy = false;
+-static void zapiszTempDiag(bool dht, float v) {
++static float g_tempDhtDiag = NAN;
++static uint64_t g_tempDhtAtUs = 0;
++static void zapiszTempDiag(float v) {
+   const uint64_t at = (uint64_t)esp_timer_get_time();
+   portENTER_CRITICAL(&g_tempDiagMux);
+-  if (dht) { g_tempDhtDiag = v; g_tempDhtAtUs = at; }
+-  else { g_tempBmpDiag = v; g_tempBmpAtUs = at; }
++  g_tempDhtDiag = v; g_tempDhtAtUs = at;
+   portEXIT_CRITICAL(&g_tempDiagMux);
+ }
+-static float czytajTempDiag(bool dht) {
++static float czytajTempDiag() {
+   float v; uint64_t at;
+   portENTER_CRITICAL(&g_tempDiagMux);
+-  if (dht) { v = g_tempDhtDiag; at = g_tempDhtAtUs; }
+-  else { v = g_tempBmpDiag; at = g_tempBmpAtUs; }
++  v = g_tempDhtDiag; at = g_tempDhtAtUs;
+   portEXIT_CRITICAL(&g_tempDiagMux);
+   const uint64_t now = (uint64_t)esp_timer_get_time();
+   return isfinite(v) && now >= at && now - at <= 15000000ULL ? v : NAN;
+ }
+-static String jsonTempDiag(bool dht) {
+-  const float v = czytajTempDiag(dht);
++static String jsonTempDiag() {
++  const float v = czytajTempDiag();
+   return isfinite(v) ? String(v, 1) : String("null");
+ }
+ 
+@@ -5995,7 +5993,7 @@ static const char* GITHUB_ASSET_PANEL = "firmware_panel.bin";
+ // falszywie; tutaj celowo stala kompilacyjna, zeby tego uniknac).
+ // v1.1.0: system logow FS (log_krytyczny.txt, logCircularTrimA, priorytet
+ // log_a/log_b) + interlock AUTO — pelny opis w CHANGELOG na samej gorze pliku.
+-static const char* FIRMWARE_VERSION = "v3.57.10";
++static const char* FIRMWARE_VERSION = "v3.57.11";
+ 
+ // ════════════════════════════════════════════════════════
+ // [PUNKT 6 — Telegram] Bot statusu/sterowania, wzorowany na architekturze
+@@ -21321,7 +21319,7 @@ struct TelemetrySample {
+   uint16_t ageS[TELEMETRY_CH_COUNT];
+   // Wypelnienie bajtow 76..79, dotychczas tylko padding. Nie zmienia ABI.
+   int16_t tDhtDiagX10;
+-  int16_t tBmpDiagX10;
++  int16_t tempDiagReserved; // zachowanie ukladu 80 B (poprzednio Zew 3)
+ };
+ 
+ // W kanalach 0..10 zajete sa bity 0..21. Stara produkcyjna probka ma
+@@ -21353,7 +21351,7 @@ static_assert(offsetof(TelemetrySample, qualityBits) == 48, "TelemetrySample.qua
+ static_assert(offsetof(TelemetrySample, simulatedBits) == 52, "TelemetrySample.simulatedBits offset changed");
+ static_assert(offsetof(TelemetrySample, ageS) == 54, "TelemetrySample.ageS offset changed");
+ static_assert(offsetof(TelemetrySample, tDhtDiagX10) == 76, "TelemetrySample DHT offset changed");
+-static_assert(offsetof(TelemetrySample, tBmpDiagX10) == 78, "TelemetrySample BME offset changed");
++static_assert(offsetof(TelemetrySample, tempDiagReserved) == 78, "TelemetrySample reserved offset changed");
+ static void telemetryFormatRecordId(const TelemetrySample &s, char *out, size_t outCap);
+ 
+ // [COMMIT-B] SPSC TelemetryRing: producer = historiaZapiszProbke() / Core 1,
+@@ -23605,8 +23603,8 @@ static bool telemetryBuildSnapshot(TelemetrySample &out, uint64_t monoNowMs64,
+       out.simulatedBits |= (uint16_t)(1U << i);
+     }
+   }
+-  out.tDhtDiagX10 = encodeTempDiag(czytajTempDiag(true), -40.0f, 80.0f);
+-  out.tBmpDiagX10 = encodeTempDiag(czytajTempDiag(false), -40.0f, 85.0f);
++  out.tDhtDiagX10 = encodeTempDiag(czytajTempDiag(), -40.0f, 80.0f);
++  out.tempDiagReserved = 0;
+   out.qualityBits |= TEMP_DIAG_MARK;
+   return true;
+ }
+@@ -28585,8 +28583,7 @@ String wifiZbudujJsonStatus() {
+   j += F("\"wifi_ssid\":\""); j += (WiFi.status() == WL_CONNECTED ? WiFi.SSID() : ""); j += F("\",");
+   j += F("\"rssi\":"); j += String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0); j += F(",");
+   j += F("\"t_zewn\":"); j += String(temperaturaNaZewnatrz, 1); j += F(",");
+-  j += F("\"t_zewn_2\":"); j += jsonTempDiag(true); j += F(",");
+-  j += F("\"t_zewn_3\":"); j += jsonTempDiag(false); j += F(",");
++  j += F("\"t_zewn_2\":"); j += jsonTempDiag(); j += F(",");
+   j += F("\"t_bojler\":"); j += String(temperaturaBojlera, 1); j += F(",");
+   j += F("\"t_ogrz\":"); j += String(temperaturaOgrzewania, 1); j += F(",");
+   j += F("\"t_ogrz_sr\":"); j += String(temperaturaOgrzewaniaSrednia, 1); j += F(",");
+@@ -31321,20 +31318,11 @@ void cisnienie() {
+   bool symCisnieniaTeraz = symulacjaTrwa(symulacjaCisnieniaAktywna, symulacjaCisnieniaDo, "cisnienie");
+   float cisnienieOdczytaneLok;
+   if (symCisnieniaTeraz) {
+-    zapiszTempDiag(false, NAN); // symulacja ciśnienia nie jest temperaturą BME
+     cisnienieOdczytaneLok = symulowaneCisnienie;
+     telemetryMarkAccepted(TELEMETRY_CH_PRESSURE, telemetryPressureNowMs, true);
+   } else {
+     telemetryMarkAttempt(TELEMETRY_CH_PRESSURE, telemetryPressureNowMs);
+     cisnienieOdczytaneLok = ((bmp.readPressure() / 100) + 18);
+-    // Nie czytaj temperatury niezainicjalizowanego czujnika; błąd ciśnienia
+-    // także unieważnia próbkę (I2C potrafi zwrócić pozornie poprawne zero).
+-    float tBmp = NAN;
+-    if (g_bmpDiagGotowy && isfinite(cisnienieOdczytaneLok) &&
+-        cisnienieOdczytaneLok >= 318.0f && cisnienieOdczytaneLok <= 1118.0f) {
+-      tBmp = bmp.readTemperature();
+-    }
+-    zapiszTempDiag(false, isfinite(tBmp) && tBmp >= -40.0f && tBmp <= 85.0f ? tBmp : NAN);
+     if (!isfinite(cisnienieOdczytaneLok)) {
+       telemetryMarkInvalid(TELEMETRY_CH_PRESSURE);
+     } else {
+@@ -31383,13 +31371,13 @@ void wilgotnosc() {
+   float wilgotnoscOdczytanaLok;
+   const uint64_t telemetryRhNowMs = telemetryMonotonicMs();
+   if (symulacjaTrwa(symulacjaWilgotnosciAktywna, symulacjaWilgotnosciDo, "wilgotnosc")) {
+-    zapiszTempDiag(true, NAN); // symulowana wilgotnosc nie jest temperatura
++    zapiszTempDiag(NAN); // symulowana wilgotnosc nie jest temperatura
+     wilgotnoscOdczytanaLok = symulowanaWilgotnosc;
+     telemetryMarkAccepted(TELEMETRY_CH_RH, telemetryRhNowMs, true);
+   } else {
+     telemetryMarkAttempt(TELEMETRY_CH_RH, telemetryRhNowMs);
+     uint8_t dhtErr = read_dht(dhtTempPomijana, wilgotnoscOdczytanaLok, DHT_PIN, DHT22);
+-    zapiszTempDiag(true, dhtErr == DHT_OK && isfinite(dhtTempPomijana) &&
++    zapiszTempDiag(dhtErr == DHT_OK && isfinite(dhtTempPomijana) &&
+         dhtTempPomijana >= -40.0f && dhtTempPomijana <= 80.0f ? dhtTempPomijana : NAN);
+     // [v3.57.4] 0,0 % z DHT22 to odczyt smieciowy, nie pomiar - traktujemy go
+     // jak blad (zostaje poprzednia dobra wartosc). W kotlowni nie ma 0 %.
+@@ -40381,7 +40369,6 @@ static bool telemetryAppendPathForSample(const TelemetrySample &s, char *buf, si
+                           v < 0 ? "-" : "", mag / 10U, mag % 10U);
+     };
+     dodajTemp("t_zewn_2", s.tDhtDiagX10, -400, 800);
+-    dodajTemp("t_zewn_3", s.tBmpDiagX10, -400, 850);
+   }
+   telemetryJsonAppend(buf, cap, used, "\"age\":[");
+   for (uint8_t i = 0; i < TELEMETRY_CH_COUNT; ++i) {
+@@ -42909,8 +42896,7 @@ static void zbudujJsonStatusPelny(const std::function<void(const String&)>& ja)
+   ja("\"wifi_ssid\":\""); ja(WiFi.status() == WL_CONNECTED ? WiFi.SSID() : ""); ja("\",");
+   ja("\"wifi_rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",");
+   ja("\"t_zewn\":" + String(temperaturaNaZewnatrz, 1) + ",");
+-  ja("\"t_zewn_2\":" + jsonTempDiag(true) + ",");
+-  ja("\"t_zewn_3\":" + jsonTempDiag(false) + ",");
++  ja("\"t_zewn_2\":" + jsonTempDiag() + ",");
+   ja("\"t_bojler\":" + String(temperaturaBojlera, 1) + ",");
+   ja("\"t_ogrz\":" + String(temperaturaOgrzewania, 1) + ",");
+   ja("\"t_ogrz_sr\":" + String(temperaturaOgrzewaniaSrednia, 1) + ",");
+@@ -47491,7 +47477,6 @@ void setup() {
+       delay(HARDENING_OPOZNIENIE_MS * proba);
+     }
+   }
+-  g_bmpDiagGotowy = bmpOk;
+   if (bmpOk) {
+     bmp.setSampling(Adafruit_BMP280::MODE_NORMAL, Adafruit_BMP280::SAMPLING_X2,
+                      Adafruit_BMP280::SAMPLING_X16, Adafruit_BMP280::FILTER_X16,

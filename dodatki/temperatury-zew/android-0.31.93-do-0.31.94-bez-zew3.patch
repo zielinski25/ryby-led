@@ -1,0 +1,289 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 4b0c1c0..5339772 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@ android {
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31093
+-        versionName = "0.31.93"
++        versionCode = 31094
++        versionName = "0.31.94"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+index e31e20a..32a9783 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -1512,7 +1512,6 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+             t_zewn = value("t_zewn", "zewn", 0, S.t_zewn),
+             // Dodatkowe temperatury są niezależne od symulacji Zew 1.
+             t_zewn_2 = S.t_zewn_2.takeIf { S.hasData("t_zewn_2") && it.isFinite() },
+-            t_zewn_3 = S.t_zewn_3.takeIf { S.hasData("t_zewn_3") && it.isFinite() },
+             t_bojler = value("t_bojler", "bojler", 1, S.t_bojler),
+             t_ogrz = value("t_ogrz", "ogrz", 2, S.t_ogrz),
+             t_ogrz_sr = value("t_ogrz_sr", "ogrz", 3, S.t_ogrz_sr),
+diff --git a/app/src/main/java/com/sterownikco/pro/core/PiecState.kt b/app/src/main/java/com/sterownikco/pro/core/PiecState.kt
+index 47a1bde..537e9ad 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/PiecState.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/PiecState.kt
+@@ -19,7 +19,6 @@ class PiecState {
+     var night = false
+     var t_zewn = Double.NaN
+     var t_zewn_2 = Double.NaN // DHT22 — wyłącznie diagnostyka
+-    var t_zewn_3 = Double.NaN // BME/BMP — wyłącznie diagnostyka
+     var t_ogrz = Double.NaN
+     var t_ogrz_sr = Double.NaN
+     var t_bojler = Double.NaN
+@@ -145,7 +144,6 @@ class PiecState {
+     fun valOf(@Suppress("UNUSED_PARAMETER") pole: String, key: String): Double = if (!hasData(key)) Double.NaN else when (key) {
+         "t_zewn" -> t_zewn
+         "t_zewn_2" -> t_zewn_2
+-        "t_zewn_3" -> t_zewn_3
+         "t_ogrz" -> t_ogrz
+         "t_ogrz_sr" -> t_ogrz_sr
+         "t_bojler" -> t_bojler
+@@ -164,7 +162,6 @@ class PiecState {
+         when (key) {
+             "t_zewn" -> t_zewn = Double.NaN
+             "t_zewn_2" -> t_zewn_2 = Double.NaN
+-            "t_zewn_3" -> t_zewn_3 = Double.NaN
+             "t_ogrz" -> t_ogrz = Double.NaN
+             "t_ogrz_sr" -> t_ogrz_sr = Double.NaN
+             "t_bojler" -> t_bojler = Double.NaN
+@@ -217,7 +214,7 @@ class PiecState {
+ 
+         // Każdy snapshot jest nowym obrazem statusu. Brak pola ma oznaczać
+         // BRAK DANYCH, a nie zachowanie poprzedniego odczytu jako świeżego.
+-        listOf("t_ogrz", "t_ogrz_sr", "t_bojler", "t_zewn", "t_zewn_2", "t_zewn_3", "t_panel", "t_pokoj", "t_powrot", "t_trociny", "cisnienie", "wilgotnosc", "dym")
++        listOf("t_ogrz", "t_ogrz_sr", "t_bojler", "t_zewn", "t_zewn_2", "t_panel", "t_pokoj", "t_powrot", "t_trociny", "cisnienie", "wilgotnosc", "dym")
+             .forEach { clearSensorValue(it) }
+         online = false; night = false
+         dym_wlaczony = false; dym_swiezy = false; dym_alarm = false
+@@ -309,7 +306,6 @@ class PiecState {
+         sensor("t_bojler", 0.0, 95.0) { t_bojler = it }
+         sensor("t_zewn", -25.0, 45.0) { t_zewn = it }
+         sensor("t_zewn_2", -40.0, 80.0) { t_zewn_2 = it }
+-        sensor("t_zewn_3", -40.0, 85.0) { t_zewn_3 = it }
+         sensor("t_panel", -10.0, 140.0) { t_panel = it }
+         sensor("t_pokoj", 8.0, 45.0) { t_pokoj = it }
+         sensor("t_powrot", 0.0, 95.0) { t_powrot = it }
+diff --git a/app/src/main/java/com/sterownikco/pro/core/RtdbClient.kt b/app/src/main/java/com/sterownikco/pro/core/RtdbClient.kt
+index 244b431..5ece83e 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/RtdbClient.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/RtdbClient.kt
+@@ -563,8 +563,7 @@ object Rtdb {
+             state = state, q = obj.optLong("q", 0), sim = simMask, simulated = rowSimulated,
+             stateKnown = stateKnown,
+             // Opcjonalne pola w °C; stare rekordy ich nie mają.
+-            t_zewn_2 = (obj.opt("t_zewn_2") as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..80.0 },
+-            t_zewn_3 = (obj.opt("t_zewn_3") as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..85.0 }
++            t_zewn_2 = (obj.opt("t_zewn_2") as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..80.0 }
+         )
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/core/Telemetry.kt b/app/src/main/java/com/sterownikco/pro/core/Telemetry.kt
+index 371ea5e..b8c585e 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/Telemetry.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/Telemetry.kt
+@@ -19,7 +19,7 @@ data class TelemRow(
+     /** Czy pole `state` było obecne i poprawne; starsze rekordy bez stanu pozostają nieznane. */
+     val stateKnown: Boolean = false,
+     /** Opcjonalne diagnostyczne temperatury w °C, tylko z nowego formatu. */
+-    val t_zewn_2: Double? = null, val t_zewn_3: Double? = null
++    val t_zewn_2: Double? = null
+ )
+ 
+ /** Rekord po mapowaniu kanałów; bitmapa zachowuje odczyty z aktywnych symulacji. */
+@@ -39,11 +39,11 @@ data class TelemPoint(
+     val pumpOn: Boolean? = null,
+     /** Id rekordu RTDB, używane do deduplikacji nakładających się odczytów archiwum. */
+     val sourceId: String = "",
+-    val t_zewn_2: Double? = null, val t_zewn_3: Double? = null
++    val t_zewn_2: Double? = null
+ ) {
+     fun hasValues(): Boolean = pumpOn != null || listOf(
+         t_zewn, t_bojler, t_ogrz, t_ogrz_sr, t_powrot, t_panel, t_pokoj, t_trociny,
+-        wilgotnosc, cisnienie, dym, klapa, syberka, t_zewn_2, t_zewn_3
++        wilgotnosc, cisnienie, dym, klapa, syberka, t_zewn_2
+     ).any { it != null && it.isFinite() }
+ 
+     fun isSimulated(key: String): Boolean {
+@@ -210,8 +210,7 @@ fun TelemRow.toPoint(): TelemPoint {
+         pumpOn = if (stateKnown) (state and PUMP_ON_STATE_BIT) != 0L else null,
+         sourceId = id,
+         // Diagnostyka ma osobne opcjonalne pola, nie przepisuje kanałów V1.
+-        t_zewn_2 = t_zewn_2?.takeIf { !simulated && it.isFinite() && it in -40.0..80.0 },
+-        t_zewn_3 = t_zewn_3?.takeIf { !simulated && it.isFinite() && it in -40.0..85.0 }
++        t_zewn_2 = t_zewn_2?.takeIf { !simulated && it.isFinite() && it in -40.0..80.0 }
+     )
+ }
+ 
+@@ -241,7 +240,6 @@ object ChartSeries {
+         SeriesDef("bojler", "Bojler", "t_bojler", 1, 1, "°C", "temp", "#ffb04a", "255,176,74", true),
+         SeriesDef("zewn", "Zew 1", "t_zewn", 0, 0, "°C", "temp", "#55d7ff", "85,215,255", true),
+         SeriesDef("zewn_2", "Zew 2", "t_zewn_2", -1, -1, "°C", "temp", "#69e6ad", "105,230,173", false),
+-        SeriesDef("zewn_3", "Zew 3", "t_zewn_3", -1, -1, "°C", "temp", "#ff87cc", "255,135,204", false),
+         SeriesDef("powrot", "Powrót", "t_powrot", 4, 4, "°C", "temp", "#a879ff", "168,121,255", false),
+         SeriesDef("panel", "Panel", "t_panel", 5, 5, "°C", "temp", "#ffd32a", "255,211,42", false),
+         SeriesDef("pokoj", "Pokój", "t_pokoj", 6, 6, "°C", "temp", "#c084fc", "192,132,252", false),
+@@ -262,13 +260,13 @@ object ChartSeries {
+     val BOUNDS = mapOf(
+         "t_ogrz" to (0.0 to 99.0), "t_ogrz_sr" to (0.0 to 99.0), "t_bojler" to (0.0 to 95.0),
+         "t_powrot" to (0.0 to 95.0), "t_panel" to (-10.0 to 140.0), "t_trociny" to (0.0 to 90.0),
+-        "t_pokoj" to (8.0 to 45.0), "t_zewn" to (-25.0 to 45.0), "t_zewn_2" to (-40.0 to 80.0), "t_zewn_3" to (-40.0 to 85.0), "wilgotnosc" to (10.0 to 100.0),
++        "t_pokoj" to (8.0 to 45.0), "t_zewn" to (-25.0 to 45.0), "t_zewn_2" to (-40.0 to 80.0), "wilgotnosc" to (10.0 to 100.0),
+         "cisnienie" to (900.0 to 1100.0), "dym" to (0.0 to 4095.0), "klapa" to (0.0 to 100.0),
+         "syberka" to (0.0 to 100.0), "pompa" to (0.0 to 100.0)
+     )
+ 
+     fun value(p: TelemPoint, key: String): Double? = when (key) {
+-        "t_zewn" -> p.t_zewn; "t_zewn_2" -> p.t_zewn_2; "t_zewn_3" -> p.t_zewn_3; "t_bojler" -> p.t_bojler; "t_ogrz" -> p.t_ogrz; "t_ogrz_sr" -> p.t_ogrz_sr
++        "t_zewn" -> p.t_zewn; "t_zewn_2" -> p.t_zewn_2; "t_bojler" -> p.t_bojler; "t_ogrz" -> p.t_ogrz; "t_ogrz_sr" -> p.t_ogrz_sr
+         "t_powrot" -> p.t_powrot; "t_panel" -> p.t_panel; "t_pokoj" -> p.t_pokoj; "t_trociny" -> p.t_trociny
+         "wilgotnosc" -> p.wilgotnosc; "cisnienie" -> p.cisnienie; "dym" -> p.dym
+         "klapa" -> p.klapa; "syberka" -> p.syberka
+diff --git a/app/src/main/java/com/sterownikco/pro/core/TelemetryCache.kt b/app/src/main/java/com/sterownikco/pro/core/TelemetryCache.kt
+index 82c4a0f..778c385 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/TelemetryCache.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TelemetryCache.kt
+@@ -352,7 +352,7 @@ class TelemetryCache(ctx: Context) {
+         val ch = listOf(
+             p.t_zewn, p.t_bojler, p.t_ogrz, p.t_ogrz_sr, p.t_powrot, p.t_panel,
+             p.t_pokoj, p.t_trociny, p.wilgotnosc, p.cisnienie, p.dym, p.klapa, p.syberka,
+-            p.t_zewn_2, p.t_zewn_3
++            p.t_zewn_2
+         )
+         ch.forEach { v ->
+             sb.append(';')
+@@ -392,8 +392,7 @@ class TelemetryCache(ctx: Context) {
+             simulated = false,
+             isLive = false,
+             pumpOn = pump,
+-            t_zewn_2 = num(17)?.takeIf { it in -40.0..80.0 },
+-            t_zewn_3 = num(18)?.takeIf { it in -40.0..85.0 }
++            t_zewn_2 = num(17)?.takeIf { it in -40.0..80.0 }
+         )
+     }
+ }
+diff --git a/app/src/main/java/com/sterownikco/pro/core/TelemetryDayCache.kt b/app/src/main/java/com/sterownikco/pro/core/TelemetryDayCache.kt
+index e9a3798..67a70a3 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/TelemetryDayCache.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/TelemetryDayCache.kt
+@@ -162,7 +162,6 @@ class TelemetryDayCache(private val root: File) {
+         out.put(if (r.simulated) 1 else 0)
+         out.put(if (r.stateKnown) 1 else 0)
+         out.put(r.t_zewn_2?.takeIf { it.isFinite() } ?: JSONObject.NULL)
+-        out.put(r.t_zewn_3?.takeIf { it.isFinite() } ?: JSONObject.NULL)
+         return out
+     }
+ 
+@@ -191,8 +190,7 @@ class TelemetryDayCache(private val root: File) {
+             sim = arr.optLong(9, 0L),
+             simulated = arr.optInt(10, 0) != 0,
+             stateKnown = arr.optInt(11, 0) != 0,
+-            t_zewn_2 = (arr.opt(12) as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..80.0 },
+-            t_zewn_3 = (arr.opt(13) as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..85.0 }
++            t_zewn_2 = (arr.opt(12) as? Number)?.toDouble()?.takeIf { it.isFinite() && it in -40.0..80.0 }
+         )
+     }
+ 
+diff --git a/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt b/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
+index f939616..0ecd1e4 100644
+--- a/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
++++ b/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
+@@ -7,17 +7,17 @@ import org.junit.Test
+ import java.nio.file.Files
+ 
+ class OutdoorDiagnosticTemperatureTest {
+-    private fun row(t2: Double? = null, t3: Double? = null, simulated: Boolean = false) = TelemRow(
++    private fun row(t2: Double? = null, simulated: Boolean = false) = TelemRow(
+         id = "test", seq = 1, ts = 1_700_000_000, mono = 0,
+         a = listOf(60.0), k = 0, s = 0, state = 0, q = 0, sim = 0,
+-        simulated = simulated, stateKnown = true, t_zewn_2 = t2, t_zewn_3 = t3
++        simulated = simulated, stateKnown = true, t_zewn_2 = t2
+     )
+ 
+-    @Test fun chartsHaveThreeSeparatelySelectableSeriesAndDashboardIsOriginal() {
++    @Test fun chartsHaveTwoOutdoorSeriesAndDashboardIsOriginal() {
+         val defs = ChartSeries.TEMP.associateBy { it.id }
+         assertEquals("Zew 1", defs.getValue("zewn").label)
+         assertEquals("Zew 2", defs.getValue("zewn_2").label)
+-        assertEquals("Zew 3", defs.getValue("zewn_3").label)
++        assertFalse(defs.containsKey("zewn_3"))
+         assertEquals("Zewnętrzna", TileDefs.TILES.first { it.id == "zewn" }.title)
+         assertFalse(TileDefs.TILES.any { it.id == "zewn_2" || it.id == "zewn_3" })
+     }
+@@ -26,52 +26,43 @@ class OutdoorDiagnosticTemperatureTest {
+         val s = PiecState()
+         s.applyIncomingData(JSONObject("""{"t_zewn":12.5,"t_zewn_2":0,"t_zewn_3":-12.3}"""))
+         assertEquals(0.0, s.t_zewn_2, 0.0)
+-        assertEquals(-12.3, s.t_zewn_3, 0.0)
+-        s.applyIncomingData(JSONObject("""{"t_zewn_2":null,"t_zewn_3":"15"}"""))
++        assertFalse(s.hasData("t_zewn_3")) // previous firmware may still send it
++        s.applyIncomingData(JSONObject("""{"t_zewn_2":null}"""))
+         assertFalse(s.hasData("t_zewn_2"))
+-        assertFalse(s.hasData("t_zewn_3"))
+         assertTrue(s.t_zewn_2.isNaN())
+-        assertTrue(s.t_zewn_3.isNaN())
+     }
+ 
+     @Test fun historyHandlesOldValidInvalidAndSimulatedSamples() {
+-        val old = row().toPoint()
+-        assertNull(ChartSeries.value(old, "t_zewn_2"))
+-        assertNull(ChartSeries.value(old, "t_zewn_3"))
+-        val valid = row(0.0, -12.3).toPoint()
+-        assertEquals(0.0, ChartSeries.value(valid, "t_zewn_2")!!, 0.0)
+-        assertEquals(-12.3, ChartSeries.value(valid, "t_zewn_3")!!, 0.0)
+-        assertNull(row(-40.1, 85.1).toPoint().t_zewn_2)
+-        assertNull(row(Double.NaN, 85.1).toPoint().t_zewn_3)
+-        assertNull(row(10.0, 20.0, simulated = true).toPoint().t_zewn_2)
++        assertNull(ChartSeries.value(row().toPoint(), "t_zewn_2"))
++        assertEquals(0.0, ChartSeries.value(row(0.0).toPoint(), "t_zewn_2")!!, 0.0)
++        assertNull(row(-40.1).toPoint().t_zewn_2)
++        assertNull(row(Double.NaN).toPoint().t_zewn_2)
++        assertNull(row(10.0, simulated = true).toPoint().t_zewn_2)
+     }
+ 
+     @Test fun chartBuildsDistinctSelectedLinesWithoutInventingValues() {
+-        val first = row(0.0, null).toPoint()
+-        val second = row(1.0, -2.0).toPoint().copy(ts = first.ts + 60_000)
+-        val series = ChartSeries.TEMP.filter { it.id in setOf("zewn", "zewn_2", "zewn_3") }
+-            .map { it.copy(on = true) }
++        val first = row(0.0).toPoint()
++        val second = row(1.0).toPoint().copy(ts = first.ts + 60_000)
++        val series = ChartSeries.TEMP.filter { it.id in setOf("zewn", "zewn_2") }.map { it.copy(on = true) }
+         val view = buildChartView(listOf(first, second), series, 1f, 1f, "COMMON", false)
+         assertEquals(listOf(6.0, 6.0), view.values["zewn"])
+         assertEquals(listOf(0.0, 1.0), view.values["zewn_2"])
+-        assertEquals(listOf(null, -2.0), view.values["zewn_3"])
+     }
+ 
+-    @Test fun dayCacheRoundTripPreservesNewValuesAndReadsOldRows() {
++    @Test fun dayCacheReadsOldAndPreviousThreeSeriesRows() {
+         val dir = Files.createTempDirectory("outdoor-chart").toFile()
+         try {
+             val cache = TelemetryDayCache(dir)
+-            cache.write("2026-11-15", listOf(row(0.0, -12.3)))
+-            val restored = cache.read("2026-11-15")!!.rows.single()
+-            assertEquals(0.0, restored.t_zewn_2!!, 0.0)
+-            assertEquals(-12.3, restored.t_zewn_3!!, 0.0)
+-            // Format v1 sprzed dodania dwóch opcjonalnych pól.
++            cache.write("2026-11-15", listOf(row(0.0)))
++            assertEquals(0.0, cache.read("2026-11-15")!!.rows.single().t_zewn_2!!, 0.0)
+             java.io.File(dir, "2026-11-14.json").writeText(
+                 """{"v":1,"saved":1,"rows":[["old",1,1700000000,0,[60],0,0,0,0,0,0,1]]}"""
+             )
+-            val old = cache.read("2026-11-14")!!.rows.single()
+-            assertNull(old.t_zewn_2)
+-            assertNull(old.t_zewn_3)
++            assertNull(cache.read("2026-11-14")!!.rows.single().t_zewn_2)
++            java.io.File(dir, "2026-11-13.json").writeText(
++                """{"v":1,"saved":1,"rows":[["previous",1,1700000000,0,[60],0,0,0,0,0,0,1,2.5,-12.3]]}"""
++            )
++            assertEquals(2.5, cache.read("2026-11-13")!!.rows.single().t_zewn_2!!, 0.0)
+         } finally { dir.deleteRecursively() }
+     }
+ }

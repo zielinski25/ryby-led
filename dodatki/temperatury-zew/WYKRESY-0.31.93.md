@@ -1,3 +1,5 @@
+> **Nieaktualne:** Zew 3 usunięto w nowych kandydatach. Aktualne informacje: [BEZ-ZEW-3.md](BEZ-ZEW-3.md). Poniżej historia poprzedniej wersji.
+
 # Poprawka aplikacji: Zew 1/2/3 na wykresie
 
 Poprawka jest przeznaczona dla projektu **0.31.92 po poprzedniej poprawce**. Przywraca definicje pulpitu dokładnie do stanu 0.31.91 (łącznie z nazwą „Zewnętrzna”); dodatkowe kafelki i ich migracja są usunięte. W wykresach istniejąca seria `zewn` ma nazwę „Zew 1” i nadal pokazuje DS18B20; obok niej są niezależnie włączane serie „Zew 2” (DHT22) i „Zew 3” (BME/BMP). Domyślnie dwie nowe serie są wyłączone, aby nie zmieniać wybranych wcześniej linii. Wyświetl je naciskając ich przyciski w zakładce Wykresy.

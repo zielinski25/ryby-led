@@ -1,3 +1,5 @@
+> **Nieaktualne:** Zew 3 usunięto w nowych kandydatach. Aktualne informacje: [BEZ-ZEW-3.md](BEZ-ZEW-3.md). Poniżej historia poprzedniej wersji.
+
 # Centrala v3.57.10 — kandydat Zew 2 / Zew 3
 
 Zastępuje wcześniejszy kandydat `v3.57.9-zew`. Podstawą pozostaje źródło **v3.57.9**, nie v3.58.x: ta wersja nie zawiera późniejszych zmian z linii 3.58.x. Zmiany funkcjonalne i ograniczenia diagnostyki, historii Firebase oraz bezpieczeństwa opisano w [CENTRALA-3.57.9-ZEW.md](CENTRALA-3.57.9-ZEW.md). Ten plik ma w źródle `FIRMWARE_VERSION = "v3.57.10"` oraz wpis do changelogu; numer umożliwia liczbowe porównanie z działającym 3.57.9. Numer 3.57.10 wybrano, aby nie używać oznaczeń istniejącej osobnej linii 3.58.x.
