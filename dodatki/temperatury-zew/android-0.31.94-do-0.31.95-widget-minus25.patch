@@ -1,0 +1,127 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 5339772..8fd3951 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@ android {
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31094
+-        versionName = "0.31.94"
++        versionCode = 31095
++        versionName = "0.31.95"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/widget/PiecWidget.kt b/app/src/main/java/com/sterownikco/pro/widget/PiecWidget.kt
+index f137159..305a22b 100644
+--- a/app/src/main/java/com/sterownikco/pro/widget/PiecWidget.kt
++++ b/app/src/main/java/com/sterownikco/pro/widget/PiecWidget.kt
+@@ -160,10 +160,10 @@ class PiecWidget : AppWidgetProvider() {
+         }
+ 
+         private val SENSOR_OPTIONS = listOf(
+-            WidgetSensor("t_ogrz", "PIEC C.O.", "Temperatura obiegu grzewczego", "PIEC", 2, 10.0, 99.0),
+-            WidgetSensor("t_bojler", "BOJLER C.W.U.", "Temperatura zasobnika ciepłej wody", "BOJLER", 1, 10.0, 95.0),
+-            WidgetSensor("t_panel", "PANEL SŁONECZNY", "Temperatura kolektora słonecznego", "PANEL", 5, 0.0, 140.0, accent = true),
+-            WidgetSensor("t_zewn", "ZEWNĘTRZNA", "Temperatura zewnętrzna", "ZEWN.", 0, -25.0, 45.0)
++            WidgetSensor("t_ogrz", "PIEC C.O.", "Temperatura obiegu grzewczego", "PIEC", 2),
++            WidgetSensor("t_bojler", "BOJLER C.W.U.", "Temperatura zasobnika ciepłej wody", "BOJLER", 1),
++            WidgetSensor("t_panel", "PANEL SŁONECZNY", "Temperatura kolektora słonecznego", "PANEL", 5, accent = true),
++            WidgetSensor("t_zewn", "ZEWNĘTRZNA", "Temperatura zewnętrzna", "ZEWN.", 0)
+         )
+ 
+         private val WIDGETS = listOf(
+@@ -245,23 +245,9 @@ class PiecWidget : AppWidgetProvider() {
+             fun isSimulated(sensor: WidgetSensor): Boolean =
+                 simulated(sensor.channel) || controllerSimulation(sensor)
+ 
+-            val simulatedBounds = mapOf(
+-                "t_ogrz" to (0.0..160.0), "t_bojler" to (0.0..160.0),
+-                "t_panel" to (-30.0..160.0), "t_zewn" to (-30.0..50.0)
+-            )
+-
+-            fun numeric(key: String): Double? {
+-                val raw = if (d == null || !d.has(key) || d.isNull(key)) null else d.opt(key)
+-                return (raw as? Number)?.toDouble()?.takeIf { it.isFinite() }
+-            }
+-
+             fun value(sensor: WidgetSensor): Double? {
+-                val range = if (controllerSimulation(sensor)) {
+-                    simulatedBounds[sensor.key] ?: (sensor.min..sensor.max)
+-                } else {
+-                    sensor.min..sensor.max
+-                }
+-                return numeric(sensor.key)?.takeIf { it in range }
++                val raw = if (d == null || !d.has(sensor.key) || d.isNull(sensor.key)) null else d.opt(sensor.key)
++                return WidgetTemperatureBounds.value(sensor.key, raw, controllerSimulation(sensor))
+             }
+ 
+             fun degrees(sensor: WidgetSensor, x: Double?): String {
+@@ -356,6 +342,18 @@ class PiecWidget : AppWidgetProvider() {
+     }
+ }
+ 
++// Tylko widżet; nie zmienia walidacji ani sterowania w centrali i aplikacji.
++internal object WidgetTemperatureBounds {
++    private const val MIN = -25.0
++    private val normalMax = mapOf("t_ogrz" to 99.0, "t_bojler" to 95.0, "t_panel" to 140.0, "t_zewn" to 45.0)
++    private val simulatedMax = mapOf("t_ogrz" to 160.0, "t_bojler" to 160.0, "t_panel" to 160.0, "t_zewn" to 50.0)
++
++    fun value(key: String, raw: Any?, controllerSimulated: Boolean): Double? {
++        val max = (if (controllerSimulated) simulatedMax else normalMax)[key] ?: return null
++        return (raw as? Number)?.toDouble()?.takeIf { it.isFinite() && it >= MIN && it <= max }
++    }
++}
++
+ /** Kolor temperatury jest oceniany według urządzenia, nie wspólnej skali °C. */
+ internal object WidgetTemperatureColors {
+     private const val UNKNOWN = "#7F93A3"
+@@ -454,8 +452,6 @@ private data class WidgetSensor(
+     val description: String,
+     val shortLabel: String,
+     val channel: Int,
+-    val min: Double,
+-    val max: Double,
+     val accent: Boolean = false
+ )
+ 
+diff --git a/app/src/test/java/com/sterownikco/pro/widget/WidgetTemperatureBoundsTest.kt b/app/src/test/java/com/sterownikco/pro/widget/WidgetTemperatureBoundsTest.kt
+new file mode 100644
+index 0000000..5c03334
+--- /dev/null
++++ b/app/src/test/java/com/sterownikco/pro/widget/WidgetTemperatureBoundsTest.kt
+@@ -0,0 +1,33 @@
++package com.sterownikco.pro.widget
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class WidgetTemperatureBoundsTest {
++    @Test fun allFourSensorsAcceptLowReadingsAtTheBoundary() {
++        for (key in listOf("t_ogrz", "t_bojler", "t_panel", "t_zewn")) {
++            for (simulated in listOf(false, true)) {
++                for (v in listOf(-25.0, -10.0, -0.1, 0.0, 5.0)) {
++                    assertEquals("$key / $simulated / $v", v, WidgetTemperatureBounds.value(key, v, simulated)!!, 0.0)
++                }
++                assertNull(WidgetTemperatureBounds.value(key, -25.1, simulated))
++                assertNull(WidgetTemperatureBounds.value(key, Double.NaN, simulated))
++                assertNull(WidgetTemperatureBounds.value(key, Double.POSITIVE_INFINITY, simulated))
++                assertNull(WidgetTemperatureBounds.value(key, null, simulated))
++                assertNull(WidgetTemperatureBounds.value(key, "-10", simulated))
++            }
++        }
++    }
++
++    @Test fun upperBoundsRemainUnchanged() {
++        val normal = mapOf("t_ogrz" to 99.0, "t_bojler" to 95.0, "t_panel" to 140.0, "t_zewn" to 45.0)
++        val simulated = mapOf("t_ogrz" to 160.0, "t_bojler" to 160.0, "t_panel" to 160.0, "t_zewn" to 50.0)
++        for ((simulation, bounds) in listOf(false to normal, true to simulated)) {
++            for ((key, max) in bounds) {
++                assertEquals(max, WidgetTemperatureBounds.value(key, max, simulation)!!, 0.0)
++                assertNull(WidgetTemperatureBounds.value(key, max + 0.1, simulation))
++            }
++        }
++        assertNull(WidgetTemperatureBounds.value("unknown", 0.0, false))
++    }
++}
