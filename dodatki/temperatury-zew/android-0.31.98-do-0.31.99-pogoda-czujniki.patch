@@ -1,0 +1,323 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 6446bb4..bb35d89 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -12,8 +12,8 @@ android {
+         applicationId = "com.sterownikco.pro"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 31098
+-        versionName = "0.31.98"
++        versionCode = 31099
++        versionName = "0.31.99"
+         vectorDrawables { useSupportLibrary = true }
+     }
+ 
+diff --git a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+index 19e1541..1bd5b98 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/AppModel.kt
+@@ -155,6 +155,8 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     private var servoModeRequestId = 0L
+     private val weatherMutex = Mutex()
+     private val weatherRefreshGate = WeatherRefreshGate()
++    private var lastWeatherSuccessElapsed: Long? = null
++    private var lastWeatherSuccessKey: WeatherRequestKey? = null
+     private val terminalCommandMutex = Mutex()
+ 
+     // ── stan połączenia ─────────────────────────────────────────────────────
+@@ -273,6 +275,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+         loadChartPrefs()
+         loadDashboardWidgets()
+         loadDashboardWidgetOrder()
++        restoreWeatherCache()
+         refreshWeather(false)
+ 
+         // [0.31.62] Po odtworzeniu aktywności wracamy tam, gdzie użytkownik był
+@@ -406,7 +409,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+     fun onResume() {
+         restoreRuntimeState()
+         bgJob?.cancel(); bgJob = null
+-        poll(); refreshWeather(true)
++        poll(); refreshWeather(false)
+         // [0.31.61] Pamięć historii czytamy z dysku od razu po wejściu do aplikacji,
+         // a nie dopiero przy otwarciu Wykresów — pierwsze wejście na wykresy nie
+         // płaci wtedy za rozpakowanie pliku.
+@@ -417,7 +420,7 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+         if (sheet == "terminal") startTerminalDlogPolling()
+         jobs = listOf(
+             scope.launch { while (true) { delay(FOREGROUND_POLL_MS); poll() } },
+-            scope.launch { while (true) { delay(15L * 60_000); refreshWeather(true) } },
++            scope.launch { while (true) { delay(15L * 60_000); refreshWeather(false) } },
+             scope.launch {
+                 while (true) {
+                     delay(1000)
+@@ -1258,20 +1261,35 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+         weatherDays
+     )
+ 
++    /** Odtwarzamy ostatnią odpowiedź, aby ponowne uruchomienie nie zerowało licznika 30 min. */
++    private fun restoreWeatherCache() {
++        val key = currentWeatherKey()
++        val nowWall = System.currentTimeMillis()
++        val entry = WeatherCache.decode(prefs.get(Prefs.K_WEATHER_CACHE), key, nowWall) ?: return
++        val restored = Weather.parseCached(entry.raw, key.days) ?: return
++        weather = restored
++        lastWeatherSuccessKey = key
++        lastWeatherSuccessElapsed = SystemClock.elapsedRealtime() - (nowWall - entry.savedAtMs)
++    }
++
+     fun refreshWeather(force: Boolean, announce: Boolean = false): Job {
+         // Wywołania podczas tego samego pobierania mogą skorzystać z jego wyniku.
+         val observedCount = weatherRefreshGate.completedCount
+         return scope.launch {
+             weatherMutex.withLock {
+                 val key = currentWeatherKey()
+-                if (weatherRefreshGate.completedForSince(key, observedCount)) {
++                if (weatherRefreshGate.completedForSince(key, observedCount) &&
++                    (!weatherRefreshGate.lastSuccess || (weather != null && lastWeatherSuccessKey == key))) {
+                     if (announce) {
+                         if (weatherRefreshGate.lastSuccess) showToast("Pogoda", "Dane pogodowe zaktualizowane", "ok")
+                         else showToast("Pogoda", if (weather == null) "Brak połączenia z Open-Meteo" else "Brak połączenia — pokazuję ostatnie dane", "err")
+                     }
+                     return@withLock
+                 }
+-                if (!force && weather != null) return@withLock
++                if (!WeatherFreshness.shouldRefresh(
++                        force = force, hasData = weather != null, sameKey = lastWeatherSuccessKey == key,
++                        lastSuccessMs = lastWeatherSuccessElapsed, nowMs = SystemClock.elapsedRealtime()
++                    )) return@withLock
+                 weatherBusy = true
+                 try {
+                     val real = Weather.fetch(http, key.lat, key.lon, key.days)
+@@ -1280,7 +1298,13 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+                     if (key != currentWeatherKey()) return@withLock
+                     weatherRefreshFailed = real == null
+                     if (real != null) {
+-                        weather = real; S.bump()
++                        weather = real.data
++                        lastWeatherSuccessKey = key
++                        lastWeatherSuccessElapsed = SystemClock.elapsedRealtime()
++                        try {
++                            prefs.set(Prefs.K_WEATHER_CACHE, WeatherCache.encode(key, real.raw, System.currentTimeMillis()))
++                        } catch (e: Exception) { /* brak cache nie blokuje odczytu */ }
++                        S.bump()
+                         if (announce) showToast("Pogoda", "Dane pogodowe zaktualizowane", "ok")
+                     } else if (announce) {
+                         showToast("Pogoda", if (weather == null) "Brak połączenia z Open-Meteo" else "Brak połączenia — pokazuję ostatnie dane", "err")
+@@ -2769,9 +2793,9 @@ class AppModel(val ctx: Context, val scope: CoroutineScope) {
+         }
+     }
+ 
+-    /** Każde wejście na zakładkę próbuje pobrać aktualną prognozę. */
++    /** Odśwież przy wejściu, gdy dane są starsze niż 30 minut lub ich brak. */
+     fun refreshWeatherTab() {
+-        refreshWeather(true)
++        refreshWeather(false)
+     }
+ 
+     // ─────────────────────────  mapowanie UI (PULPIT → arkusze) ─────────────────────────
+diff --git a/app/src/main/java/com/sterownikco/pro/core/Prefs.kt b/app/src/main/java/com/sterownikco/pro/core/Prefs.kt
+index 5e28322..9c5280b 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/Prefs.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/Prefs.kt
+@@ -330,6 +330,7 @@ class Prefs(ctx: Context) : AlarmPrefsStore {
+         const val K_CHART_PREFS = "piec_chart_prefs_v2"
+         /** [0.31.62] Ostatnia zakładka — po powrocie do aplikacji nie wracamy na pulpit. */
+         const val K_LAST_PAGE = "piec_last_page"
++        const val K_WEATHER_CACHE = "piec_weather_cache_v1"
+         const val K_LAT = "piec_weather_lat"
+         const val K_LON = "piec_weather_lon"
+         const val K_SOLAR_ARCHIVE = "solar_archive_data" // legacy/unverified; never loaded as real telemetry
+diff --git a/app/src/main/java/com/sterownikco/pro/core/Weather.kt b/app/src/main/java/com/sterownikco/pro/core/Weather.kt
+index 9a9f3fc..c23a00c 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/Weather.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/Weather.kt
+@@ -42,6 +42,7 @@ data class WCurrent(
+ )
+ 
+ data class WeatherData(val current: WCurrent, val hourly: List<WHour>, val daily: List<WDay>)
++internal data class WeatherFetchResult(val data: WeatherData, val raw: String)
+ 
+ object Weather {
+ 
+@@ -115,7 +116,7 @@ object Weather {
+         hourly.filter { it.time >= startMillis }.take(max(0, limit))
+ 
+     /** `fetchRealOpenMeteo(days)` — te same parametry zapytania co w panelu. */
+-    suspend fun fetch(client: okhttp3.OkHttpClient, lat: String, lon: String, days: Int): WeatherData? =
++    internal suspend fun fetch(client: okhttp3.OkHttpClient, lat: String, lon: String, days: Int): WeatherFetchResult? =
+         withContext(Dispatchers.IO) {
+             try {
+                 val q = "latitude=" + enc(lat) + "&longitude=" + enc(lon) +
+@@ -132,10 +133,13 @@ object Weather {
+                 val call = client.newCall(req)
+                 coroutineContext.job.invokeOnCompletion { try { call.cancel() } catch (e: Exception) { /* ignore */ } }
+                 val body = call.execute().use { r -> if (r.isSuccessful) r.body?.string() else null } ?: return@withContext null
+-                parse(JSONObject(body), days)
++                parse(JSONObject(body), days)?.let { WeatherFetchResult(it, body) }
+             } catch (e: Exception) { null }
+         }
+ 
++    internal fun parseCached(body: String, days: Int): WeatherData? =
++        try { parse(JSONObject(body), days) } catch (e: Exception) { null }
++
+     private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")
+ 
+     private fun parse(raw: JSONObject, days: Int): WeatherData? {
+diff --git a/app/src/main/java/com/sterownikco/pro/core/WeatherCache.kt b/app/src/main/java/com/sterownikco/pro/core/WeatherCache.kt
+new file mode 100644
+index 0000000..9553797
+--- /dev/null
++++ b/app/src/main/java/com/sterownikco/pro/core/WeatherCache.kt
+@@ -0,0 +1,27 @@
++package com.sterownikco.pro.core
++
++import org.json.JSONObject
++
++/** Jedna zapisana odpowiedź Open-Meteo z kluczem zapytania i czasem udanego pobrania. */
++internal data class CachedWeather(val raw: String, val savedAtMs: Long)
++
++internal object WeatherCache {
++    private const val MAX_CHARS = 1_000_000
++
++    fun encode(key: WeatherRequestKey, raw: String, savedAtMs: Long): String = JSONObject()
++        .put("v", 1).put("lat", key.lat).put("lon", key.lon).put("days", key.days)
++        .put("savedAtMs", savedAtMs).put("response", JSONObject(raw)).toString()
++
++    fun decode(stored: String?, expected: WeatherRequestKey, nowMs: Long): CachedWeather? {
++        if (stored == null || stored.length > MAX_CHARS) return null
++        return try {
++            val o = JSONObject(stored)
++            val saved = o.optLong("savedAtMs", 0L)
++            if (o.optInt("v", 0) != 1 || o.optString("lat") != expected.lat ||
++                o.optString("lon") != expected.lon || o.optInt("days", 0) != expected.days ||
++                saved <= 0L || saved > nowMs) return null
++            val response = o.optJSONObject("response") ?: return null
++            CachedWeather(response.toString(), saved)
++        } catch (e: Exception) { null }
++    }
++}
+diff --git a/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt b/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt
+index 452ac14..1b82ea0 100644
+--- a/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt
++++ b/app/src/main/java/com/sterownikco/pro/core/WeatherRefreshGate.kt
+@@ -19,3 +19,14 @@ internal class WeatherRefreshGate {
+         completedCount++
+     }
+ }
++
++/** Czas od ostatniego udanego pobrania, nie od próby ani zegara ściennego. */
++internal object WeatherFreshness {
++    const val MAX_AGE_MS = 30L * 60_000L
++
++    fun shouldRefresh(force: Boolean, hasData: Boolean, sameKey: Boolean, lastSuccessMs: Long?, nowMs: Long): Boolean {
++        if (force || !hasData || !sameKey || lastSuccessMs == null) return true
++        val age = nowMs - lastSuccessMs
++        return age < 0L || age >= MAX_AGE_MS
++    }
++}
+diff --git a/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt b/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
+index 6a012a3..34884cd 100644
+--- a/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
++++ b/app/src/main/java/com/sterownikco/pro/ui/screens/sheets/Sensors.kt
+@@ -242,9 +242,15 @@ fun SensorModal(m: AppModel, sen: SensorDef) {
+         Seg(listOf(1 to "Zew 1 · DS18B20", 2 to "Zew 2 · DHT22"), current = m.outdoorTileSource) { source ->
+             m.chooseOutdoorTileSource(source)
+         }
+-        Note("Wybór zmienia tylko wartość na kafelku. Sterowanie i symulacja poniżej dotyczą Zew 1 (DS18B20). Przy braku Zew 2 kafelek pokaże brak danych.")
++        Note("Wybór dotyczy kafelka. Sterowanie i symulacja poniżej dotyczą Zew 1 (DS18B20).")
++        SensorFullCard(m, sen.copy(name = "Zew 1 · DS18B20"), listStyle = false)
++        SensorFullCard(m, sen.copy(
++            id = "zewn_2", name = "Zew 2 · DHT22", bus = "DHT22 · temperatura",
++            key = "t_zewn_2", min = -40.0, max = 80.0, step = 0.1
++        ), listStyle = false)
++    } else {
++        SensorFullCard(m, sen, listStyle = false)
+     }
+-    SensorFullCard(m, sen, listStyle = false)
+     if (sen.id == "panel") SolarMetricsCard(m)
+     SymUnit(m, sen.id, sen.name, sen.unit, sen.min, sen.max, sen.step, sen.key)
+ }
+diff --git a/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt b/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
+index 0ecd1e4..d39c5f2 100644
+--- a/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
++++ b/app/src/test/java/com/sterownikco/pro/core/OutdoorDiagnosticTemperatureTest.kt
+@@ -65,4 +65,15 @@ class OutdoorDiagnosticTemperatureTest {
+             assertEquals(2.5, cache.read("2026-11-13")!!.rows.single().t_zewn_2!!, 0.0)
+         } finally { dir.deleteRecursively() }
+     }
++    @Test fun bothOutdoorReadingsRemainIndependentWhenDhtIsMissing() {
++        val s = PiecState()
++        s.applyIncomingData(JSONObject("""{"t_zewn":9.0,"t_zewn_2":0.0}"""))
++        assertEquals(9.0, s.valOf("zewn", "t_zewn"), 0.0)
++        assertEquals(0.0, s.valOf("zewn_2", "t_zewn_2"), 0.0)
++        s.applyIncomingData(JSONObject("""{"t_zewn":8.5,"t_zewn_2":null}"""))
++        assertEquals(8.5, s.valOf("zewn", "t_zewn"), 0.0)
++        assertTrue(s.valOf("zewn_2", "t_zewn_2").isNaN())
++        assertFalse(s.hasData("t_zewn_2"))
++    }
++
+ }
+diff --git a/app/src/test/java/com/sterownikco/pro/core/WeatherCacheTest.kt b/app/src/test/java/com/sterownikco/pro/core/WeatherCacheTest.kt
+new file mode 100644
+index 0000000..05fac75
+--- /dev/null
++++ b/app/src/test/java/com/sterownikco/pro/core/WeatherCacheTest.kt
+@@ -0,0 +1,27 @@
++package com.sterownikco.pro.core
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class WeatherCacheTest {
++    private val key = WeatherRequestKey("51.0", "21.0", 7)
++
++    @Test fun cachedDataRetainsTimestampAndExactLocationAndDays() {
++        val raw = """{"current":{"temperature_2m":0},"hourly":{"time":[]}}"""
++        val saved = WeatherCache.encode(key, raw, 1000L)
++        val restored = WeatherCache.decode(saved, key, 2000L)!!
++        assertEquals(1000L, restored.savedAtMs)
++        assertNotNull(Weather.parseCached(restored.raw, 7))
++        assertNull(WeatherCache.decode(saved, key.copy(lat = "52"), 2000L))
++        assertNull(WeatherCache.decode(saved, key.copy(lon = "22"), 2000L))
++        assertNull(WeatherCache.decode(saved, key.copy(days = 14), 2000L))
++    }
++
++    @Test fun corruptOrFutureCacheIsNotTreatedAsFresh() {
++        val saved = WeatherCache.encode(key, "{}", 2000L)
++        assertNull(WeatherCache.decode(saved, key, 1000L))
++        assertNull(WeatherCache.decode("bad json", key, 1000L))
++        assertNull(WeatherCache.decode(null, key, 1000L))
++        assertNull(WeatherCache.decode("x".repeat(1_000_001), key, 1000L))
++    }
++}
+diff --git a/app/src/test/java/com/sterownikco/pro/core/WeatherFreshnessTest.kt b/app/src/test/java/com/sterownikco/pro/core/WeatherFreshnessTest.kt
+new file mode 100644
+index 0000000..6babbdd
+--- /dev/null
++++ b/app/src/test/java/com/sterownikco/pro/core/WeatherFreshnessTest.kt
+@@ -0,0 +1,23 @@
++package com.sterownikco.pro.core
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class WeatherFreshnessTest {
++    @Test fun automaticRefreshWaitsUntilThirtyMinutesAfterSuccess() {
++        val t = 1000L
++        assertFalse(WeatherFreshness.shouldRefresh(false, true, true, t, t + 1))
++        assertFalse(WeatherFreshness.shouldRefresh(false, true, true, t, t + 30L * 60_000 - 1))
++        assertTrue(WeatherFreshness.shouldRefresh(false, true, true, t, t + 30L * 60_000))
++        assertTrue(WeatherFreshness.shouldRefresh(false, true, true, t, t + 31L * 60_000))
++    }
++
++    @Test fun missingDataChangedParametersAndManualRefreshStillRequest() {
++        val t = 1000L
++        assertTrue(WeatherFreshness.shouldRefresh(false, false, true, t, t + 1))
++        assertTrue(WeatherFreshness.shouldRefresh(false, true, false, t, t + 1))
++        assertTrue(WeatherFreshness.shouldRefresh(false, true, true, null, t + 1))
++        assertTrue(WeatherFreshness.shouldRefresh(true, true, true, t, t + 1))
++        assertTrue(WeatherFreshness.shouldRefresh(false, true, true, t, t - 1))
++    }
++}
