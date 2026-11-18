@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoMode
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.FontFamily
 import androidx.compose.ui.text.FontWeight
@@ -136,7 +138,8 @@ fun StatTile(
 ) {
     val gradient = Brush.linearGradient(
         colors = listOf(Color(0xFF0E1B2D), Color(0xFF0B1727)),
-        startX = 0f, startY = 0f, endX = 1f, endY = 1f
+        start = Offset(0f, 0f),
+        end = Offset(1f, 1f)
     )
     Surface(
         modifier = modifier,
@@ -192,12 +195,14 @@ fun ControlTile(
                 accent.copy(alpha = 0.16f),
                 accent.copy(alpha = 0.06f)
             ),
-            startX = 0f, startY = 0f, endX = 1f, endY = 1f
+            start = Offset(0f, 0f),
+            end = Offset(1f, 1f)
         )
     } else {
         Brush.linearGradient(
             colors = listOf(Color(0xFF122237), Color(0xFF0B1727)),
-            startX = 0f, startY = 0f, endX = 1f, endY = 1f
+            start = Offset(0f, 0f),
+            end = Offset(1f, 1f)
         )
     }
     Surface(

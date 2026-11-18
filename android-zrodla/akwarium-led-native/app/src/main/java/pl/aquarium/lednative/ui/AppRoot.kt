@@ -13,10 +13,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -65,13 +66,13 @@ private data class Tab(val key: String, val label: String, val icon: ImageVector
 
 private val TABS = listOf(
     Tab("dash", "Pulpit", Icons.Default.Dashboard),
-    Tab("light", "Światło", Icons.Default.WbSunny),
+    Tab("light", "Swiatlo", Icons.Default.WbSunny),
     Tab("plan", "Plan", Icons.Default.Schedule),
     Tab("sensors", "Czujniki", Icons.Default.Sensors),
     Tab("charts", "Wykresy", Icons.Default.ShowChart),
     Tab("logs", "Logi", Icons.Default.Article),
     Tab("terminal", "Terminal", Icons.Default.Code),
-    Tab("more", "Więcej", Icons.Default.MoreHoriz)
+    Tab("more", "Wiecej", Icons.Default.MoreHoriz)
 )
 
 @Composable
@@ -122,7 +123,7 @@ fun AppRoot(vm: AppViewModel) {
                 }
             }
 
-            // AppBar (jak w HTML appbar: brandMark + "AKWARIUM LED" + badge ONLINE/OFFLINE)
+            // AppBar (jak w HTML appbar: brandMark + "Akwarium LED" + badge ONLINE/OFFLINE)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -200,7 +201,7 @@ fun AppRoot(vm: AppViewModel) {
                 }
             }
 
-            // Nawigacja dolna — jeden rząd 8 zakładek (jak w HTML mobile bottomNav: grid-template-columns:repeat(8,1fr))
+            // Nawigacja dolna — jeden rząd 8 zakładek (jak w HTML mobile bottomNav)
             BottomNav(
                 selected = tab,
                 onSelect = { tab = it },
