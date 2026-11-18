@@ -1,0 +1,60 @@
+# ── Sekrety: NIGDY do tego repo (jest PUBLICZNE) ──────────────────────
+secrets.h
+secrets*.h
+secrets-*.zip
+*ZAWIERA*SEKRET*
+*ZAWIERA*TOKEN*
+odczyt-sekretow*.zip
+.env
+.env.*
+
+# Backupy źródeł: historyczne .bak potrafią mieć wpisane tokeny
+# (np. .pre-v253 miał 2 tokeny Telegram i 4 sekrety Firebase).
+*.bak
+*.pre-v*
+*.orig
+
+# ── Prywatne kopie z Dysku Google ────────────────────────────────────
+# Ten katalog to lokalny cache pobrany z Dysku, m.in. pliki z sekretami.
+google_drive/
+
+# ── Cache roboczy agenta / narzędzia ─────────────────────────────────
+.cache/
+node_modules/
+.gradle/
+local.properties
+*.iml
+.idea/
+.vscode/
+
+# ── Build artefakty ──────────────────────────────────────────────────
+.pio/
+build/
+dist/
+out/
+target/
+*.o
+*.a
+*.apk
+*.aab
+
+# ── Duże pliki diagnostyczne: miejsce na Dysku, nie w git ────────────
+# Logi z ESP (7 MB+), coredumpy, zrzuty flash, obrazy ELF (24 MB).
+*.elf
+*.bin
+coredump*
+dump_seq*
+aquarium_log*.txt
+log_combined*.txt
+log_tail*.txt
+serial-*.log
+hist_long*.csv
+hist_short*.csv
+*-rtdb-*-export*.json
+
+# ── Śmieci systemowe ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+__pycache__/
+*.pyc

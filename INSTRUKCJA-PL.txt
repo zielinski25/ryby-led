@@ -1,0 +1,248 @@
+﻿=====================================================================
+ AKWARIUM LED — APLIKACJA W 100% NATYWNA (Android, Jetpack Compose)
+ Wersja 1.0.0-native · pakiet pl.aquarium.lednative
+=====================================================================
+
+CO TO JEST
+-----------
+To jest prawdziwa aplikacja natywna na Androida:
+  * jezyk: Kotlin
+  * interfejs: Jetpack Compose (natywne komponenty Material 3)
+  * wizualizacja akwarium, wykresy i paski kanalow: Compose Canvas
+  * terminal ESP: natywny klient WebSocket (OkHttp) do ws://ESP:8080/ws
+  * logi i pliki: natywne HTTP + zapis przez MediaStore
+
+W aplikacji NIE MA:
+  * WebView
+  * plikow HTML / CSS / JavaScript
+  * mostka JavaScript (JavascriptInterface)
+
+Wyglad jest kafelkowy — taki jak na makiecie — ale kazdy kafelek jest
+natywna kontrolka Compose, a nie element strony WWW.
+
+---------------------------------------------------------------------
+KROK 1. POBRANIE I ROZPAKOWANIE
+---------------------------------------------------------------------
+Plik z paczki ląduje w C:\Users\Rafcio\Downloads.
+
+Otworz PowerShell (nie cmd) i wklej po kolei:
+
+    cd $env:USERPROFILE\Downloads
+    Unblock-File .\akwarium-led-native-android-zrodla.zip
+    Expand-Archive .\akwarium-led-native-android-zrodla.zip -DestinationPath . -Force
+    cd .\akwarium-led-native
+
+Unblock-File zdejmuje blokade "plik z Internetu" (Mark-of-the-Web).
+Rozpakuj CALY pakiet — skrypt sprawdza obecnosc gradlew.bat i zrodel.
+
+---------------------------------------------------------------------
+KROK 2. WYMAGANIA NA KOMPUTERZE
+---------------------------------------------------------------------
+1) JDK 17–22 (najlepiej 21).
+   Gradle 8.9 NIE działa z Javą 23/24/25.
+   Skrypt sam szuka JDK; jesli nie znajdzie, sprobuje zainstalowac
+   Microsoft OpenJDK 21 przez winget.
+   Jeśli masz Android Studio, jego JBR (katalog ...\Android Studio\jbr)
+   zwykle wystarcza i skrypt wykryje go automatycznie.
+
+2) Android SDK z platformą API 35.
+   Android Studio -> Tools -> SDK Manager:
+     - Android 15.0 (API 35)  [SDK Platform]
+     - Android SDK Build-Tools (35.x)
+     - Android SDK Platform-Tools
+   Skrypt sam znajduje SDK i zapisuje local.properties.
+
+3) Internet przy PIERWSZYM budowaniu.
+   Gradle pobiera Jetpack Compose, Material 3 i OkHttp z repozytoriow
+   Google/Maven Central. To jednorazowo kilkaset MB i kilka minut.
+
+---------------------------------------------------------------------
+KROK 3. BUDOWANIE APK
+---------------------------------------------------------------------
+Najprosciej: dwuklik na
+
+    BUDUJ-APK.bat
+
+albo z PowerShella w katalogu projektu:
+
+    powershell -ExecutionPolicy Bypass -File .\BUDUJ-APK.ps1
+
+Skrypt:
+  1) czyta CMD_TOKEN z Twojego secrets.h
+     (domyslnie: C:\Users\Rafcio\Documents\PlatformIO\
+      260526-184242-esp32-s3-devkitc-1\src\secrets.h),
+  2) wstrzykuje token do APK przez BuildConfig (wartosc nie jest
+     wyswietlana ani zapisywana w zrodlach),
+  3) znajduje JDK i Android SDK,
+  4) buduje APK,
+  5) kopiuje gotowy APK na Pulpit jako
+     akwarium-led-native-<data>.apk
+
+Inna sciezka do secrets.h:
+
+    .\BUDUJ-APK.ps1 -FirmwareSecrets "D:\inna\sciezka\secrets.h"
+
+Build release (mniejszy APK, minifikacja, podpis debug):
+
+    .\BUDUJ-APK.ps1 -Release
+
+Build z testami jednostkowymi logiki:
+
+    .\BUDUJ-APK.ps1 -RunTests
+
+---------------------------------------------------------------------
+KROK 4. PIERWSZE URUCHOMIENIE NA TELEFONIE
+---------------------------------------------------------------------
+1) Przenies APK na telefon (USB, Dysk Google, kabel — dowolnie)
+   i zainstaluj. Android zapyta o zgode na instalacje z nieznanych zrodel.
+
+2) Otworz aplikacje. Od razu zobaczysz zakladke Pulpit.
+
+3) Przejdz do zakladki WIECEJ:
+   a) "Konto Firebase" — wpisz e-mail i haslo operatora Firebase,
+      nacisnij "Zaloguj do Firebase".
+      Adres bazy i Web API Key sa juz wpisane domyslnie.
+   b) "Siec lokalna (LAN)" — bedac w tej samej sieci WiFi co ESP32,
+      nacisnij "Wykryj ESP w sieci". Mozesz tez wpisac adres recnie,
+      np. 192.168.1.50:8080.
+
+4) Wroc na Pulpit i nacisnij Odswiez. Kafelki wypelnia sie danymi.
+
+---------------------------------------------------------------------
+CO DZIALA PRZEZ CHMURE, A CO WYMAGA LAN
+---------------------------------------------------------------------
+Przez Firebase (dziala z dowolnej sieci, takze spoza domu):
+  - odczyt statusu (temperatury, lux, PWM, energia, harmonogram)
+  - wlaczanie/wylaczanie swiatla, tryb AUTO/MANUAL, pompka
+  - reczne PWM 5 kanalow
+  - harmonogram swiatla i pompki
+  - ustawienia czujnikow, adaptacja, min-lux
+  - restart ESP
+
+Tylko przez LAN (telefon w tej samej sieci WiFi co ESP):
+  - Logi (dziennik ESP32) + eksport pliku do Pobrane
+  - Przegladarka plikow LittleFS
+  - Terminal (WebSocket /ws)
+
+Komendy ida NAJPIERW do Firebase. Jesli chmura zawiedzie, a ESP jest
+ososiagalne w LAN, aplikacja uzyje LAN jako fallback i pokaze, ktorego
+transportu uzyla.
+
+UWAGA: kolejka komend w ESP jest odpytywana mniej wiecej co 14 sekund.
+Komenda nie dziala natychmiast — to normalne, nie jest to blad aplikacji.
+
+---------------------------------------------------------------------
+ZAKLADKI
+---------------------------------------------------------------------
+Pulpit    — wizualizacja akwarium, przelaczniki, kafelki pomiarow,
+            szybkie akcje, stan sterownika
+Swiatlo   — 5 suwakow PWM (0–1023), tryb AUTO/MANUAL, moc na kanaly
+Plan      — harmonogram swiatla (WD/WE/poludnie/wieczor/fade)
+            oraz do 6 okien pracy pompki
+Czujniki  — temperatury, lux, zrodlo adaptacji, min-lux, filtr EMA,
+            interwaly, rampa
+Wykresy   — wykresy na zywo (jasnosc, temperatura, lux, moc),
+            energia dzien/tydzien/miesiac, historia godzinowa i dniowa
+Logi      — dziennik ESP z filtrami, eksport, czyszczenie,
+            przegladarka plikow LittleFS z podgladem
+Terminal  — natywna konsola WebSocket: status, adaptive, minlux,
+            logsize, serial/wifi/both/off, save
+Wiecej    — CMD_TOKEN, konto Firebase, wykrywanie LAN, diagnostyka,
+            restart ESP, informacje o aplikacji
+
+---------------------------------------------------------------------
+GDY COS NIE DZIALA
+---------------------------------------------------------------------
+"reason=invalid" / komenda nie dochodzi do ESP
+  Token w APK nie zgadza sie z CMD_TOKEN w firmware.
+  Przebuduj APK skryptem BUDUJ-APK.ps1 z AKTUALNYM secrets.h.
+  W zakladce Wiecej sprawdzasz, czy token jest wstrzykniety ("OK")
+  i jaka ma dlugosc — sama wartosc nigdy nie jest pokazywana.
+  Jesli widzisz "BRAK", APK zbudowano bez skryptu (np. z Android Studio
+  bez zmiennej srodowiskowej) — taki APK nie wysle poprawnej komendy.
+
+Błędy parsowania: "Missing argument in parameter list", "Unexpected token '}'"
+  To było uszkodzone kodowanie pliku BUDUJ-APK.ps1 (znak myślnika U+2014
+  czytany przez PowerShell 5.1 jako CP1250 zamieniał się w cudzysłów
+  typograficzny i psuł składnię). Naprawione w tej wersji paczki:
+  skrypt jest w czystym ASCII i ma BOM UTF-8.
+  Jeśli masz starszą kopię, najprościej pobrać tę paczkę ponownie.
+  Awaryjnie można przepisać sam plik na UTF-8 z BOM:
+    $t = [IO.File]::ReadAllText(".\BUDUJ-APK.ps1", [Text.Encoding]::UTF8)
+    [IO.File]::WriteAllText(".\BUDUJ-APK.ps1", $t, (New-Object Text.UTF8Encoding $true))
+
+"Powershell nie rozpoznaje skryptu" / blokada wykonania
+  Uzyj BUDUJ-APK.bat albo:
+    powershell -ExecutionPolicy Bypass -File .\BUDUJ-APK.ps1
+  Wcześniej wykonaj Unblock-File na pobranym ZIP.
+
+"Nie znaleziono gradlew.bat"
+  Rozpakowales tylko czesc archiwum. Rozpakuj CALY ZIP i wejdz
+  do katalogu akwarium-led-native.
+
+Could not find androidx.compose.ui:graphics:. (pusta wersja po dwukropku)
+  To byla zla nazwa artefaktu w app/build.gradle.kts. Poprawne nazwy to
+  'ui-graphics' i 'ui-tooling-preview' (z przedrostkiem "ui-"), nie
+  'graphics' i 'tooling-preview'. Naprawione w tej wersji paczki.
+
+Build konczy sie bledem JDK / "Unsupported class file major version"
+  Masz za nowa Jave. Zainstaluj JDK 21 i uruchom skrypt ponownie.
+
+"Nie znaleziono Android SDK"
+  Zainstaluj API 35 w SDK Managerze Android Studio.
+
+Blad TLS / handshake_failure przy pobieraniu zaleznosci
+  Siec blokuje repozytoria Google/Maven. Sprobuj innej sieci
+  (np. hotspot z telefonu) i uruchom build ponownie.
+
+Logi / Terminal pokazuja "wymaga LAN"
+  Telefon musi byc w tej samej sieci WiFi co ESP32.
+  Wiecej -> Wykryj ESP w sieci. Skanowanie moze potrzebowac kilku sekund.
+  Jesli ESP ma adres staly, wpisz go w "Adres reczny ESP".
+
+Kafelki energii pokazuja "—"
+  Firmware nie zaraportowal jeszcze licznikow energii w tym odczycie.
+  To nie jest blad aplikacji.
+
+---------------------------------------------------------------------
+BEZPIECZENSTWO
+---------------------------------------------------------------------
+* CMD_TOKEN jest wkompilowany w APK. Nie wpisuje sie go w aplikacji
+  i nie jest wyswietlany. APK to aplikacja prywatna — nie publikuj go.
+* Haslo Firebase nie jest zapisywane. Przechowywany jest tylko token
+  odswiezajacy, szyfrowany AES/GCM w Android Keystore.
+* Adres bazy jest walidowany: tylko HTTPS i domena
+  *.firebasedatabase.app lub *.firebaseio.com, bez parametrow URL.
+  Dzieki temu token logowania nie moze trafic na obcy serwer.
+* Aplikacja nie zmienia regul Firebase ani firmware ESP.
+
+---------------------------------------------------------------------
+STRUKTURA PROJEKTU
+---------------------------------------------------------------------
+akwarium-led-native/
+  BUDUJ-APK.bat / BUDUJ-APK.ps1   skrypt budowania (Windows)
+  INSTRUKCJA-PL.txt               ten plik
+  README.md                       opis techniczny
+  gradlew / gradlew.bat           Gradle Wrapper 8.9
+  settings.gradle.kts
+  build.gradle.kts
+  app/
+    build.gradle.kts              Compose, BuildConfig z CMD_TOKEN
+    src/main/AndroidManifest.xml
+    src/main/res/                 motyw, ikona, teksty
+    src/main/java/pl/aquarium/lednative/
+      MainActivity.kt             ComponentActivity + setContent
+      core/                       logika, HTTP, Firebase, LAN,
+                                  terminal WebSocket, modele
+      ui/                         motyw, ViewModel, komponenty,
+                                  8 ekranow Compose
+    src/test/java/...             testy jednostkowe JVM (logika, modele)
+
+Build z linii polecen bez skryptu (token NIE zostanie wstrzykniety):
+    .\gradlew.bat :app:assembleDebug
+Build z tokenem recznie:
+    $env:RYBY_CMD_TOKEN = "<twoj token>"
+    .\gradlew.bat :app:assembleDebug
+    Remove-Item Env:RYBY_CMD_TOKEN
+
+=====================================================================
