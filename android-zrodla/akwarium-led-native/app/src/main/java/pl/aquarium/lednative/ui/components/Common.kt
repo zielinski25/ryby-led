@@ -11,6 +11,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoMode
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,9 +30,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.FontFamily
+import androidx.compose.ui.text.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.aquarium.lednative.ui.Border
@@ -33,6 +47,7 @@ import pl.aquarium.lednative.ui.TextHi
 import pl.aquarium.lednative.ui.TextMid
 import pl.aquarium.lednative.ui.Warm
 
+/** Karta sekcji — ciemne tło z obramowaniem jak w HTML .card. */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
@@ -50,6 +65,7 @@ fun SectionCard(
     }
 }
 
+/** Nagłówek karty — tytuł, ikona w kwadracie, opcjonalny element trailing. */
 @Composable
 fun CardHeader(
     title: String,
@@ -76,21 +92,24 @@ fun CardHeader(
     }
 }
 
+/** Pigułka statusu — jak w HTML .pill. */
 @Composable
 fun Pill(text: String, color: Color = Cyan) {
     Box(
         Modifier.clip(RoundedCornerShape(999.dp))
-            .background(color.copy(alpha = 0.16f))
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 9.dp, vertical = 3.dp)
+            .background(color.copy(alpha = 0.10f))
+            .border(1.dp, color.copy(alpha = 0.33f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 7.dp, vertical = 2.dp)
     ) {
         Text(
-            text, color = color, fontSize = 9.sp,
-            fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp
+            text, color = color, fontSize = 7.sp,
+            fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp,
+            fontFamily = FontFamily.Monospace
         )
     }
 }
 
+/** Tytuł ekranu — jak w HTML .pageHead. */
 @Composable
 fun ScreenTitle(title: String, subtitle: String, badge: (@Composable () -> Unit)? = null) {
     Row(
@@ -105,7 +124,7 @@ fun ScreenTitle(title: String, subtitle: String, badge: (@Composable () -> Unit)
     }
 }
 
-/** Kafelek statystyki: etykieta, duza wartosc, opis. */
+/** Kafelek statystyki — 1:1 ze wzoru HTML .tile. */
 @Composable
 fun StatTile(
     label: String,
@@ -115,33 +134,45 @@ fun StatTile(
     accent: Color,
     modifier: Modifier = Modifier
 ) {
+    val gradient = Brush.linearGradient(
+        colors = listOf(Color(0xFF0E1B2D), Color(0xFF0B1727)),
+        startX = 0f, startY = 0f, endX = 1f, endY = 1f
+    )
     Surface(
         modifier = modifier,
         color = Surface2,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(13.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Border)
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(icon, null, tint = accent, modifier = Modifier.size(14.dp))
+        Box(
+            Modifier
+                .background(gradient)
+                .clip(RoundedCornerShape(13.dp))
+                .padding(11.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(icon, null, tint = accent, modifier = Modifier.size(12.dp))
+                    Text(
+                        label, fontSize = 7.sp, color = TextDim,
+                        fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
                 Text(
-                    label, fontSize = 9.sp, color = TextDim,
-                    fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp
+                    value, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                    color = accent, maxLines = 1, fontFamily = FontFamily.Monospace
                 )
+                Text(hint, fontSize = 8.sp, color = TextMid, maxLines = 2)
             }
-            Text(
-                value, fontSize = 19.sp, fontWeight = FontWeight.Bold,
-                color = accent, maxLines = 1
-            )
-            Text(hint, fontSize = 10.sp, color = TextMid, maxLines = 2)
         }
     }
 }
 
-/** Duzy kafelek sterujacy (wl/wyl) z podswietleniem stanu. */
+/** Duzy kafelek sterujacy (wl/wyl) — 1:1 ze wzoru HTML .primaryControl. */
 @Composable
 fun ControlTile(
     label: String,
@@ -155,44 +186,67 @@ fun ControlTile(
     onClick: () -> Unit
 ) {
     val tint = if (active) accent else TextDim
+    val gradient = if (active) {
+        Brush.linearGradient(
+            colors = listOf(
+                accent.copy(alpha = 0.16f),
+                accent.copy(alpha = 0.06f)
+            ),
+            startX = 0f, startY = 0f, endX = 1f, endY = 1f
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color(0xFF122237), Color(0xFF0B1727)),
+            startX = 0f, startY = 0f, endX = 1f, endY = 1f
+        )
+    }
     Surface(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(11.dp))
             .clickable(enabled = enabled, onClick = onClick),
-        color = if (active) accent.copy(alpha = 0.12f) else Surface2,
-        shape = RoundedCornerShape(16.dp),
+        color = Surface2,
+        shape = RoundedCornerShape(11.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp, if (active) accent.copy(alpha = 0.45f) else Border
         )
     ) {
-        Row(
-            Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Box(
+            Modifier
+                .background(gradient)
+                .clip(RoundedCornerShape(11.dp))
+                .padding(10.dp, 9.dp)
         ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                    .background(tint.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(icon, null, tint = tint, modifier = Modifier.size(21.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    label, fontSize = 9.sp, color = TextDim,
-                    fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp
+                Box(
+                    Modifier.size(26.dp).clip(RoundedCornerShape(8.dp))
+                        .background(tint.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, null, tint = tint, modifier = Modifier.size(14.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        label, fontSize = 9.sp, color = TextDim,
+                        fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                    if (hint.isNotBlank()) Text(hint, fontSize = 10.sp, color = TextMid)
+                }
+                Box(
+                    Modifier.size(10.dp).clip(RoundedCornerShape(999.dp))
+                        .background(if (active) accent else Border)
                 )
-                Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
-                if (hint.isNotBlank()) Text(hint, fontSize = 10.sp, color = TextMid)
             }
-            Box(
-                Modifier.size(10.dp).clip(RoundedCornerShape(999.dp))
-                    .background(if (active) accent else Border)
-            )
         }
     }
 }
 
+/** Szybki kafelek akcji — jak w HTML .quickTile. */
 @Composable
 fun QuickTile(
     label: String,
@@ -202,25 +256,27 @@ fun QuickTile(
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
+        modifier = modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick),
         color = Surface2,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(10.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Border)
     ) {
         Column(
-            Modifier.padding(vertical = 14.dp, horizontal = 10.dp),
+            Modifier.padding(vertical = 10.dp, horizontal = 9.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
+            Icon(icon, null, tint = accent, modifier = Modifier.size(13.dp))
             Text(
-                label, fontSize = 10.sp, color = TextMid,
-                fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                label, fontSize = 8.sp, color = TextMid,
+                fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace
             )
         }
     }
 }
 
+/** Wiersz ustawień — tytuł, opis, kontrolka po prawej. */
 @Composable
 fun SettingRow(
     title: String,
@@ -241,6 +297,7 @@ fun SettingRow(
     }
 }
 
+/** Zakładki segmentowane — jak w HTML .seg. */
 @Composable
 fun SegmentedTabs(
     options: List<Pair<String, String>>,
@@ -249,29 +306,36 @@ fun SegmentedTabs(
     onSelect: (String) -> Unit
 ) {
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(Surface2).padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+        modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+            .background(Surface2).padding(1.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.dp)
     ) {
-        options.forEach { (key, label) ->
+        options.forEachIndexed { index, (key, label) ->
             val active = key == selected
             Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                Modifier.weight(1f).clip(RoundedCornerShape(7.dp))
                     .background(if (active) Cyan.copy(alpha = 0.18f) else Color.Transparent)
                     .clickable { onSelect(key) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    label, fontSize = 11.sp,
+                    label, fontSize = 7.sp,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                    color = if (active) Cyan else TextMid, maxLines = 1
+                    color = if (active) Cyan else TextMid, maxLines = 1,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            if (index < options.size - 1) {
+                Box(
+                    Modifier.width(0.5.dp).background(Border.copy(alpha = 0.3f))
                 )
             }
         }
     }
 }
 
+/** Baner informacyjny — jak w HTML .info. */
 @Composable
 fun InfoBanner(text: String, warn: Boolean = false) {
     val c = if (warn) Warm else Cyan
@@ -286,6 +350,7 @@ fun InfoBanner(text: String, warn: Boolean = false) {
     }
 }
 
+/** Stan pusty — jak w HTML .emptyState. */
 @Composable
 fun EmptyState(text: String, hint: String) {
     Column(
@@ -301,6 +366,7 @@ fun EmptyState(text: String, hint: String) {
     }
 }
 
+/** Para klucz-wartość — jak w HTML .keyValue. */
 @Composable
 fun KeyValue(key: String, value: String, valueColor: Color = TextHi) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

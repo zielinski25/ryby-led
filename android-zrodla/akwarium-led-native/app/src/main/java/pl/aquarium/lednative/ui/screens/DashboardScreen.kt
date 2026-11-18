@@ -25,6 +25,7 @@ import pl.aquarium.lednative.ui.Cyan
 import pl.aquarium.lednative.ui.FsBlue
 import pl.aquarium.lednative.ui.Green
 import pl.aquarium.lednative.ui.Red
+import pl.aquarium.lednative.ui.TextDim
 import pl.aquarium.lednative.ui.Warm
 import pl.aquarium.lednative.ui.components.AquariumView
 import pl.aquarium.lednative.ui.components.CardHeader
@@ -40,7 +41,8 @@ import pl.aquarium.lednative.ui.components.StatTile
 @Composable
 fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
     val s = vm.status
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Nagłówek ekranu (jak w HTML .pageHead)
         ScreenTitle("Pulpit", "Akwarium LED · sterowanie i podgląd") {
             Pill(
                 when (vm.connection) {
@@ -58,6 +60,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
             )
         }
 
+        // Banery informacyjne
         if (!vm.tokenReady) {
             InfoBanner(
                 "Ten APK nie ma wstrzykniętego CMD_TOKEN — komendy zostaną odrzucone " +
@@ -73,12 +76,14 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
             )
         }
 
+        // Karta z wizualizacją akwarium (jak w HTML .card z .tankVisual)
         SectionCard { AquariumView(s) }
 
+        // Primary controls — 4 duże kafelki sterujące (jak w HTML .primaryControls)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ControlTile(
-                label = "ŚWIATŁO",
-                value = if (s?.power == true) "Włączone" else "Wyłączone",
+                label = "OŚWIETLENIE LED",
+                value = if (s?.power == true) "WŁĄCZONE" else "WYŁĄCZONE",
                 hint = if (s == null) "brak danych" else "${s.pwmPercent}% jasności",
                 icon = Icons.Default.Lightbulb,
                 active = s?.power == true,
@@ -87,30 +92,42 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                 modifier = Modifier.weight(1f)
             ) { vm.togglePower() }
             ControlTile(
-                label = "TRYB",
-                value = if (s?.auto != false) "Automatyczny" else "Ręczny",
-                hint = if (s?.auto != false) "harmonogram" else "PWM z aplikacji",
+                label = "POMPA / FILTR",
+                value = if (s?.pumpOn == true) "WŁĄCZONA" else "WYŁĄCZONA",
+                hint = s?.pumpSlots?.let {
+                    if (it.isEmpty()) "brak okien czasowych" else "${it.size} okien w harmonogramie"
+                } ?: "brak danych",
+                icon = Icons.Default.Waves,
+                active = s?.pumpOn == true,
+                accent = Blue,
+                enabled = !vm.busy,
+                modifier = Modifier.weight(1f)
+            ) { vm.togglePump() }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ControlTile(
+                label = "TRYB PRACY",
+                value = if (s?.auto != false) "AUTO" else "MANUAL",
+                hint = if (s?.auto != false) "harmonogram" else "stałe PWM",
                 icon = Icons.Default.AutoMode,
                 active = s?.auto != false,
                 accent = Cyan,
                 enabled = !vm.busy,
                 modifier = Modifier.weight(1f)
             ) { vm.toggleMode() }
+            ControlTile(
+                label = "ADAPTACJA",
+                value = if (vm.source.contains("adapt", ignoreCase = true)) "AKTYWNA" else "WYŁĄCZONA",
+                hint = "Pokój + woda",
+                icon = Icons.Default.Sensors,
+                active = true,
+                accent = Cyan,
+                enabled = !vm.busy,
+                modifier = Modifier.weight(1f)
+            ) { /* adapt toggle */ }
         }
 
-        ControlTile(
-            label = "POMPKA / NAPOŁĄTRZACZ",
-            value = if (s?.pumpOn == true) "Pracuje" else "Zatrzymana",
-            hint = s?.pumpSlots?.let {
-                if (it.isEmpty()) "brak okien czasowych" else "${it.size} okien w harmonogramie"
-            } ?: "brak danych",
-            icon = Icons.Default.Waves,
-            active = s?.pumpOn == true,
-            accent = Blue,
-            enabled = !vm.busy,
-            modifier = Modifier.fillMaxWidth()
-        ) { vm.togglePump() }
-
+        // Statystyki — 2 rzędy po 2 kafelki (jak w HTML .tempGrid / .statTile)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatTile(
                 "TEMP. WODY", Logic.fmtTemp(s?.tempWater) + "°C", "sonda DS18B20",
@@ -135,6 +152,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
             )
         }
 
+        // Szybkie akcje (jak w HTML .quickGrid)
         SectionCard {
             CardHeader("Szybkie akcje", Icons.Default.PowerSettingsNew)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -145,6 +163,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
             }
         }
 
+        // Stan sterownika (jak w HTML .card z KeyValue)
         SectionCard {
             CardHeader("Stan sterownika", Icons.Default.DeviceThermostat, FsBlue)
             KeyValue("Firmware", s?.fwVersion ?: "—")
