@@ -193,22 +193,16 @@ fun ControlTile(
     onClick: () -> Unit
 ) {
     val tint = if (active) accent else TextDim
-    val gradient = if (active) {
-        Brush.linearGradient(
-            colors = listOf(
-                accent.copy(alpha = 0.16f),
-                accent.copy(alpha = 0.06f)
-            ),
-            start = Offset(0f, 0f),
-            end = Offset(1f, 1f)
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFF122237), Color(0xFF0B1727)),
-            start = Offset(0f, 0f),
-            end = Offset(1f, 1f)
-        )
-    }
+    // HTML .primaryControl: gradient #172c43 -> #0d1c2e -> #091523, cień, obramowanie
+    val gradient = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF172C43),
+            Color(0xFF0D1C2E),
+            Color(0xFF091523)
+        ),
+        start = Offset(0f, 0f),
+        end = Offset(1f, 1f)
+    )
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(11.dp))
@@ -216,7 +210,7 @@ fun ControlTile(
         color = Surface2,
         shape = RoundedCornerShape(11.dp),
         border = androidx.compose.foundation.BorderStroke(
-            1.dp, if (active) accent.copy(alpha = 0.45f) else Border
+            1.dp, if (active) Color(0xFF16708A) else Border
         )
     ) {
         Box(
@@ -230,9 +224,17 @@ fun ControlTile(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // HTML .pcIcon: gradient #12394c -> #0a2033, border #2bbddd55
                 Box(
                     Modifier.size(26.dp).clip(RoundedCornerShape(8.dp))
-                        .background(tint.copy(alpha = 0.16f)),
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFF12394C), Color(0xFF0A2033)),
+                                start = Offset(0f, 0f),
+                                end = Offset(1f, 1f)
+                            )
+                        )
+                        .border(1.dp, Color(0xFF2BBDDD).copy(alpha = 0.33f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(icon, null, tint = tint, modifier = Modifier.size(14.dp))
