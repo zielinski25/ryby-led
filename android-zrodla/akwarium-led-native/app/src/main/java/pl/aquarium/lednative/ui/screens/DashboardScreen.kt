@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +21,8 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -39,9 +40,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import pl.aquarium.lednative.core.DeviceSettings
 import pl.aquarium.lednative.core.DeviceStatus
 import pl.aquarium.lednative.core.Logic
@@ -54,20 +55,14 @@ import pl.aquarium.lednative.ui.TextHi
 import pl.aquarium.lednative.ui.TextMid
 import pl.aquarium.lednative.ui.Warm
 import pl.aquarium.lednative.ui.components.AquariumView
-import pl.aquarium.lednative.ui.components.CardHeader
 import pl.aquarium.lednative.ui.components.ControlTile
-import pl.aquarium.lednative.ui.components.InfoBanner
 import pl.aquarium.lednative.ui.components.LineChart
 import pl.aquarium.lednative.ui.components.Pill
 import pl.aquarium.lednative.ui.components.PrimaryButton
 import pl.aquarium.lednative.ui.components.PwmSlider
 import pl.aquarium.lednative.ui.components.QuickTile
-import pl.aquarium.lednative.ui.components.ScreenTitle
 import pl.aquarium.lednative.ui.components.SectionCard
 import pl.aquarium.lednative.ui.components.SegmentedTabs
-
-private val OffValue = Color(0xFFFFAC84)   // HTML .primaryControl[data-state="off"] b / i
-private val OnValue  = Color(0xFF57E6BB)   // HTML .primaryControl[data-state="on"] b
 
 @Composable
 private fun ModeSwitch(onClick: () -> Unit) {
@@ -87,12 +82,14 @@ private fun ModeSwitch(onClick: () -> Unit) {
 }
 
 @Composable
-private fun LightTile(label: String, value: String, sub: String, icon: ImageVector, accent: Color) {
+private fun LightTile(
+    label: String, value: String, sub: String, icon: ImageVector, accent: Color,
+    modifier: Modifier = Modifier
+) {
     // HTML .lightTile w .lightGrid
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .weight(1f)
             .clip(RoundedCornerShape(9.dp))
             .background(Color(0xFF0B1726))
             .border(1.dp, Color(0xFFFFFFFF).copy(alpha = 0.07f), RoundedCornerShape(9.dp))
@@ -110,7 +107,7 @@ private fun LightTile(label: String, value: String, sub: String, icon: ImageVect
                 Icon(icon, null, tint = accent, modifier = Modifier.size(13.dp))
                 Text(label, fontSize = 6.sp, color = TextDim, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace)
             }
-            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = accent, fontFamily = FontFamily.Monospace, maxLines = 1)
+            Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accent, fontFamily = FontFamily.Monospace, maxLines = 1)
             Text(sub, fontSize = 7.sp, color = TextMid, maxLines = 2)
         }
     }
@@ -118,10 +115,10 @@ private fun LightTile(label: String, value: String, sub: String, icon: ImageVect
 
 /** Jeden panel energii (HTML .energyStats>div). */
 @Composable
-private fun EnergyStat(label: String, value: String, unit: String) {
-    Column(Modifier.weight(1f)) {
+private fun EnergyStat(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(label, fontSize = 6.sp, color = TextDim, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-        Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi, maxLines = 1)
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextHi, maxLines = 1)
         Text(unit, fontSize = 8.sp, color = TextMid, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
     }
 }
@@ -142,37 +139,10 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
     var settings by remember { mutableStateOf(DeviceSettings.from(s ?: DeviceStatus())) }
     // Lokalna kopia wartości PWM (suwaki działają na podglądzie i wysyłają zmiany na żywo).
     var pwmValues by remember { mutableStateOf(pwm.toMutableList()) }
+    var pwmExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // pageHead — HTML .pageHead: tytuł, podtytuł i prawy blok "updated" (czas odczytu + FW)
-        ScreenTitle(
-            "Pulpit",
-            "Akwarium LED · sterowanie i podgląd",
-            badge = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Ostatni odczyt", fontSize = 7.sp, color = TextDim, fontFamily = FontFamily.Monospace)
-                    Text(vm.lastSync ?: "—", fontSize = 8.sp, color = TextDim, fontFamily = FontFamily.Monospace)
-                    Text("FW ${s?.fwVersion ?: "—"}", fontSize = 8.sp, color = TextDim, fontFamily = FontFamily.Monospace)
-                }
-            }
-        )
-
-        // Banery informacyjne (token, połączenie) — functional warnings.
-        if (!vm.tokenReady) {
-            InfoBanner(
-                "Ten APK nie ma wstrzykniętego CMD_TOKEN — komendy zostaną odrzucone " +
-                    "jako reason=invalid. Zbuduj aplikację skryptem BUDUJ-APK.ps1.",
-                warn = true
-            )
-        }
-        if (!vm.signedIn && vm.lanBase == null) {
-            InfoBanner(
-                "Brak połączenia. Zaloguj się do Firebase lub wykryj ESP w sieci lokalnej " +
-                    "(zakładka Więcej).",
-                warn = true
-            )
-        }
-
+        // HTML home() zaczyna sie bez pageHead i banerow; pierwsza jest karta zbiornika.
         // Karta zbiornika — HTML section.card > cardHead "Podgląd zbiornika" + 2 pill + tankVisual + blendLabels
         SectionCard {
             Row(
@@ -250,13 +220,17 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                 accent = Cyan,
                 enabled = !vm.busy,
                 modifier = Modifier.weight(1f),
-                onClick = { /* adapt toggle — ustawienia w karcie poniżej */ }
+                onClick = {
+                    val updated = settings.copy(adaptEnabled = !adapt)
+                    settings = updated
+                    vm.saveSettings(updated)
+                }
             )
         }
 
         // Ustawienia czujników i MIN LUX — HTML <details> "Ustawienia czujników i MIN LUX"
         SectionCard {
-            var expanded by remember { mutableStateOf(true) }
+            var expanded by remember { mutableStateOf(false) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -271,7 +245,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                 )
                 Text(if (expanded) "▲" else "▼", fontSize = 10.sp, color = TextDim, fontFamily = FontFamily.Monospace)
             }
-            if (expanded && s != null) {
+            if (expanded) {
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -282,7 +256,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                             options = listOf("0" to "Wyłączone", "1" to "Pokój", "2" to "Pokój + woda"),
                             selected = settings.sensorMode.toString(),
                             modifier = Modifier.width(160.dp),
-                            onSelect { settings = settings.copy(sensorMode = it.toInt()) }
+                            onSelect = { selected -> settings = settings.copy(sensorMode = selected.toInt()) }
                         )
                     }
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -371,15 +345,31 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                         Text("Przesuń, aby ustawić ogólną jasność wszystkich kanałów", fontSize = 6.sp, color = TextMid)
                     }
                 }
-                pwmValues.forEachIndexed { index, value ->
-                    PwmSlider(index = index, value = value, enabled = !vm.busy, onChange = { newValue ->
-                        pwmValues = pwmValues.toMutableList().apply { set(index, newValue) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { pwmExpanded = !pwmExpanded }.padding(vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Rozwiń regulację poszczególnych kanałów",
+                        fontSize = 8.sp, color = TextMid, fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "5 kanałów  ${if (pwmExpanded) "⌃" else "⌄"}",
+                        fontSize = 6.sp, color = TextDim, fontFamily = FontFamily.Monospace
+                    )
+                }
+                if (pwmExpanded) {
+                    pwmValues.forEachIndexed { index, value ->
+                        PwmSlider(index = index, value = value, enabled = !vm.busy, onChange = { newValue ->
+                            pwmValues = pwmValues.toMutableList().apply { set(index, newValue) }
+                            vm.applyPwm(pwmValues)
+                        })
+                    }
+                    PrimaryButton("Zapisz PWM", enabled = !vm.busy, modifier = Modifier.fillMaxWidth(), onClick = {
                         vm.applyPwm(pwmValues)
                     })
                 }
-                PrimaryButton("Zapisz PWM", enabled = !vm.busy, modifier = Modifier.fillMaxWidth(), onClick = {
-                    vm.applyPwm(pwmValues)
-                })
             }
         }
 
@@ -393,14 +383,16 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Energia i historia zużycia", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextHi)
-                    Text("Szacunek LED + pompka · bez fizycznego miernika", fontSize = 6.sp, color = TextDim)
+                    Column(Modifier.weight(1f)) {
+                        Text("Energia i historia zużycia", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                        Text("Szacunek LED + pompka · bez fizycznego miernika", fontSize = 6.sp, color = TextDim)
+                    }
                     Pill("ESTYMACJA", Color(0xFF67DFF2))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    EnergyStat("TERAZ", Logic.fmtWatts(watts), "W")
-                    EnergyStat("DZIŚ · EST.", "${(todayWh / 1000.0).format("%.2f")}", "kWh")
-                    EnergyStat("MIESIĄC · EST.", Logic.costPln(todayWh, s?.kwhPrice), "zł")
+                    EnergyStat("TERAZ", Logic.fmtWatts(watts), "W", Modifier.weight(1f))
+                    EnergyStat("DZIŚ · EST.", "${(todayWh / 1000.0).format("%.2f")}", "kWh", Modifier.weight(1f))
+                    EnergyStat("MIESIĄC · EST.", Logic.costPln(todayWh * 30.0, s?.kwhPrice), "zł", Modifier.weight(1f))
                 }
                 LineChart(
                     values = s?.hourPowerWh ?: emptyList(),
@@ -426,28 +418,55 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                     Text("Światło i LUX", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextHi)
                     Text("pomiary ›", fontSize = 8.sp, color = TextDim, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                 }
+                val sunLux = s?.luxRoom?.toInt() ?: 0
+                val ledLux = if (power) (850.0 * pwmAvg / 650.0).roundToInt() else 0
+                val luxScale = (s?.minLuxTarget ?: 2000).coerceAtLeast(500)
+                val sunShare = (sunLux.toFloat() / luxScale).coerceIn(0f, 1f)
+                val ledShare = (ledLux.toFloat() / luxScale).coerceIn(0f, 1f - sunShare)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LightTile(
                         label = "SŁOŃCE",
                         value = s?.luxRoom?.let { "${it.toInt()} lx" } ?: "—",
                         sub = "przy roślinach",
                         icon = Icons.Default.WbSunny,
-                        accent = Warm
+                        accent = Warm,
+                        modifier = Modifier.weight(1f)
                     )
                     LightTile(
                         label = "DOŚWIETL.",
-                        value = s?.luxWater?.let { "${it.toInt()} lx" } ?: "—",
+                        value = if (s?.luxRoom == null && !power) "—" else "$ledLux lx",
                         sub = "LED · $pwmPercent%",
                         icon = Icons.Default.Lightbulb,
-                        accent = Cyan
+                        accent = Cyan,
+                        modifier = Modifier.weight(1f)
                     )
                     LightTile(
                         label = "NAD WODĄ",
-                        value = s?.luxWater?.let { "${it.toInt()} lx" } ?: "—",
-                        sub = "czujnik TSL2561",
+                        value = s?.luxWater?.let { if (it >= 1000) "${(it / 1000.0).format("%.1f")}k" else "${it.toInt()}" } ?: "—",
+                        sub = "lx · czujnik",
                         icon = Icons.Default.DeviceThermostat,
-                        accent = FsBlue
+                        accent = FsBlue,
+                        modifier = Modifier.weight(1f)
                     )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("ŚWIATŁO ŁĄCZNIE PRZY ROŚLINACH", fontSize = 6.sp, color = TextDim, fontFamily = FontFamily.Monospace)
+                    Text("${sunLux + ledLux} / $luxScale lx", fontSize = 7.sp, color = TextHi, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(99.dp)).background(Border)
+                ) {
+                    if (sunShare > 0f) Box(Modifier.weight(sunShare).fillMaxWidth().height(7.dp).background(Warm))
+                    if (ledShare > 0f) Box(Modifier.weight(ledShare).fillMaxWidth().height(7.dp).background(Cyan))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("☀ SŁOŃCE", fontSize = 6.sp, color = TextDim, fontFamily = FontFamily.Monospace)
+                    Text("💡 LED", fontSize = 6.sp, color = TextDim, fontFamily = FontFamily.Monospace)
+                    Text("SKALA 0–$luxScale lx", fontSize = 6.sp, color = TextDim, fontFamily = FontFamily.Monospace)
                 }
             }
         }
@@ -460,8 +479,11 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             QuickTile("Sterowanie PWM", Icons.Default.Dashboard, modifier = Modifier.weight(1f), accent = Warm) { onNavigate("light") }
             QuickTile("Harmonogram", Icons.Default.Schedule, modifier = Modifier.weight(1f), accent = FsBlue) { onNavigate("plan") }
-            QuickTile("Ostatnie logi", Icons.Default.Article, modifier = Modifier.weight(1f), accent = Cyan) { onNavigate("more") }
+            QuickTile("Ostatnie logi", Icons.Default.Article, modifier = Modifier.weight(1f), accent = Cyan) { onNavigate("logs") }
         }
     }
 }
+
+private fun Double.format(pattern: String): String =
+    java.lang.String.format(java.util.Locale.US, pattern, this)
 

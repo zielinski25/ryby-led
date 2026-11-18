@@ -170,6 +170,56 @@ fun AquariumView(status: DeviceStatus?, modifier: Modifier = Modifier) {
                 )
             }
 
+            // Dwie listwy LED nad wodą (w makiecie zawierają osobne odczyty temperatury).
+            val panelW = tankW * 0.29f
+            val panelH = tankH * 0.15f
+            val panelY = tankTop + tankH * 0.035f
+            listOf(0.20f, 0.52f).forEachIndexed { index, fx ->
+                val px = tankLeft + tankW * fx
+                drawRoundRect(
+                    color = Color(0xFF21354A),
+                    topLeft = Offset(px, panelY), size = Size(panelW, panelH),
+                    cornerRadius = CornerRadius(7f, 7f)
+                )
+                drawRoundRect(
+                    color = Color(0xFF91AEBF),
+                    topLeft = Offset(px, panelY), size = Size(panelW, panelH),
+                    cornerRadius = CornerRadius(7f, 7f), style = Stroke(width = 1.4f)
+                )
+                drawRoundRect(
+                    color = (if (index == 0) Color(0xFFD6F7FF) else Color(0xFF6ED8F4)).copy(alpha = 0.85f),
+                    topLeft = Offset(px + panelW * 0.12f, panelY + panelH * 0.23f),
+                    size = Size(panelW * 0.76f, panelH * 0.18f),
+                    cornerRadius = CornerRadius(5f, 5f)
+                )
+            }
+
+            // Termometr wody po lewej i obudowa filtra po prawej.
+            val thermometerX = tankLeft + tankW * 0.075f
+            val thermometerY = waterTop + tankH * 0.28f
+            drawRoundRect(
+                color = Color(0xFF9FEFFF),
+                topLeft = Offset(thermometerX, thermometerY),
+                size = Size(8f, tankH * 0.42f), cornerRadius = CornerRadius(5f, 5f)
+            )
+            drawRoundRect(
+                color = Color(0xFFFF755E),
+                topLeft = Offset(thermometerX + 2f, thermometerY + tankH * 0.20f),
+                size = Size(4f, tankH * 0.18f), cornerRadius = CornerRadius(3f, 3f)
+            )
+            val filterX = tankLeft + tankW * 0.88f
+            val filterY = waterTop + tankH * 0.17f
+            drawRoundRect(
+                color = Color(0xFF344B61),
+                topLeft = Offset(filterX, filterY),
+                size = Size(tankW * 0.07f, tankH * 0.40f), cornerRadius = CornerRadius(9f, 9f)
+            )
+            drawRoundRect(
+                color = if (pump) Color(0xFF4ADE80) else Color(0xFF6B8299),
+                topLeft = Offset(filterX + tankW * 0.023f, filterY + tankH * 0.11f),
+                size = Size(4f, 4f), cornerRadius = CornerRadius(2f, 2f)
+            )
+
             // Podloze.
             drawRoundRect(
                 color = Color(0xFF123049),
@@ -190,14 +240,35 @@ fun AquariumView(status: DeviceStatus?, modifier: Modifier = Modifier) {
                     }
                     drawPath(
                         plant,
-                        color = Color(0xFF1F7A55).copy(alpha = 0.85f),
-                        style = Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        color = Color(0xFF1F7A55).copy(alpha = 0.9f),
+                        style = Stroke(width = 4f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     )
+                    // Liście po obu stronach łodygi — w HTML są pełnymi, widocznymi liśćmi,
+                    // nie samymi kreskami.
+                    val leafColor = if (idx % 2 == 0) Color(0xFF24BC83) else Color(0xFF168F91)
+                    val leafStroke = if (idx % 2 == 0) Color(0xFF75EFBD) else Color(0xFF62DAD3)
+                    for (leafIndex in 0..2) {
+                        val leafY = plantBase - ph * (0.28f + leafIndex * 0.22f)
+                        val side = if (leafIndex % 2 == 0) -1f else 1f
+                        drawPlantLeaf(
+                            x = px + sway * (1f - leafIndex * 0.25f),
+                            y = leafY,
+                            direction = side,
+                            leafSize = tankW * 0.045f,
+                            fill = leafColor,
+                            outline = leafStroke
+                        )
+                    }
                 }
 
-            // Ryby.
-            drawFish(Offset(tankLeft + tankW * 0.42f, waterTop + tankH * 0.34f), 16f, Color(0xFFFF9F43), phase)
-            drawFish(Offset(tankLeft + tankW * 0.62f, waterTop + tankH * 0.52f), 12f, Color(0xFF7AD4FF), phase + 1.7f)
+            // Sześć neonów w ławicy oraz dwie większe ryby jak w makiecie HTML.
+            for (i in 0 until 6) {
+                val x = tankLeft + tankW * (0.24f + i * 0.085f)
+                val y = waterTop + tankH * (0.33f + if (i % 2 == 0) 0.04f else -0.015f)
+                drawFish(Offset(x, y), 5.5f, Color(0xFF27DDF4), phase + i * 0.45f)
+            }
+            drawFish(Offset(tankLeft + tankW * 0.69f, waterTop + tankH * 0.59f), 13f, Color(0xFFE7A63F), phase + 0.8f)
+            drawFish(Offset(tankLeft + tankW * 0.52f, waterTop + tankH * 0.78f), 10f, Color(0xFF9D8066), phase + 1.7f)
 
             // Babelki pompki.
             if (pump) {
@@ -241,6 +312,28 @@ fun AquariumView(status: DeviceStatus?, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+private fun DrawScope.drawPlantLeaf(
+    x: Float,
+    y: Float,
+    direction: Float,
+    leafSize: Float,
+    fill: Color,
+    outline: Color
+) {
+    val endX = x + direction * leafSize * 1.7f
+    val endY = y - leafSize * 1.25f
+    val leaf = Path().apply {
+        moveTo(x, y)
+        cubicTo(x + direction * leafSize * 0.15f, y - leafSize * 0.95f,
+            endX - direction * leafSize * 0.25f, endY - leafSize * 0.30f, endX, endY)
+        cubicTo(endX - direction * leafSize * 0.15f, endY + leafSize * 0.95f,
+            x + direction * leafSize * 0.35f, y + leafSize * 0.32f, x, y)
+        close()
+    }
+    drawPath(leaf, color = fill.copy(alpha = 0.95f))
+    drawPath(leaf, color = outline.copy(alpha = 0.9f), style = Stroke(width = 1.2f))
 }
 
 private fun DrawScope.drawFish(center: Offset, size: Float, color: Color, phase: Float) {
