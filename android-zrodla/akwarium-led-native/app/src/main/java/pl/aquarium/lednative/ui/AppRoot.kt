@@ -179,7 +179,6 @@ fun AppRoot(vm: AppViewModel) {
                     }
                 }
             }
-            }  // zamknięcie pierwszej Column (pasek statusu + AppBar)
 
             // Zawartość ekranu (jak w HTML screen content — scrollowane, padding 13dp)
             Column(
@@ -201,19 +200,19 @@ fun AppRoot(vm: AppViewModel) {
                     }
                 }
             }
+        } // Column(modifier = Modifier.fillMaxSize())
 
-            // Nawigacja dolna — jeden rząd 8 zakładek (jak w HTML mobile bottomNav)
-            BottomNav(
-                selected = tab,
-                onSelect = { tab = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 3.dp)
-                    .navigationBarsPadding()
-            )
-        }
-    }
-}
+        // Nawigacja dolna — jeden rząd 8 zakładek (jak w HTML mobile bottomNav)
+        BottomNav(
+            selected = tab,
+            onSelect = { tab = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 3.dp)
+                .navigationBarsPadding()
+        )
+    } // Box(tło)
+} // AppRoot
 
 @Composable
 private fun BottomNav(selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -255,5 +254,5 @@ private fun BottomNav(selected: String, onSelect: (String) -> Unit, modifier: Mo
                 )
             }
         }
-    }
-}
+    } // Row
+} // BottomNav
