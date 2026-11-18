@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +23,7 @@ import pl.aquarium.lednative.ui.Cyan
 import pl.aquarium.lednative.ui.FsBlue
 import pl.aquarium.lednative.ui.Green
 import pl.aquarium.lednative.ui.Warm
+import pl.aquarium.lednative.ui.TextDim
 import pl.aquarium.lednative.ui.components.BarChart
 import pl.aquarium.lednative.ui.components.CardHeader
 import pl.aquarium.lednative.ui.components.ChannelBars
@@ -53,28 +55,31 @@ fun ChartsScreen(vm: AppViewModel) {
         when (tab) {
             "live" -> {
                 SectionCard {
-                    CardHeader("Jasność LED (%)", Icons.Default.ShowChart, Warm)
+                    CardHeader("Wykresy", Icons.Default.ShowChart, Cyan) {
+                        Text("ostatnie 24 h", fontSize = 7.sp, color = TextDim)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        StatTile(
+                            "PŁYTA LED 1", Logic.fmtTemp(s?.tempPlate1) + "°C", "",
+                            Icons.Default.Thermostat, Warm, Modifier.weight(1f)
+                        )
+                        StatTile(
+                            "PŁYTA LED 2", Logic.fmtTemp(s?.tempPlate2) + "°C", "",
+                            Icons.Default.Thermostat, Warm, Modifier.weight(1f)
+                        )
+                        StatTile(
+                            "WODA", Logic.fmtTemp(s?.tempWater) + "°C", "",
+                            Icons.Default.Thermostat, FsBlue, Modifier.weight(1f)
+                        )
+                    }
+                    Text("JASNOŚĆ PWM", fontSize = 6.sp, color = TextDim)
                     LineChart(
                         samples.map { it.pwm.average() * 100.0 / Logic.PWM_MAX },
-                        Warm, unit = "%"
+                        Warm, unit = "%", heightDp = 78
                     )
+                    Text("TEMPERATURA WODY", fontSize = 6.sp, color = TextDim)
+                    LineChart(samples.mapNotNull { it.tempWater }, Cyan, unit = "°C", heightDp = 78)
                 }
-                SectionCard {
-                    CardHeader("Temperatura wody (°C)", Icons.Default.Thermostat, Cyan)
-                    LineChart(samples.mapNotNull { it.tempWater }, Cyan, unit = "°C")
-                }
-                SectionCard {
-                    CardHeader("Natężenie światła (lx)", Icons.Default.WbSunny, FsBlue)
-                    LineChart(samples.mapNotNull { it.lux }, FsBlue, unit = " lx")
-                }
-                SectionCard {
-                    CardHeader("Moc chwilowa (W)", Icons.Default.Bolt, Green)
-                    LineChart(samples.mapNotNull { it.powerW }, Green, unit = " W")
-                }
-                InfoBanner(
-                    "Wykresy „Na żywo” powstają z odczytów statusu co 15 s w trakcie działania " +
-                        "aplikacji (${samples.size} próbek w pamięci). Historia dobowa pochodzi z ESP."
-                )
             }
             "energy" -> {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -40,17 +40,15 @@ import pl.aquarium.lednative.ui.components.Pill
 import pl.aquarium.lednative.ui.components.PrimaryButton
 import pl.aquarium.lednative.ui.components.ScreenTitle
 import pl.aquarium.lednative.ui.components.SectionCard
-import pl.aquarium.lednative.ui.components.SegmentedTabs
 import pl.aquarium.lednative.ui.components.TextFieldStyled
 import pl.aquarium.lednative.ui.components.TimeField
 
 @Composable
 fun ScheduleScreen(vm: AppViewModel) {
     val s = vm.status
-    var tab by remember { mutableStateOf("led") }
     var sched by remember { mutableStateOf(LedSchedule()) }
     var fade by remember { mutableStateOf("30") }
-    var slots by remember { mutableStateOf(listOf(PumpSlot("08:00", "10:00"))) }
+    var slots by remember { mutableStateOf(listOf(PumpSlot("08:00", "08:20"), PumpSlot("21:00", "21:15"))) }
     var ledLoaded by remember { mutableStateOf(false) }
     var pumpLoaded by remember { mutableStateOf(false) }
 
@@ -72,10 +70,7 @@ fun ScheduleScreen(vm: AppViewModel) {
         ScreenTitle("Plan", "Harmonogram światła i pompki") {
             Pill(if (s?.auto != false) "AUTO" else "MANUAL", if (s?.auto != false) Cyan else Warm)
         }
-        SegmentedTabs(listOf("led" to "Światło", "pump" to "Pompka"), tab) { tab = it }
-
-        if (tab == "led") {
-            SectionCard {
+        SectionCard {
                 CardHeader("Harmonogram dobowy", Icons.Default.Schedule)
                 TimeField("Start w tygodniu (WD)", sched.morningWD) {
                     sched = sched.copy(morningWD = it)
@@ -114,12 +109,12 @@ fun ScheduleScreen(vm: AppViewModel) {
                     else vm.saveSchedule(sched, f)
                 }
             }
-            InfoBanner(
-                "Zmiana trafia do Firebase jako config (configType=schedule) plus komenda " +
-                    "config_refresh. ESP pobiera kolejkę mniej więcej co 14 sekund."
-            )
-        } else {
-            SectionCard {
+        InfoBanner(
+            "Zmiana trafia do Firebase jako config (configType=schedule) plus komenda " +
+                "config_refresh. ESP pobiera kolejkę mniej więcej co 14 sekund."
+        )
+
+        SectionCard {
                 CardHeader("Okna pracy pompki", Icons.Default.Waves, Blue) {
                     Pill("${slots.size}/6", Blue)
                 }
@@ -171,10 +166,9 @@ fun ScheduleScreen(vm: AppViewModel) {
                     else vm.savePumpSlots(slots)
                 }
             }
-            InfoBanner(
-                "Firmware przyjmuje maksymalnie 6 okien. Okno może przechodzić przez północ " +
-                    "(np. 23:00 → 01:00)."
-            )
-        }
+        InfoBanner(
+            "Firmware przyjmuje maksymalnie 6 okien. Okno może przechodzić przez północ " +
+                "(np. 23:00 → 01:00)."
+        )
     }
 }

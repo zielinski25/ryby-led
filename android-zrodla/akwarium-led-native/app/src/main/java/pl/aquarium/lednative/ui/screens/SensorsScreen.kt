@@ -1,14 +1,22 @@
 package pl.aquarium.lednative.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import pl.aquarium.lednative.core.DeviceSettings
 import pl.aquarium.lednative.core.Logic
@@ -30,6 +39,7 @@ import pl.aquarium.lednative.ui.TextDim
 import pl.aquarium.lednative.ui.Warm
 import pl.aquarium.lednative.ui.components.CardHeader
 import pl.aquarium.lednative.ui.components.InfoBanner
+import pl.aquarium.lednative.ui.components.LineChart
 import pl.aquarium.lednative.ui.components.NumberField
 import pl.aquarium.lednative.ui.components.Pill
 import pl.aquarium.lednative.ui.components.PrimaryButton
@@ -50,6 +60,7 @@ fun SensorsScreen(vm: AppViewModel) {
     var luxTarget by remember { mutableStateOf("2000") }
     var luxInterval by remember { mutableStateOf("30") }
     var loaded by remember { mutableStateOf(false) }
+    var settingsExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(s) {
         if (!loaded && s != null) {
@@ -75,28 +86,81 @@ fun SensorsScreen(vm: AppViewModel) {
             Pill(when (cfg.sensorMode) { 0 -> "POKÓJ"; 1 -> "WODA"; else -> "OBA" }, FsBlue)
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(
-                "PLYTA 1", Logic.fmtTemp(s?.tempPlate1) + "°C", "radiator LED",
-                Icons.Default.Thermostat, Warm, Modifier.weight(1f)
-            )
-            StatTile(
-                "PLYTA 2", Logic.fmtTemp(s?.tempPlate2) + "°C", "radiator LED",
-                Icons.Default.Thermostat, Warm, Modifier.weight(1f)
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(
-                "LUX POKOJOWY", Logic.fmtLux(s?.luxRoom), "BH1750 #1",
-                Icons.Default.WbSunny, FsBlue, Modifier.weight(1f)
-            )
-            StatTile(
-                "LUX NAD WODĄ", Logic.fmtLux(s?.luxWater), "BH1750 #2",
-                Icons.Default.WbSunny, Cyan, Modifier.weight(1f)
-            )
-        }
-
         SectionCard {
+            CardHeader("Temperatury", Icons.Default.Thermostat, Warm) {
+                Text("aktualizacja teraz", fontSize = 7.sp, color = TextDim)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatTile(
+                    "PŁYTA LED 1", Logic.fmtTemp(s?.tempPlate1) + "°C", "radiator",
+                    Icons.Default.Thermostat, Warm, Modifier.weight(1f)
+                )
+                StatTile(
+                    "PŁYTA LED 2", Logic.fmtTemp(s?.tempPlate2) + "°C", "radiator",
+                    Icons.Default.Thermostat, Warm, Modifier.weight(1f)
+                )
+                StatTile(
+                    "WODA", Logic.fmtTemp(s?.tempWater) + "°C", "akwarium",
+                    Icons.Default.Thermostat, FsBlue, Modifier.weight(1f)
+                )
+            }
+        }
+        val ledLux = if (s?.power == true) (850.0 * (s.pwmPercent / 64.0)).toInt() else 0
+        val sunLux = s?.luxRoom?.toInt() ?: 0
+        val luxScale = (s?.minLuxTarget ?: 2000).coerceAtLeast(500)
+        val sunShare = (sunLux.toFloat() / luxScale).coerceIn(0f, 1f)
+        val ledShare = (ledLux.toFloat() / luxScale).coerceIn(0f, 1f - sunShare)
+        SectionCard {
+            CardHeader("Natężenie światła", Icons.Default.WbSunny, Cyan) { Pill("TSL2561", Green) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                StatTile(
+                    "SŁOŃCE", Logic.fmtLux(s?.luxRoom), "przy roślinach",
+                    Icons.Default.WbSunny, Warm, Modifier.weight(1f)
+                )
+                StatTile(
+                    "DOŚWIETL.", if (s == null) "—" else "$ledLux lx", "LED · ${s?.pwmPercent ?: 0}%",
+                    Icons.Default.WbSunny, Cyan, Modifier.weight(1f)
+                )
+                StatTile(
+                    "NAD WODĄ", Logic.fmtLux(s?.luxWater), "czujnik TSL2561",
+                    Icons.Default.WbSunny, FsBlue, Modifier.weight(1f)
+                )
+            }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("ŚWIATŁO ŁĄCZNIE PRZY ROŚLINACH", fontSize = 6.sp, color = TextDim)
+                Text("${sunLux + ledLux} / $luxScale lx", fontSize = 7.sp, color = TextHi)
+            }
+            Row(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(99.dp)).background(Surface3)) {
+                if (sunShare > 0f) Box(Modifier.weight(sunShare).fillMaxWidth().height(6.dp).background(Warm))
+                if (ledShare > 0f) Box(Modifier.weight(ledShare).fillMaxWidth().height(6.dp).background(Cyan))
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("☀ SŁOŃCE", fontSize = 6.sp, color = TextDim)
+                Text("💡 LED", fontSize = 6.sp, color = TextDim)
+                Text("SKALA 0–$luxScale lx", fontSize = 6.sp, color = TextDim)
+            }
+        }
+        SectionCard {
+            CardHeader("Historia pomiarów", Icons.Default.Tune, Cyan) {
+                Text("12 h", fontSize = 7.sp, color = TextDim)
+            }
+            LineChart(vm.samples.mapNotNull { it.tempWater }, Cyan, unit = "°C")
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("— PŁYTA LED", fontSize = 6.sp, color = Warm)
+                Text("— WODA", fontSize = 6.sp, color = FsBlue)
+                Text("— LUX", fontSize = 6.sp, color = Cyan)
+            }
+        }
+        SectionCard {
+            Row(
+                Modifier.fillMaxWidth().clickable { settingsExpanded = !settingsExpanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Ustawienia czujników i adaptacji", fontSize = 9.sp, color = TextHi, modifier = Modifier.weight(1f))
+                Text(if (settingsExpanded) "▲" else "▼", fontSize = 8.sp, color = TextDim)
+            }
+        }
+        if (settingsExpanded) SectionCard {
             CardHeader("Źródło adaptacji", Icons.Default.Sensors, FsBlue)
             SegmentedTabs(
                 listOf("0" to "Pokojowy", "1" to "Nad wodą", "2" to "Oba"),
@@ -118,6 +182,7 @@ fun SensorsScreen(vm: AppViewModel) {
             }
         }
 
+        if (settingsExpanded) {
         SectionCard {
             CardHeader("Minimalne światło (min-lux)", Icons.Default.WbSunny, Green) {
                 if (s?.minLuxActive == true) Pill("AKTYWNY", Green)
@@ -193,5 +258,6 @@ fun SensorsScreen(vm: AppViewModel) {
             "Ustawienia są wysyłane jako config do Firebase (adapt / minlux / params / schedule) " +
                 "i potwierdzane komendą config_refresh. Bez LAN nie ma podglądu logów."
         )
+        }
     }
 }

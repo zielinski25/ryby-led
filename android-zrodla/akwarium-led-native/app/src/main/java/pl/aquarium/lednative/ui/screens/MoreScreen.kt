@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import pl.aquarium.lednative.ui.components.SegmentedTabs
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,12 +49,18 @@ fun MoreScreen(vm: AppViewModel) {
     var host by remember { mutableStateOf(vm.prefs.manualHost) }
     var confirmRestart by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
+    var pane by remember { mutableStateOf("settings") }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ScreenTitle("Więcej", "Połączenie, konto i diagnostyka") {
             Pill("v${BuildConfig.VERSION_NAME}", FsBlue)
         }
+        SegmentedTabs(
+            listOf("settings" to "Ustawienia", "terminal" to "Terminal", "charts" to "Wykresy", "logs" to "Logi"),
+            pane
+        ) { pane = it }
 
+        if (pane == "settings") {
         SectionCard {
             CardHeader("CMD_TOKEN", Icons.Default.Key, if (vm.tokenReady) Green else Red) {
                 Pill(if (vm.tokenReady) "OK" else "BRAK", if (vm.tokenReady) Green else Red)
@@ -139,6 +146,14 @@ fun MoreScreen(vm: AppViewModel) {
                 "Aplikacja w pełni natywna: Kotlin + Jetpack Compose, bez WebView, bez HTML " +
                     "i bez mostka JavaScript. Wygląd kafelkowy odtworzony natywnymi komponentami."
             )
+        }
+        } else {
+            when (pane) {
+                "terminal" -> TerminalScreen(vm)
+                "charts" -> ChartsScreen(vm)
+                "logs" -> LogsScreen(vm)
+                else -> Unit
+            }
         }
     }
 
