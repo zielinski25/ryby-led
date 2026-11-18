@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -66,13 +67,13 @@ private data class Tab(val key: String, val label: String, val icon: ImageVector
 
 private val TABS = listOf(
     Tab("dash", "Pulpit", Icons.Default.Dashboard),
-    Tab("light", "Swiatlo", Icons.Default.WbSunny),
+    Tab("light", "Światło", Icons.Default.WbSunny),
     Tab("plan", "Plan", Icons.Default.Schedule),
     Tab("sensors", "Czujniki", Icons.Default.Sensors),
     Tab("charts", "Wykresy", Icons.Default.ShowChart),
     Tab("logs", "Logi", Icons.Default.Article),
     Tab("terminal", "Terminal", Icons.Default.Code),
-    Tab("more", "Wiecej", Icons.Default.MoreHoriz)
+    Tab("more", "Więcej", Icons.Default.MoreHoriz)
 )
 
 @Composable
@@ -98,7 +99,7 @@ fun AppRoot(vm: AppViewModel) {
             .navigationBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Pasek statusu (jak w HTML sysline: czas po lewej, WiFi · Bateria po prawej)
+            // Pasek statusu (jak w HTML .sysline: czas po lewej, WiFi · Bateria po prawej)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -123,29 +124,39 @@ fun AppRoot(vm: AppViewModel) {
                 }
             }
 
-            // AppBar (jak w HTML appbar: brandMark + "Akwarium LED" + badge ONLINE/OFFLINE)
+            // AppBar (jak w HTML .appbar: brandMark + "AKWARIUM LED" + badge ONLINE/OFFLINE)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(9.dp)
             ) {
+                // Brand mark — kwadrat z gradientem cyjan jak w HTML .brandMark
                 Box(
                     Modifier
                         .size(34.dp)
                         .clip(RoundedCornerShape(11.dp))
-                        .background(Cyan.copy(alpha = 0.16f)),
+                        .background(
+                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                colors = listOf(Cyan, Color(0xFF0070FF)),
+                                start = Offset(0f, 0f),
+                                end = Offset(1f, 1f)
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.WbSunny, null, tint = Cyan, modifier = Modifier.size(19.dp))
+                    Icon(Icons.Default.WbSunny, null, tint = Color(0xFF00131C), modifier = Modifier.size(17.dp))
                 }
+                // Brand text — "AKWARIUM LED" + podtekst jak w HTML .brand
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Akwarium LED",
-                        fontSize = 15.sp,
+                        "AKWARIUM LED",
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Cyan
+                        color = Cyan,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.4.sp
                     )
                     Text(
                         "ESP32 S3 · ${vm.source}",
@@ -154,33 +165,36 @@ fun AppRoot(vm: AppViewModel) {
                         fontFamily = FontFamily.Monospace
                     )
                 }
+                // Spacer
+                Box(Modifier.weight(1f))
+                // Badge ONLINE/OFFLINE z kropką jak w HTML .headerBadge + .onlineDot
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(7.dp))
-                        .background(if (vm.connection == Logic.Conn.ONLINE) Green.copy(alpha = 0.10f) else Red.copy(alpha = 0.10f))
-                        .border(1.dp, if (vm.connection == Logic.Conn.ONLINE) Green.copy(alpha = 0.33f) else Red.copy(alpha = 0.33f), RoundedCornerShape(7.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                        .background(if (vm.connection == Logic.Conn.ONLINE) Color(0x1100D4F5) else Color(0x11FF4D6D))
+                        .border(1.dp, if (vm.connection == Logic.Conn.ONLINE) Color(0x3300D4F5) else Color(0x33FF4D6D), RoundedCornerShape(7.dp))
+                        .padding(horizontal = 7.dp, vertical = 5.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Box(
                             Modifier.size(6.dp).clip(RoundedCornerShape(999.dp))
                                 .background(if (vm.connection == Logic.Conn.ONLINE) Green else Red)
-                        )
+                        }
                         Text(
                             if (vm.connection == Logic.Conn.ONLINE) "ONLINE" else "OFFLINE",
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (vm.connection == Logic.Conn.ONLINE) Green else Red,
+                            color = if (vm.connection == Logic.Conn.ONLINE) Cyan else Red,
                             fontFamily = FontFamily.Monospace
                         )
                     }
                 }
             }
 
-            // Zawartość ekranu (jak w HTML screen content — scrollowane, padding 13dp)
+            // Zawartość ekranu (jak w HTML .content — scrollowane, padding 13dp)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -202,13 +216,13 @@ fun AppRoot(vm: AppViewModel) {
             }
         } // Column(modifier = Modifier.fillMaxSize())
 
-        // Nawigacja dolna — jeden rząd 8 zakładek (jak w HTML mobile bottomNav)
+        // Nawigacja dolna — jeden rząd 8 zakładek (jak w HTML .bottomNav z repeat(8, minmax(0,1fr)))
         BottomNav(
             selected = tab,
             onSelect = { tab = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 3.dp)
+                .padding(horizontal = 3.dp, vertical = 3.dp)
                 .navigationBarsPadding()
         )
     } // Box(tło)
@@ -216,13 +230,13 @@ fun AppRoot(vm: AppViewModel) {
 
 @Composable
 private fun BottomNav(selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
-    // Osiem zakładek w jednym rzędzie — jak w HTML mobile bottomNav.
+    // Osiem zakładek w jednym rzędzie — jak w HTML .bottomNav z repeat(8, minmax(0,1fr))
     Row(
         modifier = modifier
             .background(Surface1)
             .border(1.dp, Border, RoundedCornerShape(999.dp))
             .clip(RoundedCornerShape(999.dp)),
-        horizontalArrangement = Arrangement.spacedBy(1.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         TABS.forEachIndexed { index, t ->
             val active = t.key == selected
@@ -243,14 +257,8 @@ private fun BottomNav(selected: String, onSelect: (String) -> Unit, modifier: Mo
                     t.label, fontSize = 5.2.sp,
                     color = if (active) Cyan else TextDim,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                    textAlign = TextAlign.Center, maxLines = 1
-                )
-            }
-            if (index < TABS.size - 1) {
-                Box(
-                    Modifier
-                        .width(0.5.dp)
-                        .background(Border.copy(alpha = 0.3f))
+                    textAlign = TextAlign.Center, maxLines = 1,
+                    fontFamily = FontFamily.Monospace
                 )
             }
         }

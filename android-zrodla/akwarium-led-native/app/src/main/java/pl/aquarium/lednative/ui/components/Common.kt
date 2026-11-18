@@ -49,6 +49,9 @@ import pl.aquarium.lednative.ui.TextHi
 import pl.aquarium.lednative.ui.TextMid
 import pl.aquarium.lednative.ui.Warm
 
+private val ControlValueOn = Color(0xFF57E6BB)   // HTML .primaryControl[data-state="on"] b
+private val ControlValueOff = Color(0xFFFFAC84)  // HTML .primaryControl[data-state="off"] b / i
+
 /** Karta sekcji — ciemne tło z obramowaniem jak w HTML .card. */
 @Composable
 fun SectionCard(
@@ -101,7 +104,7 @@ fun Pill(text: String, color: Color = Cyan) {
         Modifier.clip(RoundedCornerShape(999.dp))
             .background(color.copy(alpha = 0.10f))
             .border(1.dp, color.copy(alpha = 0.33f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 7.dp, vertical = 2.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
     ) {
         Text(
             text, color = color, fontSize = 7.sp,
@@ -186,6 +189,7 @@ fun ControlTile(
     accent: Color,
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val tint = if (active) accent else TextDim
@@ -239,13 +243,14 @@ fun ControlTile(
                         fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp,
                         fontFamily = FontFamily.Monospace
                     )
-                    Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                    Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (active) ControlValueOn else ControlValueOff)
                     if (hint.isNotBlank()) Text(hint, fontSize = 10.sp, color = TextMid)
                 }
                 Box(
                     Modifier.size(10.dp).clip(RoundedCornerShape(999.dp))
-                        .background(if (active) accent else Border)
+                        .background(if (active) accent else ControlValueOff)
                 )
+                trailing?.invoke()
             }
         }
     }
