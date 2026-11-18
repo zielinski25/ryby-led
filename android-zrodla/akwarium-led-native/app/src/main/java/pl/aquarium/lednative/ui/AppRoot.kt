@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -146,7 +147,7 @@ fun AppRoot(vm: AppViewModel) {
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.WbSunny, null, tint = Color(0xFF00131C), modifier = Modifier.size(17.dp))
+                    Text("🐠", fontSize = 19.sp)
                 }
                 // Brand text — "AKWARIUM LED" + podtekst jak w HTML .brand
                 Column(Modifier.weight(1f)) {
@@ -197,7 +198,8 @@ fun AppRoot(vm: AppViewModel) {
             // Zawartość ekranu (jak w HTML .content — scrollowane, padding 13dp)
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .padding(start = 13.dp, top = 13.dp, end = 13.dp, bottom = 52.dp)
                     .verticalScroll(scroll)
             ) {

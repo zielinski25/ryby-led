@@ -226,7 +226,7 @@ fun ControlTile(
             ) {
                 // HTML .pcIcon: gradient #12394c -> #0a2033, border #2bbddd55
                 Box(
-                    Modifier.size(26.dp).clip(RoundedCornerShape(8.dp))
+                    Modifier.size(24.dp).clip(RoundedCornerShape(8.dp))
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(Color(0xFF12394C), Color(0xFF0A2033)),
@@ -241,12 +241,12 @@ fun ControlTile(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        label, fontSize = 9.sp, color = TextDim,
-                        fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp,
+                        label, fontSize = 7.sp, color = TextDim,
+                        fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp,
                         fontFamily = FontFamily.Monospace
                     )
-                    Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (active) ControlValueOn else ControlValueOff)
-                    if (hint.isNotBlank()) Text(hint, fontSize = 10.sp, color = TextMid)
+                    Text(value, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (active) ControlValueOn else ControlValueOff, maxLines = 1, softWrap = false)
+                    if (hint.isNotBlank()) Text(hint, fontSize = 7.sp, color = TextMid, maxLines = 1, softWrap = false)
                 }
                 Box(
                     Modifier.size(10.dp).clip(RoundedCornerShape(999.dp))
