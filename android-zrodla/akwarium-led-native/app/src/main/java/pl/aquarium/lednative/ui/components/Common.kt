@@ -61,10 +61,10 @@ fun SectionCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = Surface1,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Border)
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             content()
         }
     }
@@ -85,11 +85,11 @@ fun CardHeader(
     ) {
         if (icon != null) {
             Box(
-                Modifier.size(28.dp).clip(RoundedCornerShape(9.dp))
+                Modifier.size(25.dp).clip(RoundedCornerShape(8.dp))
                     .background(iconTint.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = iconTint, modifier = Modifier.size(16.dp))
+                Icon(icon, null, tint = iconTint, modifier = Modifier.size(12.dp))
             }
         }
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -154,9 +154,9 @@ fun StatTile(
             Modifier
                 .background(gradient)
                 .clip(RoundedCornerShape(13.dp))
-                .padding(11.dp)
+                .padding(9.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -169,7 +169,7 @@ fun StatTile(
                     )
                 }
                 Text(
-                    value, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                    value, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                     color = accent, maxLines = 1, fontFamily = FontFamily.Monospace
                 )
                 Text(hint, fontSize = 8.sp, color = TextMid, maxLines = 2)
@@ -355,10 +355,10 @@ fun InfoBanner(text: String, warn: Boolean = false) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(c.copy(alpha = 0.10f))
             .border(1.dp, c.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(9.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(text, fontSize = 11.sp, color = TextMid, lineHeight = 16.sp)
+        Text(text, fontSize = 8.sp, color = TextMid, lineHeight = 11.sp)
     }
 }
 
@@ -382,7 +382,7 @@ fun EmptyState(text: String, hint: String) {
 @Composable
 fun KeyValue(key: String, value: String, valueColor: Color = TextHi) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(key, fontSize = 11.sp, color = TextDim, modifier = Modifier.weight(1f))
-        Text(value, fontSize = 12.sp, color = valueColor, fontWeight = FontWeight.SemiBold)
+        Text(key, fontSize = 8.sp, color = TextDim, modifier = Modifier.weight(1f))
+        Text(value, fontSize = 8.sp, color = valueColor, fontWeight = FontWeight.SemiBold)
     }
 }

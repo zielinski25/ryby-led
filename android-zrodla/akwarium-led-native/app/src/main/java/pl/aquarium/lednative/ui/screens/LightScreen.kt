@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness6
-import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,8 +19,6 @@ import pl.aquarium.lednative.ui.AppViewModel
 import pl.aquarium.lednative.ui.Cyan
 import pl.aquarium.lednative.ui.Warm
 import pl.aquarium.lednative.ui.components.CardHeader
-import pl.aquarium.lednative.ui.components.ChannelBars
-import pl.aquarium.lednative.ui.components.GhostButton
 import pl.aquarium.lednative.ui.components.InfoBanner
 import pl.aquarium.lednative.ui.components.Pill
 import pl.aquarium.lednative.ui.components.PrimaryButton
@@ -32,15 +28,26 @@ import pl.aquarium.lednative.ui.components.SectionCard
 import pl.aquarium.lednative.ui.components.SettingRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import pl.aquarium.lednative.ui.Border
 import pl.aquarium.lednative.ui.Surface3
 import pl.aquarium.lednative.ui.TextDim
+import pl.aquarium.lednative.ui.TextHi
 
 @Composable
 fun LightScreen(vm: AppViewModel) {
     val s = vm.status
     var pwm by remember { mutableStateOf(List(Logic.PWM_CHANNELS) { 0 }) }
     var loaded by remember { mutableStateOf(false) }
+    var channelsExpanded by remember { mutableStateOf(false) }
 
     // Pierwszy odczyt wypelnia suwaki; pozniej nie nadpisujemy edycji uzytkownika.
     LaunchedEffect(s?.pwm) {
@@ -98,45 +105,51 @@ fun LightScreen(vm: AppViewModel) {
         }
 
         SectionCard {
-            CardHeader("Kanały LED", Icons.Default.Brightness6, Warm) {
-                Pill("${(pwm.sum() / pwm.size * 100.0 / Logic.PWM_MAX).toInt()}% śr.")
+            CardHeader("Sterowanie PWM", Icons.Default.Brightness6, Warm) {
+                Pill("0–1023", Cyan)
             }
-            (0 until Logic.PWM_CHANNELS).forEach { i ->
-                PwmSlider(
-                    index = i,
-                    value = pwm.getOrElse(i) { 0 },
-                    enabled = !vm.busy,
-                    onChange = { v -> pwm = pwm.toMutableList().also { it[i] = v } }
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("★ Wszystkie kanały", fontSize = 8.sp, color = TextHi, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("${pwm.average().roundToInt()} / 1023", fontSize = 8.sp, color = Cyan, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = pwm.average().toFloat(),
+                    onValueChange = { raw ->
+                        val v = raw.roundToInt().coerceIn(0, Logic.PWM_MAX)
+                        pwm = List(Logic.PWM_CHANNELS) { v }
+                        vm.applyPwm(pwm)
+                    },
+                    valueRange = 0f..Logic.PWM_MAX.toFloat(),
+                    enabled = !vm.busy && vm.tokenReady,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Cyan, activeTrackColor = Cyan,
+                        inactiveTrackColor = Border, disabledThumbColor = TextDim,
+                        disabledActiveTrackColor = TextDim, disabledInactiveTrackColor = Border
+                    )
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GhostButton("Zeruj", Modifier.weight(1f)) { pwm = List(Logic.PWM_CHANNELS) { 0 } }
-                GhostButton("50%", Modifier.weight(1f)) { pwm = List(Logic.PWM_CHANNELS) { 512 } }
-                GhostButton("100%", Modifier.weight(1f)) { pwm = List(Logic.PWM_CHANNELS) { Logic.PWM_MAX } }
-                GhostButton("Z ESP", Modifier.weight(1f)) {
-                    s?.let { pwm = it.pwm }
-                    vm.refresh()
+            Row(
+                Modifier.fillMaxWidth().clickable { channelsExpanded = !channelsExpanded }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Rozwiń osobne kanały", fontSize = 8.sp, color = TextMid, modifier = Modifier.weight(1f))
+                Text("5 kanałów  ${if (channelsExpanded) "⌃" else "⌄"}", fontSize = 7.sp, color = TextDim, fontFamily = FontFamily.Monospace)
+            }
+            if (channelsExpanded) {
+                (0 until Logic.PWM_CHANNELS).forEach { i ->
+                    PwmSlider(
+                        index = i,
+                        value = pwm.getOrElse(i) { 0 },
+                        enabled = !vm.busy && vm.tokenReady,
+                        onChange = { v -> pwm = pwm.toMutableList().also { it[i] = v } }
+                    )
                 }
             }
             PrimaryButton(
-                if (vm.busy) "Wysyłanie…" else "Wyślij PWM do akwarium",
+                if (vm.busy) "Wysyłanie…" else "Zapisz",
                 enabled = !vm.busy && vm.tokenReady
             ) { vm.applyPwm(pwm) }
-        }
-
-        SectionCard {
-            CardHeader("Podgląd z ESP", Icons.Default.Lightbulb)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GhostButton("LED 100%", Modifier.weight(1f), color = Warm) { vm.ledFull() }
-                GhostButton("LED OFF", Modifier.weight(1f)) { vm.ledOff() }
-                GhostButton("Odśwież", Modifier.weight(1f)) { vm.refresh() }
-            }
-            s?.let {
-                if (it.powerNowCh.isNotEmpty()) {
-                    CardHeader("Moc na kanałach", Icons.Default.WbSunny, Warm)
-                    ChannelBars(it.powerNowCh)
-                }
-            }
         }
     }
 }

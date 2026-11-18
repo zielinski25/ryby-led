@@ -59,15 +59,15 @@ fun PwmSlider(
             )
             Text(
                 ChannelNames.getOrElse(index) { "Kanał ${index + 1}" },
-                fontSize = 12.sp, color = TextMid, modifier = Modifier.weight(1f)
+                fontSize = 8.sp, color = TextMid, modifier = Modifier.weight(1f)
             )
             Text(
                 "${(value * 100.0 / Logic.PWM_MAX).roundToInt()}%",
-                fontSize = 12.sp, color = color, fontWeight = FontWeight.Bold
+                fontSize = 8.sp, color = color, fontWeight = FontWeight.Bold
             )
             Text(
                 "  $value",
-                fontSize = 10.sp, color = TextDim
+                fontSize = 7.sp, color = TextDim
             )
         }
         Slider(
@@ -98,7 +98,7 @@ fun NumberField(
     enabled: Boolean = true
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 10.sp, color = TextDim, fontWeight = FontWeight.Bold)
+        Text(label, fontSize = 8.sp, color = TextDim, fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
@@ -112,7 +112,7 @@ fun NumberField(
             colors = fieldColors(),
             textStyle = MaterialTheme.typography.bodyLarge
         )
-        if (hint.isNotBlank()) Text(hint, fontSize = 9.sp, color = TextDim)
+        if (hint.isNotBlank()) Text(hint, fontSize = 7.sp, color = TextDim)
     }
 }
 
@@ -127,7 +127,7 @@ fun TextFieldStyled(
     enabled: Boolean = true
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 10.sp, color = TextDim, fontWeight = FontWeight.Bold)
+        Text(label, fontSize = 8.sp, color = TextDim, fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
@@ -141,7 +141,7 @@ fun TextFieldStyled(
             colors = fieldColors(),
             textStyle = MaterialTheme.typography.bodyLarge
         )
-        if (hint.isNotBlank()) Text(hint, fontSize = 9.sp, color = TextDim)
+        if (hint.isNotBlank()) Text(hint, fontSize = 7.sp, color = TextDim)
     }
 }
 
@@ -167,7 +167,7 @@ fun PrimaryButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(46.dp),
+        modifier = modifier.fillMaxWidth().height(34.dp),
         enabled = enabled,
         shape = RoundedCornerShape(13.dp),
         colors = ButtonDefaults.buttonColors(
@@ -177,7 +177,7 @@ fun PrimaryButton(
             disabledContentColor = TextDim
         )
     ) {
-        Text(text, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text(text, fontWeight = FontWeight.Bold, fontSize = 9.sp)
     }
 }
 
@@ -191,13 +191,13 @@ fun GhostButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.height(42.dp),
+        modifier = modifier.height(32.dp),
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Border),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = color)
     ) {
-        Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -210,7 +210,7 @@ fun TimeField(
     onChange: (Int) -> Unit
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 10.sp, color = TextDim, fontWeight = FontWeight.Bold)
+        Text(label, fontSize = 8.sp, color = TextDim, fontWeight = FontWeight.Bold)
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                 .background(Surface2).padding(horizontal = 10.dp, vertical = 6.dp),
@@ -218,7 +218,7 @@ fun TimeField(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                Logic.fmtHHMM(minutes), fontSize = 15.sp,
+                Logic.fmtHHMM(minutes), fontSize = 10.sp,
                 color = TextHi, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
             )
