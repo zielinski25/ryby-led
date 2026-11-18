@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Belka lampy LED -->
+    <path
+        android:fillColor="#123049"
+        android:pathData="M26,28h56v7h-56z" />
+    <!-- Stożek światła -->
+    <path
+        android:fillColor="#1A00D4F5"
+        android:pathData="M32,35h44l10,32h-64z" />
+    <!-- Kropla / sygnatura LED -->
+    <path
+        android:fillColor="#00D4F5"
+        android:pathData="M54,40C54,40 39,58 39,69C39,77.28 45.72,84 54,84C62.28,84 69,77.28 69,69C69,58 54,40 54,40Z" />
+    <path
+        android:fillColor="#0070FF"
+        android:pathData="M54,84C62.28,84 69,77.28 69,69C69,63.5 65,55.5 60.5,49.5C60.5,49.5 63,65 54,71C48,75 43.5,72.5 40.5,69.5C41,77.5 46.5,84 54,84Z" />
+    <path
+        android:fillColor="#EAFBFF"
+        android:pathData="M48.5,60C47,63 46.5,66 47.5,68.5C48.5,70 50,70 50.5,68.5C49.5,65.5 50.5,62.5 52,60C51,58.5 49.5,58.5 48.5,60Z" />
+</vector>
