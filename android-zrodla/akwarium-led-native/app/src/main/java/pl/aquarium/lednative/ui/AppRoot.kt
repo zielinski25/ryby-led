@@ -168,7 +168,7 @@ fun AppRoot(vm: AppViewModel) {
                         Box(
                             Modifier.size(6.dp).clip(RoundedCornerShape(999.dp))
                                 .background(if (vm.connection == Logic.Conn.ONLINE) Green else Red)
-                        ) {
+                        )
                         Text(
                             if (vm.connection == Logic.Conn.ONLINE) "ONLINE" else "OFFLINE",
                             fontSize = 8.sp,
