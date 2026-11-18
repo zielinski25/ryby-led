@@ -179,6 +179,7 @@ fun AppRoot(vm: AppViewModel) {
                     }
                 }
             }
+            }  // zamknięcie pierwszej Column (pasek statusu + AppBar)
 
             // Zawartość ekranu (jak w HTML screen content — scrollowane, padding 13dp)
             Column(
