@@ -198,7 +198,7 @@ fun AppRoot(vm: AppViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(13.dp)
+                    .padding(start = 13.dp, top = 13.dp, end = 13.dp, bottom = 52.dp)
                     .verticalScroll(scroll)
             ) {
                 Crossfade(targetState = tab, animationSpec = tween(180), label = "tab") { current ->
@@ -221,9 +221,9 @@ fun AppRoot(vm: AppViewModel) {
             selected = tab,
             onSelect = { tab = it },
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(horizontal = 3.dp, vertical = 3.dp)
-                .navigationBarsPadding()
         )
     } // Box(tło)
 } // AppRoot
