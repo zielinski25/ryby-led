@@ -1,4 +1,4 @@
-﻿# BUDUJ-APK.ps1 - buduje APK "Akwarium LED NATIVE" (100% Jetpack Compose) na Windows.
+# BUDUJ-APK.ps1 - buduje APK "Akwarium LED NATIVE" (100% Jetpack Compose) na Windows.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .\BUDUJ-APK.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File .\BUDUJ-APK.ps1 -FirmwareSecrets "C:\...\secrets.h"
@@ -30,12 +30,19 @@ try {
 
 # Projekt jest w TYM katalogu (gradlew.bat obok skryptu).
 $Proj = $PSScriptRoot
-if ([string]::IsNullOrWhiteSpace($Proj)) {
-    $Proj = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Proj = $null
+$curr = Get-Location
+for ($i = 0; $i -lt 5; $i++) {
+    if (Test-Path -LiteralPath (Join-Path $curr 'gradlew.bat')) {
+        $Proj = $curr
+        break
+    }
+    $curr = Split-Path -Parent $curr
 }
-if (-not (Test-Path -LiteralPath (Join-Path $Proj 'gradlew.bat'))) {
-    throw "Nie znaleziono $Proj\gradlew.bat. Rozpakuj CALY pakiet i uruchom skrypt z glownego katalogu."
+if (-not $Proj) {
+    throw "Nie znaleziono gradlew.bat w biezacym katalogu ani w katalogach nadrzednych. Uruchom skrypt z folderu zawierajacego zrodla Androida."
 }
+Write-Host "Zrodla Androida: $Proj" -ForegroundColor Green
 $MainSrc = Join-Path $Proj 'app\src\main\java\pl\aquarium\lednative\MainActivity.kt'
 if (-not (Test-Path -LiteralPath $MainSrc)) {
     throw "Niekompletny pakiet: brak zrodel aplikacji. Rozpakuj archiwum ponownie."
