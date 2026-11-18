@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Waves
 import androidx.compose.material.icons.filled.WbSunny
@@ -139,7 +140,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickTile("LED 100%", Icons.Default.WbSunny, Modifier.weight(1f), Warm) { vm.ledFull() }
                 QuickTile("LED OFF", Icons.Default.Lightbulb, Modifier.weight(1f)) { vm.ledOff() }
-                QuickTile("Wykresy", Icons.Default.Visibility, Modifier.weight(1f), FsBlue) { onNavigate("charts") }
+                QuickTile("Wykresy", Icons.Default.ShowChart, Modifier.weight(1f), FsBlue) { onNavigate("charts") }
                 QuickTile("Restart", Icons.Default.RestartAlt, Modifier.weight(1f), Red) { vm.restartDevice() }
             }
         }
