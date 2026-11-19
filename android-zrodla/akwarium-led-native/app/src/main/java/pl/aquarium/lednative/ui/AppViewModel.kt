@@ -86,6 +86,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var track: Logic.TrackState? = null
     private var pollJob: Job? = null
     private var terminal: TerminalClient? = null
+    private var pendingPwm: List<Int>? = null
 
     init {
         status = repo.cachedStatus()
@@ -157,11 +158,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { block() }
                 message = success
                 delay(900L)
-                refresh(silent = true)
+                if (pendingPwm == null) refresh(silent = true)
             } catch (e: Exception) {
                 fail(e, "Komenda nieudana")
             } finally {
                 busy = false
+                val latestPwm = pendingPwm
+                pendingPwm = null
+                if (latestPwm != null) applyPwm(latestPwm)
             }
         }
     }
@@ -185,8 +189,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun ledOff() = act("Wyslano: LED OFF") { repo.ledOff() }
     fun restartDevice() = act("Wyslano: restart ESP") { repo.restart() }
 
-    fun applyPwm(values: List<Int>) =
-        act("Wyslano PWM: ${Logic.pwmArgs(values)}") { repo.setPwm(values) }
+    fun applyPwm(values: List<Int>) {
+        val requested = values.toList()
+        if (busy) {
+            // Zostaw tylko najnowszą wartość z gestów wykonanych podczas trwającej komendy.
+            pendingPwm = requested
+            return
+        }
+        act("Wyslano PWM: ${Logic.pwmArgs(requested)}") { repo.setPwm(requested) }
+    }
 
     fun saveSchedule(s: LedSchedule, fade: Int) =
         act("Wyslano harmonogram swiatla") { repo.saveSchedule(s, fade) }

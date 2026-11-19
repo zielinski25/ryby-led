@@ -336,7 +336,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                             },
                             onValueChangeFinished = { vm.applyPwm(pwmValues) },
                             valueRange = 0f..Logic.PWM_MAX.toFloat(),
-                            enabled = !vm.busy,
+                            enabled = vm.tokenReady,
                             colors = SliderDefaults.colors(
                                 thumbColor = Cyan, activeTrackColor = Cyan,
                                 inactiveTrackColor = Color(0xFF1E3350),
@@ -364,7 +364,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                 if (pwmExpanded) {
                     pwmValues.forEachIndexed { index, value ->
                         PwmSlider(
-                            index = index, value = value, enabled = !vm.busy,
+                            index = index, value = value, enabled = vm.tokenReady,
                             onChange = { newValue ->
                                 pwmValues = pwmValues.toMutableList().apply { set(index, newValue) }
                             },
