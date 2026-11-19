@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Inject locally read firmware secret via environment; never persist it in source.
+val rybyCmdToken = System.getenv("RYBY_CMD_TOKEN").orEmpty()
+
 android {
     namespace = "pl.aquarium.lednative"
     compileSdk = 34
@@ -13,7 +16,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.3.0"
-        buildConfigField("String", "RYBY_CMD_TOKEN", "\"\"")
+        buildConfigField("String", "RYBY_CMD_TOKEN", "\"${rybyCmdToken}\"")
     }
 
     buildTypes {
