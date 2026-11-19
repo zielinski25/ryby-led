@@ -57,7 +57,7 @@ fun ChartsScreen(vm: AppViewModel) {
             "live" -> {
                 SectionCard {
                     CardHeader("Wykresy", Icons.Default.ShowChart, Cyan) {
-                        Text("ostatnie 24 h", fontSize = 7.sp, color = TextDim)
+                        Text("${samples.size} próbek · od uruchomienia", fontSize = 7.sp, color = TextDim)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         StatTile(

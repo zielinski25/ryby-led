@@ -100,30 +100,7 @@ fun AppRoot(vm: AppViewModel) {
             .navigationBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Pasek statusu (jak w HTML .sysline: czas po lewej, WiFi · Bateria po prawej)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "13:27",
-                    fontSize = 9.sp,
-                    color = Color(0xFF9CB5C3),
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace
-                )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Text(
-                        "WiFi · Bateria",
-                        fontSize = 9.sp,
-                        color = Color(0xFF9CB5C3),
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
+            // Pasek czasu i łączności dostarcza system Android; nie pokazujemy atrap.
 
             // AppBar (jak w HTML .appbar: brandMark + "AKWARIUM LED" + badge ONLINE/OFFLINE)
             Row(
@@ -168,7 +145,7 @@ fun AppRoot(vm: AppViewModel) {
                 }
                 // Spacer
                 Box(Modifier.weight(1f))
-                // Badge ONLINE/OFFLINE z kropką jak w HTML .headerBadge + .onlineDot
+                // Status Firebase. Nie oznacza dostępności lokalnego API ESP.
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(7.dp))
@@ -185,7 +162,7 @@ fun AppRoot(vm: AppViewModel) {
                                 .background(if (vm.connection == Logic.Conn.ONLINE) Green else Red)
                         )
                         Text(
-                            if (vm.connection == Logic.Conn.ONLINE) "ONLINE" else "OFFLINE",
+                            if (vm.connection == Logic.Conn.ONLINE) "FB ONLINE" else "FB OFFLINE",
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (vm.connection == Logic.Conn.ONLINE) Cyan else Red,

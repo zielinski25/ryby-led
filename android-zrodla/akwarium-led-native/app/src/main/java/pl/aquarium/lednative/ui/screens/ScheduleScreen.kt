@@ -183,43 +183,13 @@ fun ScheduleScreen(vm: AppViewModel) {
                 "(np. 23:00 → 01:00)."
         )
         SectionCard {
-            CardHeader("Lokalizacja · wybierz na mapie", Icons.Default.LocationOn, Warm) {
-                Pill("MAPA", Cyan)
-            }
-            Box(
-                Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF10252D))
-            ) {
-                Canvas(Modifier.fillMaxWidth().height(150.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    val river = Path().apply {
-                        moveTo(-10f, h * 0.74f)
-                        cubicTo(w * 0.22f, h * 0.55f, w * 0.28f, h * 0.91f, w * 0.52f, h * 0.69f)
-                        cubicTo(w * 0.72f, h * 0.49f, w * 0.82f, h * 0.92f, w + 10f, h * 0.54f)
-                    }
-                    drawPath(river, color = Color(0xFF145477), style = Stroke(width = 28f))
-                    drawPath(river, color = Color(0xFF1C6B88), style = Stroke(width = 2f))
-                    for (i in 0..4) {
-                        val y = h * (0.14f + i * 0.19f)
-                        drawLine(Color(0xFF405456), Offset(0f, y), Offset(w, y + (i - 2) * 8f), 5f)
-                        drawLine(Color(0xFF9B9A6B), Offset(0f, y + 7f), Offset(w, y + 10f + (i - 2) * 8f), 1.2f)
-                    }
-                    for (i in 0..4) {
-                        val x = w * (0.12f + i * 0.20f)
-                        drawLine(Color(0xFF405456), Offset(x, 0f), Offset(x + (i - 2) * 18f, h), 5f)
-                        drawLine(Color(0xFF9B9A6B), Offset(x + 8f, 0f), Offset(x + 15f + (i - 2) * 18f, h), 1.2f)
-                    }
-                }
-                Text("Żoliborz", Modifier.align(Alignment.TopStart).padding(9.dp), fontSize = 7.sp, color = Color(0xFF9AB8AE))
-                Text("Wola", Modifier.align(Alignment.TopCenter).padding(top = 30.dp), fontSize = 7.sp, color = Color(0xFF9AB8AE))
-                Text("Śródmieście", Modifier.align(Alignment.TopEnd).padding(9.dp), fontSize = 7.sp, color = Color(0xFF9AB8AE))
-                Text("📍", Modifier.align(Alignment.Center).offset(x = 22.dp, y = (-8).dp), fontSize = 18.sp)
-                Text("WYBRANO", Modifier.align(Alignment.Center).padding(top = 20.dp), fontSize = 6.sp, color = Color.White)
-                Text("Ochota · Wisła · Praga", Modifier.align(Alignment.BottomCenter).padding(bottom = 7.dp), fontSize = 7.sp, color = Color(0xFF9AB8AE))
-            }
-            KeyValue("Wybrana lokalizacja", "Punkt ESP")
-            KeyValue("Współrzędne", "z konfiguracji sterownika")
+            CardHeader("Lokalizacja", Icons.Default.LocationOn, Warm)
+            Text(
+                "Wybór lokalizacji i współrzędne nie są dostępne w bieżącej konfiguracji ESP. " +
+                    "Nie pokazujemy fikcyjnej, interaktywnej mapy ani nie wysyłamy współrzędnych.",
+                fontSize = 10.sp, color = TextDim
+            )
         }
+
     }
 }

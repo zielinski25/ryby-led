@@ -120,7 +120,7 @@ fun SensorsScreen(vm: AppViewModel) {
                     Icons.Default.WbSunny, Warm, Modifier.weight(1f)
                 )
                 StatTile(
-                    "DOŚWIETL.", if (s == null) "—" else "$ledLux lx", "LED · ${s?.pwmPercent ?: 0}%",
+                    "LED · SZACUNEK", if (s == null) "—" else "$ledLux lx", "wyliczenie z PWM, nie pomiar",
                     Icons.Default.WbSunny, Cyan, Modifier.weight(1f)
                 )
                 StatTile(
@@ -143,14 +143,13 @@ fun SensorsScreen(vm: AppViewModel) {
             }
         }
         SectionCard {
-            CardHeader("Historia pomiarów", Icons.Default.Tune, Cyan) {
-                Text("12 h", fontSize = 7.sp, color = TextDim)
+            CardHeader("Temperatura wody · próbki od uruchomienia", Icons.Default.Tune, Cyan) {
+                Text("${vm.samples.size} próbek", fontSize = 7.sp, color = TextDim)
             }
-            LineChart(vm.samples.mapNotNull { it.tempWater }, Cyan, unit = "°C")
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("— PŁYTA LED", fontSize = 6.sp, color = Warm)
-                Text("— WODA", fontSize = 6.sp, color = FsBlue)
-                Text("— LUX", fontSize = 6.sp, color = Cyan)
+            if (vm.samples.count { it.tempWater != null } >= 2) {
+                LineChart(vm.samples.mapNotNull { it.tempWater }, Cyan, unit = "°C")
+            } else {
+                Text("Za mało próbek do narysowania wykresu. Dane są zbierane podczas działania aplikacji.", fontSize = 9.sp, color = TextDim)
             }
         }
         SectionCard {
