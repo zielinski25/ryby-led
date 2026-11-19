@@ -65,7 +65,7 @@ fun LocationPicker(vm: AppViewModel, onDismiss: () -> Unit) {
                 mapRef?.controller?.animateTo(point)
                 marker?.position = point
                 marker?.let { mapRef?.invalidate() }
-                info = "Ustawiono bieżącą pozycję telefonu. Sprawdź pinezkę i zatwierdź wysłanie do ESP."
+                info = "Ustawiono ostatnią znaną pozycję telefonu. Sprawdź pinezkę i zatwierdź wysłanie do ESP."
             } else info = "Brak ostatniej pozycji. Włącz lokalizację telefonu i spróbuj ponownie."
         } else info = "Brak zgody na lokalizację. Możesz nadal wskazać punkt, dotykając mapy."
     }
@@ -126,7 +126,7 @@ fun LocationPicker(vm: AppViewModel, onDismiss: () -> Unit) {
                                     marker?.position = point
                                     mapRef?.controller?.animateTo(point)
                                     mapRef?.invalidate()
-                                    info = "Ustawiono bieżącą pozycję telefonu. Zatwierdź, aby wysłać do ESP."
+                                    info = "Ustawiono ostatnią znaną pozycję telefonu. Zatwierdź, aby wysłać do ESP."
                                 } else info = "Nie znaleziono ostatniej pozycji telefonu."
                             } else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                         }) { Text("Moja lokalizacja") }
