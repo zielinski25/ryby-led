@@ -333,8 +333,8 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                             onValueChange = {
                                 val v = it.roundToInt().coerceIn(0, Logic.PWM_MAX)
                                 pwmValues = pwmValues.map { v }.toMutableList()
-                                vm.applyPwm(pwmValues)
                             },
+                            onValueChangeFinished = { vm.applyPwm(pwmValues) },
                             valueRange = 0f..Logic.PWM_MAX.toFloat(),
                             enabled = !vm.busy,
                             colors = SliderDefaults.colors(
@@ -363,10 +363,13 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                 }
                 if (pwmExpanded) {
                     pwmValues.forEachIndexed { index, value ->
-                        PwmSlider(index = index, value = value, enabled = !vm.busy, onChange = { newValue ->
-                            pwmValues = pwmValues.toMutableList().apply { set(index, newValue) }
-                            vm.applyPwm(pwmValues)
-                        })
+                        PwmSlider(
+                            index = index, value = value, enabled = !vm.busy,
+                            onChange = { newValue ->
+                                pwmValues = pwmValues.toMutableList().apply { set(index, newValue) }
+                            },
+                            onChangeFinished = { vm.applyPwm(pwmValues) }
+                        )
                     }
                     PrimaryButton("Zapisz PWM", enabled = !vm.busy, modifier = Modifier.fillMaxWidth(), onClick = {
                         vm.applyPwm(pwmValues)

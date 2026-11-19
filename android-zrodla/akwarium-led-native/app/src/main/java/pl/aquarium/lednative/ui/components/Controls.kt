@@ -48,7 +48,8 @@ fun PwmSlider(
     value: Int,
     enabled: Boolean,
     onChange: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onChangeFinished: (() -> Unit)? = null
 ) {
     val color = ChannelColors.getOrElse(index) { Cyan }
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -73,6 +74,7 @@ fun PwmSlider(
         Slider(
             value = value.toFloat(),
             onValueChange = { onChange(it.roundToInt().coerceIn(0, Logic.PWM_MAX)) },
+            onValueChangeFinished = { onChangeFinished?.invoke() },
             valueRange = 0f..Logic.PWM_MAX.toFloat(),
             enabled = enabled,
             colors = SliderDefaults.colors(
