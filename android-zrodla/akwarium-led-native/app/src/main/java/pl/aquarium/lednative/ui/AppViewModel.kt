@@ -61,6 +61,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var lanBase by mutableStateOf(repo.lan.base)
         private set
+    var espLocation by mutableStateOf<Pair<Double, Double>?>(null)
+        private set
     var signedIn by mutableStateOf(repo.rtdb.signedIn)
         private set
     val tokenReady: Boolean get() = prefs.tokenValid
@@ -230,6 +232,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setManualHost(host: String) {
         prefs.manualHost = host
         message = if (host.isBlank()) "Wyczyszczono adres reczny" else "Zapisano adres: $host"
+    }
+
+    fun loadEspLocation() {
+        viewModelScope.launch {
+            try {
+                if (repo.lan.base == null) {
+                    val found = withContext(Dispatchers.IO) { repo.lan.discover() }
+                    lanBase = found
+                }
+                val coords = withContext(Dispatchers.IO) { repo.lan.location() }
+                espLocation = coords
+            } catch (e: Exception) {
+                fail(e, "Nie udało się pobrać lokalizacji z ESP. Sprawdź połączenie LAN.")
+            }
+        }
+    }
+
+    fun saveEspLocation(latitude: Double, longitude: Double) {
+        if (busy) return
+        viewModelScope.launch {
+            busy = true
+            try {
+                if (repo.lan.base == null) {
+                    val found = withContext(Dispatchers.IO) { repo.lan.discover() }
+                    lanBase = found
+                }
+                withContext(Dispatchers.IO) { repo.lan.setLocation(latitude, longitude) }
+                espLocation = latitude to longitude
+                message = "Lokalizacja zapisana w ESP: %.4f, %.4f".format(latitude, longitude)
+            } catch (e: Exception) {
+                fail(e, "Nie udało się wysłać lokalizacji do ESP. Połącz telefon i ESP z tą samą siecią Wi-Fi.")
+            } finally {
+                busy = false
+            }
+        }
     }
 
     fun forgetLan() {

@@ -1,6 +1,7 @@
 package pl.aquarium.lednative.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +64,7 @@ fun ScheduleScreen(vm: AppViewModel) {
     var slots by remember { mutableStateOf(listOf(PumpSlot("08:00", "08:20"), PumpSlot("21:00", "21:15"))) }
     var ledLoaded by remember { mutableStateOf(false) }
     var pumpLoaded by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(s?.schedule) {
         if (!ledLoaded && s != null) {
@@ -183,13 +185,26 @@ fun ScheduleScreen(vm: AppViewModel) {
                 "(np. 23:00 → 01:00)."
         )
         SectionCard {
-            CardHeader("Lokalizacja", Icons.Default.LocationOn, Warm)
-            Text(
-                "Wybór lokalizacji i współrzędne nie są dostępne w bieżącej konfiguracji ESP. " +
-                    "Nie pokazujemy fikcyjnej, interaktywnej mapy ani nie wysyłamy współrzędnych.",
-                fontSize = 10.sp, color = TextDim
-            )
+            Row(
+                Modifier.fillMaxWidth().clickable {
+                    showLocationPicker = true
+                    vm.loadEspLocation()
+                },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    CardHeader("Lokalizacja akwarium", Icons.Default.LocationOn, Warm)
+                    val point = vm.espLocation
+                    Text(
+                        point?.let { "ESP: %.5f°, %.5f°".format(it.first, it.second) }
+                            ?: "Dotknij, aby otworzyć mapę i ustawić lokalizację",
+                        fontSize = 9.sp, color = TextDim
+                    )
+                }
+                Pill("MAPA", Cyan)
+            }
         }
+        if (showLocationPicker) LocationPicker(vm) { showLocationPicker = false }
 
     }
 }

@@ -133,6 +133,18 @@ class LanClient(private val context: Context, private val prefs: AppPrefs) {
 
     fun status(): DeviceStatus = DeviceStatus.parse(JSONObject(api("/api/status")))
 
+    fun location(): Pair<Double, Double> {
+        val json = JSONObject(api("/api/location"))
+        if (!json.optBoolean("ok")) throw IOException("Nie udało się odczytać lokalizacji z ESP")
+        return json.getDouble("lat") to json.getDouble("lon")
+    }
+
+    fun setLocation(latitude: Double, longitude: Double) {
+        val body = JSONObject().put("lat", latitude).put("lon", longitude).toString()
+        val response = JSONObject(api("/api/location", "POST", body))
+        if (!response.optBoolean("ok")) throw IOException(response.optString("error", "ESP odrzuciło lokalizację"))
+    }
+
     fun setPower(on: Boolean) { api("/set-power?v=${if (on) 1 else 0}") }
     fun setMode(auto: Boolean) { api("/set-tryb?v=${if (auto) 1 else 0}") }
     fun setPump(on: Boolean) { api("/api/quick/pump_${if (on) "on" else "off"}", "POST") }
