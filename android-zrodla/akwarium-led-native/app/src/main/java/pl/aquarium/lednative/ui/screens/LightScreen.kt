@@ -49,6 +49,7 @@ import pl.aquarium.lednative.ui.TextHi
 fun LightScreen(vm: AppViewModel) {
     val s = vm.status
     var pwm by remember { mutableStateOf(List(Logic.PWM_CHANNELS) { 0 }) }
+    var pwmSliderValues by remember { mutableStateOf(List(Logic.PWM_CHANNELS) { 0f }) }
     var loaded by remember { mutableStateOf(false) }
     var channelsExpanded by remember { mutableStateOf(false) }
 
@@ -56,6 +57,7 @@ fun LightScreen(vm: AppViewModel) {
     LaunchedEffect(s?.pwm) {
         if (!loaded && s != null) {
             pwm = s.pwm
+            pwmSliderValues = s.pwm.map { it.toFloat() }
             loaded = true
         }
     }
@@ -117,8 +119,9 @@ fun LightScreen(vm: AppViewModel) {
                     Text("${pwm.average().roundToInt()} / 1023", fontSize = 8.sp, color = Cyan, fontFamily = FontFamily.Monospace)
                 }
                 Slider(
-                    value = pwm.average().toFloat(),
+                    value = pwmSliderValues.average().toFloat(),
                     onValueChange = { raw ->
+                        pwmSliderValues = List(Logic.PWM_CHANNELS) { raw }
                         val v = raw.roundToInt().coerceIn(0, Logic.PWM_MAX)
                         pwm = List(Logic.PWM_CHANNELS) { v }
                     },
@@ -143,9 +146,12 @@ fun LightScreen(vm: AppViewModel) {
                 (0 until Logic.PWM_CHANNELS).forEach { i ->
                     PwmSlider(
                         index = i,
-                        value = pwm.getOrElse(i) { 0 },
+                        value = pwmSliderValues.getOrElse(i) { pwm.getOrElse(i) { 0 }.toFloat() },
                         enabled = vm.tokenReady,
-                        onChange = { v -> pwm = pwm.toMutableList().also { it[i] = v } },
+                        onChange = { raw ->
+                            pwmSliderValues = pwmSliderValues.toMutableList().also { it[i] = raw }
+                            pwm = pwm.toMutableList().also { it[i] = raw.roundToInt() }
+                        },
                         onChangeFinished = { vm.applyPwm(pwm) }
                     )
                 }

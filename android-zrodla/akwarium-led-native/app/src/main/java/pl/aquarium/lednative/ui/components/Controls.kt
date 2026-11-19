@@ -45,9 +45,9 @@ import kotlin.math.roundToInt
 @Composable
 fun PwmSlider(
     index: Int,
-    value: Int,
+    value: Float,
     enabled: Boolean,
-    onChange: (Int) -> Unit,
+    onChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     onChangeFinished: (() -> Unit)? = null
 ) {
@@ -67,13 +67,13 @@ fun PwmSlider(
                 fontSize = 8.sp, color = color, fontWeight = FontWeight.Bold
             )
             Text(
-                "  $value",
+                "  ${value.roundToInt()}",
                 fontSize = 7.sp, color = TextDim
             )
         }
         Slider(
             value = value.toFloat(),
-            onValueChange = { onChange(it.roundToInt().coerceIn(0, Logic.PWM_MAX)) },
+            onValueChange = { onChange(it.coerceIn(0f, Logic.PWM_MAX.toFloat())) },
             onValueChangeFinished = { onChangeFinished?.invoke() },
             valueRange = 0f..Logic.PWM_MAX.toFloat(),
             enabled = enabled,

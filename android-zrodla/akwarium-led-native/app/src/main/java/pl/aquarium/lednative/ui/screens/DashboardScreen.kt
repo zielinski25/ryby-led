@@ -141,6 +141,8 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
     var settings by remember { mutableStateOf(DeviceSettings.from(s ?: DeviceStatus())) }
     // Lokalna kopia wartości PWM (suwaki działają na podglądzie i wysyłają zmiany na żywo).
     var pwmValues by remember { mutableStateOf(pwm.toMutableList()) }
+    var pwmSliderValues by remember { mutableStateOf(pwm.map { it.toFloat() }) }
+    var commonPwm by remember { mutableStateOf(pwm.average().toFloat()) }
     var pwmExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -329,10 +331,12 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                             }
                         }
                         Slider(
-                            value = (pwmValues.sum() / pwmValues.size).toFloat(),
-                            onValueChange = {
-                                val v = it.roundToInt().coerceIn(0, Logic.PWM_MAX)
+                            value = commonPwm,
+                            onValueChange = { raw ->
+                                commonPwm = raw
+                                val v = raw.roundToInt().coerceIn(0, Logic.PWM_MAX)
                                 pwmValues = pwmValues.map { v }.toMutableList()
+                                pwmSliderValues = List(Logic.PWM_CHANNELS) { raw }
                             },
                             onValueChangeFinished = { vm.applyPwm(pwmValues) },
                             valueRange = 0f..Logic.PWM_MAX.toFloat(),
@@ -364,9 +368,12 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                 if (pwmExpanded) {
                     pwmValues.forEachIndexed { index, value ->
                         PwmSlider(
-                            index = index, value = value, enabled = vm.tokenReady,
+                            index = index, value = pwmSliderValues.getOrElse(index) { value.toFloat() },
+                            enabled = vm.tokenReady,
                             onChange = { newValue ->
-                                pwmValues = pwmValues.toMutableList().apply { set(index, newValue) }
+                                pwmSliderValues = pwmSliderValues.toMutableList().also { it[index] = newValue }
+                                pwmValues = pwmValues.toMutableList().also { it[index] = newValue.roundToInt() }
+                                commonPwm = pwmSliderValues.average().toFloat()
                             },
                             onChangeFinished = { vm.applyPwm(pwmValues) }
                         )
