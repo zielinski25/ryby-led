@@ -121,10 +121,10 @@ fun LightScreen(vm: AppViewModel) {
                     onValueChange = { raw ->
                         val v = raw.roundToInt().coerceIn(0, Logic.PWM_MAX)
                         pwm = List(Logic.PWM_CHANNELS) { v }
-                        vm.applyPwm(pwm)
                     },
+                    onValueChangeFinished = { vm.applyPwm(pwm) },
                     valueRange = 0f..Logic.PWM_MAX.toFloat(),
-                    enabled = !vm.busy && vm.tokenReady,
+                    enabled = vm.tokenReady,
                     colors = SliderDefaults.colors(
                         thumbColor = Cyan, activeTrackColor = Cyan,
                         inactiveTrackColor = Border, disabledThumbColor = TextDim,
@@ -144,8 +144,9 @@ fun LightScreen(vm: AppViewModel) {
                     PwmSlider(
                         index = i,
                         value = pwm.getOrElse(i) { 0 },
-                        enabled = !vm.busy && vm.tokenReady,
-                        onChange = { v -> pwm = pwm.toMutableList().also { it[i] = v } }
+                        enabled = vm.tokenReady,
+                        onChange = { v -> pwm = pwm.toMutableList().also { it[i] = v } },
+                        onChangeFinished = { vm.applyPwm(pwm) }
                     )
                 }
             }
