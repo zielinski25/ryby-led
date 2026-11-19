@@ -3,6 +3,7 @@ package pl.aquarium.lednative.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Tune
@@ -40,6 +41,7 @@ import kotlin.math.roundToInt
 import pl.aquarium.lednative.ui.Border
 import pl.aquarium.lednative.ui.Surface3
 import pl.aquarium.lednative.ui.TextDim
+import pl.aquarium.lednative.ui.TextMid
 import pl.aquarium.lednative.ui.TextHi
 
 @Composable

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -55,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import pl.aquarium.lednative.core.Logic
+import pl.aquarium.lednative.ui.Border
 import pl.aquarium.lednative.ui.screens.ChartsScreen
 import pl.aquarium.lednative.ui.screens.DashboardScreen
 import pl.aquarium.lednative.ui.screens.LightScreen
@@ -183,7 +183,7 @@ fun AppRoot(vm: AppViewModel) {
                         Box(
                             Modifier.size(6.dp).clip(RoundedCornerShape(999.dp))
                                 .background(if (vm.connection == Logic.Conn.ONLINE) Green else Red)
-                        }
+                        )
                         Text(
                             if (vm.connection == Logic.Conn.ONLINE) "ONLINE" else "OFFLINE",
                             fontSize = 8.sp,

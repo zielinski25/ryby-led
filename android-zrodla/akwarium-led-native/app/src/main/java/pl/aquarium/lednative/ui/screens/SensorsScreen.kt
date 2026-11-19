@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import pl.aquarium.lednative.core.DeviceSettings
 import pl.aquarium.lednative.core.Logic
 import pl.aquarium.lednative.ui.AppViewModel
@@ -36,6 +37,7 @@ import pl.aquarium.lednative.ui.FsBlue
 import pl.aquarium.lednative.ui.Green
 import pl.aquarium.lednative.ui.Surface3
 import pl.aquarium.lednative.ui.TextDim
+import pl.aquarium.lednative.ui.TextHi
 import pl.aquarium.lednative.ui.Warm
 import pl.aquarium.lednative.ui.components.CardHeader
 import pl.aquarium.lednative.ui.components.InfoBanner

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,6 +48,7 @@ import pl.aquarium.lednative.core.DeviceSettings
 import pl.aquarium.lednative.core.DeviceStatus
 import pl.aquarium.lednative.core.Logic
 import pl.aquarium.lednative.ui.AppViewModel
+import pl.aquarium.lednative.ui.Border
 import pl.aquarium.lednative.ui.Cyan
 import pl.aquarium.lednative.ui.FsBlue
 import pl.aquarium.lednative.ui.Green
@@ -330,7 +332,7 @@ fun DashboardScreen(vm: AppViewModel, onNavigate: (String) -> Unit) {
                             value = (pwmValues.sum() / pwmValues.size).toFloat(),
                             onValueChange = {
                                 val v = it.roundToInt().coerceIn(0, Logic.PWM_MAX)
-                                pwmValues = pwmValues.map { v }
+                                pwmValues = pwmValues.map { v }.toMutableList()
                                 vm.applyPwm(pwmValues)
                             },
                             valueRange = 0f..Logic.PWM_MAX.toFloat(),
