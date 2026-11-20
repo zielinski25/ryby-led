@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test z lektury „Mikołajek” – klasa 4 | losowy zestaw pytań</title>
+<style>
+:root{
+  --bg:#f4f1ea; --card:#fff; --ink:#20232b; --muted:#6b7280; --line:#e4ded2;
+  --accent:#e0603a; --accent-dark:#b8451f;
+  --ok:#2f8f5b; --ok-bg:#e8f6ee; --bad:#c0392b; --bad-bg:#fdecea;
+  --shadow:0 6px 24px rgba(32,35,43,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  background:var(--bg);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:920px;margin:0 auto;padding:0 18px 80px}
+
+header{background:linear-gradient(135deg,#20232b 0%,#3a3f4d 55%,#e0603a 165%);
+  color:#fff;padding:36px 0 28px;margin-bottom:24px;border-bottom:5px solid var(--accent)}
+header .wrap{padding-bottom:0}
+.eyebrow{display:inline-block;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+  padding:5px 12px;border-radius:999px;margin-bottom:13px}
+header h1{margin:0 0 8px;font-size:clamp(1.45rem,4.3vw,2.25rem);line-height:1.15;letter-spacing:-.01em}
+header p.sub{margin:0;color:#d9dbe1;max-width:64ch;font-size:.95rem}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.meta span{font-size:.78rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);
+  padding:6px 11px;border-radius:8px;color:#f1f2f5}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:18px 20px;box-shadow:var(--shadow)}
+.intro{margin-bottom:22px}
+.intro h2{margin:0 0 8px;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.intro p{margin:.35em 0;font-size:.94rem}
+.intro b{color:var(--accent-dark)}
+
+.bar{position:sticky;top:0;z-index:20;background:rgba(244,241,234,.94);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line);margin-bottom:22px}
+.bar-inner{max-width:920px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.progress{flex:1;min-width:140px;height:9px;background:#e2dccf;border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#f0913f);transition:width .25s}
+.bar .stat{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar .stat b{color:var(--ink)}
+.btn{font:inherit;font-size:.84rem;font-weight:600;cursor:pointer;border-radius:10px;
+  padding:8px 13px;border:1px solid var(--accent);background:var(--accent);color:#fff;
+  transition:transform .08s,filter .15s}
+.btn:hover{filter:brightness(1.07)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;color:var(--accent-dark);border-color:#e0b8a8}
+.btn.ghost:hover{background:#fbe9e2}
+
+.cluster{margin-bottom:30px}
+.cluster-head{display:flex;align-items:flex-start;gap:13px;margin:0 0 13px}
+.badge{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;
+  background:var(--ink);color:#fff;font-weight:700;font-size:1rem;box-shadow:0 4px 12px rgba(32,35,43,.22)}
+.cluster[data-k="1"] .badge{background:#2d6f8f}
+.cluster[data-k="2"] .badge{background:#7a5aa8}
+.cluster[data-k="3"] .badge{background:#2f8f5b}
+.cluster[data-k="4"] .badge{background:#b8451f}
+.cluster h2{margin:0;font-size:1.12rem;letter-spacing:-.01em}
+.cluster .hint{margin:2px 0 0;font-size:.84rem;color:var(--muted)}
+
+.q{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:15px 17px;margin-bottom:11px;box-shadow:0 2px 10px rgba(32,35,43,.045)}
+.q.done{box-shadow:none}
+.q-top{display:flex;gap:10px;align-items:baseline;margin-bottom:10px}
+.num{flex:0 0 auto;font-size:.7rem;font-weight:700;color:#fff;background:#b9b2a3;
+  min-width:25px;height:25px;border-radius:7px;display:grid;place-items:center;
+  font-variant-numeric:tabular-nums;transform:translateY(-1px)}
+.q.correct .num{background:var(--ok)}
+.q.wrong .num{background:var(--bad)}
+.q-text{font-weight:600;font-size:.98rem;margin:0}
+.q-src{display:block;font-weight:400;color:var(--muted);font-size:.78rem;margin-top:4px;font-style:italic}
+
+.answers{display:grid;gap:8px}
+.ans{display:flex;gap:10px;align-items:flex-start;text-align:left;font:inherit;font-size:.92rem;
+  cursor:pointer;background:#fbfaf7;border:1px solid var(--line);border-radius:11px;
+  padding:9px 12px;color:var(--ink);transition:background .12s,border-color .12s,transform .08s}
+.ans:hover:not(:disabled){background:#f5eee4;border-color:#d8c9b4}
+.ans:active:not(:disabled){transform:scale(.995)}
+.ans .letter{flex:0 0 auto;width:20px;height:20px;border-radius:5px;display:grid;place-items:center;
+  background:#eee8dc;font-size:.72rem;font-weight:700;color:#6d6555;margin-top:2px}
+.ans:disabled{cursor:default}
+.ans.chosen-ok{background:var(--ok-bg);border-color:#a6d8bc}
+.ans.chosen-ok .letter{background:var(--ok);color:#fff}
+.ans.chosen-bad{background:var(--bad-bg);border-color:#eeb3ac}
+.ans.chosen-bad .letter{background:var(--bad);color:#fff}
+.ans.reveal{background:var(--ok-bg);border-color:#a6d8bc}
+.ans.reveal .letter{background:var(--ok);color:#fff}
+.ans.faded{opacity:.5}
+
+.fb{display:none;margin-top:10px;font-size:.87rem;border-radius:10px;
+  padding:9px 12px;border-left:4px solid var(--ok);background:var(--ok-bg)}
+.fb.show{display:block;animation:pop .18s ease-out}
+.fb.bad{border-left-color:var(--bad);background:var(--bad-bg)}
+.fb b{display:block;margin-bottom:2px;font-size:.76rem;text-transform:uppercase;letter-spacing:.07em}
+.fb.bad b{color:var(--bad)}
+.fb:not(.bad) b{color:var(--ok)}
+@keyframes pop{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+
+.summary{margin-top:36px;background:var(--card);border:1px solid var(--line);
+  border-radius:18px;padding:24px 22px;box-shadow:var(--shadow)}
+.summary h2{margin:0 0 4px;font-size:1.3rem}
+.summary .lead{color:var(--muted);margin:0 0 18px;font-size:.9rem}
+.score-big{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+.ring{--p:0;width:108px;height:108px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  background:conic-gradient(var(--accent) calc(var(--p)*1%),#eae3d6 0);position:relative}
+.ring::after{content:"";position:absolute;inset:11px;background:var(--card);border-radius:50%}
+.ring span{position:relative;z-index:1;font-weight:700;font-size:1.3rem;font-variant-numeric:tabular-nums;text-align:center}
+.ring span small{display:block;font-size:.6rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.grade{font-size:1rem;line-height:1.4}
+.grade b{font-size:1.85rem;display:block;line-height:1.1}
+table.per{width:100%;border-collapse:collapse;margin:6px 0 4px;font-size:.88rem}
+table.per th{text-align:left;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  padding:8px 6px;border-bottom:1px solid var(--line)}
+table.per td{padding:9px 6px;border-bottom:1px solid #f0ebe1;vertical-align:middle}
+table.per td:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.mini{height:7px;background:#eee8dc;border-radius:99px;overflow:hidden;min-width:80px}
+.mini i{display:block;height:100%;background:var(--accent);width:0;transition:width .4s}
+
+footer{margin-top:32px;text-align:center;font-size:.76rem;color:#9a9384;line-height:1.7}
+
+@media print{
+  body{background:#fff}
+  .bar,.btn{display:none}
+  header{background:#fff;color:#000;border-bottom:2px solid #000}
+  header p.sub,.meta span{color:#333}
+  .meta span,.eyebrow{border-color:#bbb;background:#f2f2f2;color:#333}
+  .panel,.q,.summary{box-shadow:none;break-inside:avoid}
+  .fb{display:block !important}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Lektura · klasa 4</div>
+    <h1>Test z lektury „Mikołajek”</h1>
+    <p class="sub">René Goscinny (tekst) i Jean-Jacques Sempé (ilustracje) · tłum. Tola Markuszewicz i Elżbieta Staniszkis.
+    Za każdym razem losowany jest <b>inny zestaw</b> pytań z puli 150+ — można wracać do testu wiele razy.</p>
+    <div class="meta">
+      <span>4 klastry · 35 pytań w zestawie</span>
+      <span id="mSet">—</span>
+      <span id="mPool">—</span>
+      <span>1 pkt za pytanie</span>
+    </div>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="bar-inner">
+    <div class="progress"><i id="pbar"></i></div>
+    <div class="stat"><b id="sDone">0</b>/<span id="totQ">0</span> odpowiedzi</div>
+    <div class="stat"><b id="sPts">0</b> pkt</div>
+    <button class="btn ghost" id="resetBtn" type="button">Nowy test (losuj pytania)</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="panel intro">
+    <h2>Jak to działa</h2>
+    <p>Test składa się z <b>4 klastrów</b> i <b>166 pytań w puli</b>. Każde wejście (lub kliknięcie „Nowy test”) losuje nowy zestaw 35 pytań: inne pytania, inna kolejność odpowiedzi, inna kolejność klastrów. Pytania, których jeszcze nie widziałeś, mają pierwszeństwo — dopiero po wyczerpaniu puli wracają te najdawniej widziane. W jednej sesji przeglądarki pula nie powtórzy się przez 4–5 testów.</p>
+    <p>Po kliknięciu odpowiedzi od razu pojawia się informacja zwrotna z wyjaśnieniem — test działa więc także jako powtórka przed sprawdzianem.</p>
+  </div>
+
+  <div id="clusters"></div>
+
+  <div class="summary" id="summary" hidden>
+    <h2>Wynik tego zestawu</h2>
+    <p class="lead">1 punkt za każdą poprawną odpowiedź. Skala ocen jest orientacyjna — ustala ją nauczyciel.</p>
+    <div class="score-big">
+      <div class="ring" id="ring"><span id="ringTxt">0<small>punktów</small></span></div>
+      <div class="grade" id="gradeBox"></div>
+    </div>
+    <table class="per">
+      <thead><tr><th>Klaster</th><th>Skuteczność</th><th>Punkty</th></tr></thead>
+      <tbody id="perBody"></tbody>
+    </table>
+    <p style="font-size:.85rem;color:var(--muted);margin:14px 0 0" id="summaryHint"></p>
+    <p style="margin:18px 0 0"><button class="btn" id="againBtn" type="button">Zagraj ponownie – wylosuj nowe pytania</button></p>
+  </div>
+
+  <footer>
+    Test dydaktyczny do lektury „Mikołajek” (René Goscinny, Jean-Jacques Sempé) · poziom klasy 4<br>
+    Treść pytań opracowana na podstawie pełnego tekstu lektury oraz opracowań dostępnych w Internecie.
+  </footer>
+</div>
+
+<script>
+/* =========================================================
+   PULA PYTAŃ — 4 klastry, 150+ pytań
+   c = indeks poprawnej odpowiedzi w tablicy a
+   ========================================================= */
+const POOL = [
+/* ===== KLASTER 1: Autor, narrator, świat przedstawiony ===== */
+{ k:0, q:"Kto napisał tekst „Mikołajka”?", a:["René Goscinny","Jean-Jacques Sempé","Antoine de Saint-Exupéry","Charles Perrault"], c:0,
+  e:"Autorem tekstu jest René Goscinny. Sempé jest autorem ilustracji — nie myl tych dwóch ról." },
+{ k:0, q:"Kto wykonał ilustracje do „Mikołajka”?", a:["Jean-Jacques Sempé","René Goscinny","Jan Marcin Szancer","Bohdan Butenko"], c:0,
+  e:"Ilustracje stworzył Jean-Jacques Sempé — to on nadał bohaterom ich rozpoznawalny wygląd." },
+{ k:0, q:"Kto przetłumaczył „Mikołajka” na język polski?", a:["Tola Markuszewicz i Elżbieta Staniszkis","Irena Tuwim","Joanna Papuzińska","Hanna Januszewska"], c:0,
+  e:"Polskie tłumaczenie przygotowały Tola Markuszewicz i Elżbieta Staniszkis — ich nazwiska są na stronie tytułowej." },
+{ k:0, q:"Które wydawnictwo opublikowało polskie wydanie lektury?", a:["Nasza Księgarnia","Znak","Greg","Media Rodzina"], c:0,
+  e:"Polskie wydanie ukazało się nakładem Naszej Księgarni." },
+{ k:0, q:"W jakim kraju rozgrywają się przygody Mikołajka?", a:["We Francji","W Anglii","W Polsce","We Włoszech"], c:0,
+  e:"Mikołajek mieszka z rodzicami we Francji, w domu z ogrodem, i chodzi do francuskiej szkoły." },
+{ k:0, q:"Jakim utworem jest „Mikołajek”?", a:["Zbiorem humorystycznych opowiadań","Powieścią przygodową","Baśnią","Poematem"], c:0,
+  e:"To zbiór krótkich opowiadań humorystycznych — każde ma własny początek, konflikt i puentę." },
+{ k:0, q:"Kto opowiada wydarzenia w lekturze?", a:["Mikołajek — narrator pierwszoosobowy","Wszechwiedzący narrator w trzeciej osobie","Tata Mikołajka","Pan Dubon (Rosół)"], c:0,
+  e:"Narratorem jest sam Mikołajek. Mówi o sobie „ja”, jest uczestnikiem zdarzeń i nie wie więcej niż dziecko w jego wieku." },
+{ k:0, q:"Ile lat ma Mikołajek?", a:["Około 7–8 lat","Około 4–5 lat","Około 11–12 lat","Około 14 lat"], c:0,
+  e:"To chłopiec w wieku około 7–8 lat, uczeń najmłodszej klasy, który dopiero uczy się szkolnych zasad." },
+{ k:0, q:"Ile opowiadań zawiera tom „Mikołajek”?", a:["19","12","25","7"], c:0,
+  e:"Tom liczy 19 opowiadań — od „Najmilszej pamiątki” do „Uciekam z domu”." },
+{ k:0, q:"Które opowiadanie otwiera tom „Mikołajek”?", a:["„Najmilsza pamiątka”","„Zabawa w kowbojów”","„Futbol”","„Rosół”"], c:0,
+  e:"Zbiór otwiera „Najmilsza pamiątka”, czyli historia nieudanego zdjęcia klasowego." },
+{ k:0, q:"Które opowiadanie kończy tom „Mikołajek”?", a:["„Uciekam z domu”","„Rower”","„Dżodżo”","„Pan Bordenave nie lubi słońca”"], c:0,
+  e:"Tom zamyka „Uciekam z domu” — historia nieudanej próby ucieczki po naganie mamy." },
+{ k:0, q:"Czy opowiadania tworzą jedną ciągłą fabułę z jednym finałem?", a:["Nie — każde opowiadanie jest samodzielne, a łączą je narrator i bohaterowie","Tak, to jedna długa historia","Tak, ale tylko w pierwszej połowie książki","Nie, bo każde opowiadanie ma innych bohaterów"], c:0,
+  e:"Każde opowiadanie ma własny początek, konflikt i puentę. Spójność zapewniają narrator oraz stała grupa bohaterów i miejsc." },
+{ k:0, q:"Które miejsca są najważniejszymi przestrzeniami lektury?", a:["Szkoła, dom Mikołajka i podwórko","Zamek, las i morze","Dworzec, port i lotnisko","Muzeum, teatr i opera"], c:0,
+  e:"Świat Mikołajka to przede wszystkim szkoła, dom z ogrodem oraz podwórko, plac i ulica między szkołą a domem." },
+{ k:0, q:"Kto mówi o sobie „ja” i relacjonuje wszystko z dziecięcej perspektywy?", a:["Mikołajek","Ananiasz","Narrator spoza świata przedstawionego","Alcest"], c:0,
+  e:"To Mikołajek — narrator pierwszoosobowy. Dzięki temu czytelnik widzi świat tylko tak, jak rozumie go dziecko." },
+{ k:0, q:"Czy narrator wie, co naprawdę myślą dorośli?", a:["Nie — domyśla się i często się myli","Tak, zna wszystkie ich myśli","Tak, bo dorośli mu wszystko opowiadają","Nie, bo dorośli mówią po francusku"], c:0,
+  e:"Mikołajek relacjonuje tylko to, co zobaczył i usłyszał. Czytelnik wyciąga wnioski, których chłopiec nie dostrzega." },
+{ k:0, q:"Jakim językiem posługuje się narrator?", a:["Prostym, potocznym, emocjonalnym — jak dziecko","Podniosłym, pełnym metafor","Naukowym i formalnym","Archaicznym, staropolskim"], c:0,
+  e:"Narracja jest dynamiczna, pozornie prosta i silnie nacechowana emocjonalnie — brzmi jak autentyczne opowiadanie dziecka." },
+{ k:0, q:"Jak zbudowane jest typowe opowiadanie z tego tomu?", a:["Wstęp, rozwinięcie i wyrazista puenta","Tylko opis przyrody","Dialog bez zakończenia","Strofa, refren, strofa"], c:0,
+  e:"Każde opowiadanie ma wstęp, rozwinięcie i wyraźnie zaznaczony, często zaskakujący finał, czyli puentę." },
+{ k:0, q:"Kiedy ukazał się pierwszy tom książkowy „Mikołajka” we Francji?", a:["W 1960 roku","W 1939 roku","W 1975 roku","W 2004 roku"], c:0,
+  e:"Opowiadania drukowano w prasie od 1959 roku, a pierwszy tom książkowy ukazał się we Francji w 1960 roku." },
+{ k:0, q:"Kiedy rozgrywają się wydarzenia?", a:["W czasach współczesnych autorom, w latach 50.–60. XX wieku","W średniowieczu","W czasach II wojny światowej","W przyszłości"], c:0,
+  e:"Akcja toczy się w czasach współczesnych autorom — w latach 50. i 60. XX wieku (telewizja dopiero się pojawia, jeździ się rowerem)." },
+{ k:0, q:"Czym jest „Mikołajek” pod względem rodzaju literackiego?", a:["Epiką (narracja prozatorska)","Liryką","Dramatem","Publicystyką"], c:0,
+  e:"To epika — proza narracyjna. Nie ma tu wiersza ani scenariusza teatralnego, choć bohaterowie często odgrywają scenki." },
+{ k:0, q:"Kogo Mikołajek nazywa „pieszczoszkiem naszej pani”?", a:["Ananiasza","Alcesta","Rufusa","Gotfryda"], c:0,
+  e:"„Pierwszy uczeń i pieszczoszek naszej pani” to stały przydomek Ananiasza — dlatego koledzy go nie lubią." },
+{ k:0, q:"Dlaczego chłopcy nie mogą bić Ananiasza?", a:["Bo nosi okulary","Bo jest najsilniejszy","Bo skarży dyrektorowi","Bo jest najmłodszy"], c:0,
+  e:"Ananiasz nosi okulary i „nie zawsze można go bić” — to powtarzany żart, który ratuje go przed bójkami." },
+
+{ k:0, q:"Jak nazywa się cykl, którego pierwszym tomem jest „Mikołajek”?", a:["„Pierwsze przygody Mikołajka”","„Nowe przygody Mikołajka”","„Mikołajek i spółka”","„Wakacje Mikołajka”"], c:0,
+  e:"Tom „Mikołajek” jest pierwszym z pięciu zbiorów cyklu „Pierwsze przygody Mikołajka”, wydanych za życia autora." },
+{ k:0, q:"Czy narrator opowiada wydarzenia z perspektywy dorosłego wspominającego dzieciństwo?", a:["Nie — opowiada na bieżąco jako dziecko","Tak, jest już dorosły","Tak, ale tylko w ostatnim opowiadaniu","Nie da się tego ustalić"], c:0,
+  e:"Mikołajek relacjonuje zdarzenia tak, jak je rozumie w chwili ich trwania — bez dystansu dorosłego wspomnienia." },
+{ k:0, q:"Do jakiego typu szkoły chodzi Mikołajek?", a:["Do szkoły podstawowej, do jednej klasy z paczką kolegów","Do gimnazjum","Do liceum","Do szkoły muzycznej"], c:0,
+  e:"To szkoła podstawowa. W jednej klasie uczy się cała paczka: Alcest, Ananiasz, Euzebiusz, Gotfryd, Rufus, Kleofas i inni." },
+{ k:0, q:"Kto jest adresatem opowieści — do kogo zwraca się narrator?", a:["Do czytelnika, opowiadając mu swoją historię","Do nauczycielki","Do taty","Do pana Bledurta"], c:0,
+  e:"Narracja ma charakter swobodnej opowieści kierowanej do czytelnika — stąd wrażenie bezpośredniego kontaktu." },
+{ k:0, q:"Jakie wydarzenie rodzinne jest tematem opowiadania „Fajny bukiet”?", a:["Urodziny mamy","Imieniny taty","Boże Narodzenie","Wielkanoc"], c:0,
+  e:"To urodziny mamy — Mikołajek od zeszłego roku co roku kupuje jej prezent za oszczędności ze skarbonki." },
+/* ===== KLASTER 2: Bohaterowie ===== */
+{ k:1, q:"Który bohater bez przerwy je i dlatego jest bardzo gruby?", a:["Alcest","Ananiasz","Kleofas","Maksencjusz"], c:0,
+  e:"Alcest to najlepszy przyjaciel Mikołajka. Jedzenie interesuje go bardziej niż nauka i zabawa — nosi bułeczki z czekoladą." },
+{ k:1, q:"Co Alcest najczęściej ma przy sobie?", a:["Bułeczki z czekoladą","Gwizdek policyjny","Książkę do arytmetyki","Monetę na szczęście"], c:0,
+  e:"Alcest ciągle je bułeczki z czekoladą — kupuje je nawet przed powrotem do domu, żeby mieć zapas na wypadek braku deseru." },
+{ k:1, q:"Dlaczego Alcest zostaje bramkarzem w meczu piłki nożnej?", a:["Bo nie lubi biegać, a jest gruby i dobrze zasłania bramkę","Bo jest najlepszy w skokach","Bo przyniósł piłkę","Bo tak zdecydował sędzia"], c:0,
+  e:"Alcest sam chce być bramkarzem — nie lubi biegać, a jego postura świetnie „kryje bramkę”." },
+{ k:1, q:"Kto jest najlepszym uczniem klasy, nosi okulary i często płacze?", a:["Ananiasz","Euzebiusz","Gotfryd","Joachim"], c:0,
+  e:"Ananiasz to pierwszy uczeń i ulubieniec nauczycielki. Jest pilny, ale bywa zagubiony, skarży kolegów i płacze z byle powodu." },
+{ k:1, q:"Kto jest najsilniejszy w klasie i lubi dawać „fangę w nos”?", a:["Euzebiusz","Alcest","Kleofas","Mikołajek"], c:0,
+  e:"Euzebiusz jest bardzo silny i rozwiązuje spory pięścią — „on mocno wali, ten Euzebiusz”." },
+{ k:1, q:"Czyim synem jest Rufus?", a:["Policjanta","Dyrektora szkoły","Lekarza","Piekarza"], c:0,
+  e:"Rufus jest synem policjanta i chętnie to podkreśla. Nosi policyjną czapkę, ma kajdanki, pałkę i gwizdek, który nazywa pamiątką rodzinną." },
+{ k:1, q:"Który chłopiec ma bardzo bogatego tatę i chwali się drogimi rzeczami?", a:["Gotfryd","Alcest","Rufus","Cyryl"], c:0,
+  e:"Gotfryd ma bogatego tatę, który kupuje mu wszystko, czego chce: kostium Marsjanina, aparat z osłoną i teleobiektywem, strój piłkarski." },
+{ k:1, q:"Za co przebiera się Gotfryd na zdjęcie klasowe?", a:["Za Marsjanina — ma kask przypominający słój","Za kowboja","Za Indianina","Za policjanta"], c:0,
+  e:"Gotfryd upiera się, że będzie sfotografowany jako Marsjanin, i przychodzi w kasku, który wygląda jak słój." },
+{ k:1, q:"Kto jest najsłabszym uczniem w klasie?", a:["Kleofas","Ananiasz","Maksencjusz","Alcest"], c:0,
+  e:"Kleofas to ostatni uczeń w klasie. Kiedy odpowiada, „z jego pauzy są nici” — zostaje za karę w klasie." },
+{ k:1, q:"Kto ma rower i przygotowuje się do wyścigu dookoła Francji?", a:["Joachim","Gotfryd","Rufus","Kleofas"], c:0,
+  e:"Joachim ma rower i marzy o wyścigu dookoła Francji, choć — jak mówi Mikołajek — „nie jeździ szybko, szczególnie pod górę”." },
+{ k:1, q:"Kto ma bardzo długie, chude nogi i najszybciej biega?", a:["Maksencjusz","Euzebiusz","Gotfryd","Cyryl"], c:0,
+  e:"Maksencjusz ma długie chude nogi i wystające brudne kolana. W meczu zostaje sędzią liniowym i zamiast chorągiewki powiewa chusteczką." },
+{ k:1, q:"Kim jest Rosół?", a:["Wychowawcą klasy, panem Dubon","Szkolnym woźnym","Dyrektorem szkoły","Kucharzem w stołówce"], c:0,
+  e:"Rosół to przezwisko wychowawcy, pana Dubon. Ma duże wąsy, często wlepia kary i ciągle mówi: „Spójrzcie mi w oczy”." },
+{ k:1, q:"Skąd wzięło się przezwisko „Rosół”?", a:["Z powiedzenia „Spójrzcie mi w oczy” — na rosole są oka","Bo wychowawca lubi jeść zupę","Bo uczył o zupach","Bo mieszka przy ulicy Rosolnej"], c:0,
+  e:"Wychowawca powtarza „Spójrzcie mi w oczy”, a na rosole pływają „oka” — stąd przezwisko, którego nie wolno mu powtarzać." },
+{ k:1, q:"Jaką karę najczęściej wymierza Rosół?", a:["Każe odmieniać i przepisywać zdania","Każe klęczeć w kącie","Zabiera dzienniczek","Wzywa rodziców"], c:0,
+  e:"Rosół każe odmieniać zdania, np. „Nie powinienem odmawiać miejsca koledze, który zabrudził koszulę bułką z dżemem”." },
+{ k:1, q:"Kto pilnuje porządku na boisku podczas przerw i lubi, gdy pada deszcz?", a:["Pan Bordenave","Rosół","Pan Bledurt","Dyrektor"], c:0,
+  e:"Pan Bordenave pilnuje dzieci na boisku. Gdy pada, uczniowie zostają w sali — ma wtedy mniej pracy, dlatego „nie lubi słońca”." },
+{ k:1, q:"Kim jest pan Bledurt?", a:["Sąsiadem Mikołajka, który lubi przekomarzać się z jego tatą","Nauczycielem arytmetyki","Właścicielem psa Reksa","Inspektorem szkolnym"], c:0,
+  e:"Pan Bledurt to sąsiad, który „bardzo lubi przekomarzać się z tatą”. W zabawie w kowbojów zostaje Dzikim Bawołem." },
+{ k:1, q:"Kim jest Dżodżo (Żorż Mac Jutosh)?", a:["Anglikiem, który przychodzi do klasy, by nauczyć się francuskiego","Nowym nauczycielem","Synem inspektora","Kolegą Mikołajka z wakacji"], c:0,
+  e:"Dżodżo to rudowłosy chłopiec z piegami, Anglik, którego rodzice oddali do francuskiej szkoły, by nauczył się języka." },
+{ k:1, q:"Kim jest Ludeczka?", a:["Córką koleżanki mamy Mikołajka","Koleżanką z klasy","Siostrą Ananiasza","Nauczycielką muzyki"], c:0,
+  e:"Ludeczka to córka przyjaciółki mamy. Mikołajek początkowo jej nie lubi, ale zyskuje szacunek do niej, gdy dziewczynka rozbija szybę piłką." },
+{ k:1, q:"Jaki stosunek do zwierząt ma mama Mikołajka?", a:["Nie chce psa w domu, ale po oddaniu Reksa płacze","Uwielbia wszystkie zwierzęta","Chce kupić psa za wszelką cenę","Pracuje jako weterynarz"], c:0,
+  e:"Mama zabrania przyprowadzać zwierzaki (wcześniej była mysz), ale gdy Reks odchodzi, płacze — jest troskliwa i wrażliwa." },
+{ k:1, q:"Co w domu Mikołajka jest szczególnie chronione przed psem?", a:["Fotel, na którym tacie wolno siedzieć tylko wtedy, gdy są goście","Telewizor","Biblioteczka taty","Skrzynka z narzędziami"], c:0,
+  e:"Reks gryzie obicie fotela, na którym tata może siadać tylko przy gościach — to główny powód gniewu mamy." },
+{ k:1, q:"Jaki jest tata Mikołajka?", a:["Pracuje, bywa nerwowy, czyta gazetę w fotelu i lubi się bawić oraz rywalizować","Jest zawsze spokojny i opanowany","Nigdy nie ma go w domu","Pracuje jako nauczyciel Mikołajka"], c:0,
+  e:"Tata bywa wybuchowy, ale w oczach syna jest najfajniejszy. Bawi się w kowbojów, buduje budę, ściga się z panem Bledurtem." },
+{ k:1, q:"Jak nazywa się pies, którego Mikołajek przyprowadza do domu?", a:["Reks","Burek","Kiki","Fafik"], c:0,
+  e:"Mikołajek nazywa psa Reksem od psa z filmu kryminalnego. Naprawdę zwierzę nazywa się jednak Kiki." },
+{ k:1, q:"Jak naprawdę nazywał się „Reks” i kto go odebrał?", a:["Kiki — odebrał go pan Julian Józef Trempe","Burek — odebrał go listonosz","Kiki — odebrał go pan Bledurt","Reks — odebrał go dyrektor"], c:0,
+  e:"Pies nazywał się Kiki, a właściciel, pan Julian Józef Trempe, rozpoznał go po obroży z nazwiskiem i adresem." },
+{ k:1, q:"Kto w klasie siedzi w pierwszej ławce razem z Joachimem?", a:["Cyryl","Alcest","Rufus","Kleofas"], c:0,
+  e:"W pierwszej ławce siedzą Cyryl i Joachim. To ich ławkę Ananiasz oblewa atramentem, a potem klasa ją przestawia." },
+{ k:1, q:"Komu Rosół powierza pilnowanie klasy, gdy nauczycielka choruje?", a:["Ananiaszowi","Joachimowi","Mikołajkowi","Rufusowi"], c:0,
+  e:"Rosół sadza Ananiasza za stołem pani, bo to najlepszy uczeń. Pomysł kończy się kompletnym chaosem." },
+{ k:1, q:"Kto w klasie mówi, że „posiada pewien zasób angielskich słów”?", a:["Ananiasz","Gotfryd","Kleofas","Maksencjusz"], c:0,
+  e:"Ananiasz chwali się „zasobem angielskich słów” i opowiada Dżodżowi o krawcu i ogrodzie wuja — chłopiec puka się w czoło." },
+{ k:1, q:"Który bohater potrafi świetnie boksować i pokonuje Euzebiusza?", a:["Dżodżo","Alcest","Gotfryd","Rufus"], c:0,
+  e:"Dżodżo zasłania twarz pięściami i tańczy jak bokserzy z telewizji. Zadaje Euzebiuszowi tyle ciosów, że ten siada na ziemi." },
+{ k:1, q:"Jak nazywa się dyrektor szkoły wobec wychowawcy?", a:["Zwraca się do niego „panie Dubon”","Mówi do niego „Rosół”","Nazywa go „panem profesorem”","Mówi do niego po imieniu „Julian”"], c:0,
+  e:"W chwili zdenerwowania dyrektor niemal mówi „Ros...”, ale poprawia się na „panie Dubon” — przezwisko jest zakazane." },
+{ k:1, q:"Który bohater nie ma w domu telewizora?", a:["Mikołajek","Kleofas","Ananiasz","Gotfryd"], c:0,
+  e:"Mikołajek mówi, że telewizję oglądają u Kleofasa, bo oni jeszcze nie mają odbiornika, choć bardzo by chciał." },
+{ k:1, q:"Kto według Mikołajka jest „najfajniejszym tatą na świecie”?", a:["Jego własny tata","Tata Gotfryda","Tata Rufusa","Pan Bledurt"], c:0,
+  e:"Mikołajek powtarza, że tata jest fajny — bawi się z nim, buduje budę dla psa i staje w jego obronie." },
+
+{ k:1, q:"Kto w klasie ma starszego brata, od którego pożycza harcerski kapelusz?", a:["Euzebiusz","Gotfryd","Rufus","Cyryl"], c:0,
+  e:"Euzebiusz przynosi na zabawę w kowbojów stary harcerski kapelusz starszego brata, pas z drewnianymi nabojami i dwa futerały z rewolwerami." },
+{ k:1, q:"Kto przynosi na zabawę policyjną czapkę, kajdanki, pałkę i gwizdek?", a:["Rufus","Euzebiusz","Gotfryd","Alcest"], c:0,
+  e:"Rufus dostaje te rekwizyty od taty policjanta i chętnie się nimi chwali — gwizdek nazywa „pamiątką rodzinną”." },
+{ k:1, q:"Który bohater najbardziej lubi się przebierać?", a:["Gotfryd","Kleofas","Ananiasz","Alcest"], c:0,
+  e:"Gotfryd uwielbia kostiumy: przebiera się za kowboja, przychodzi jako Marsjanin w kasku-słoiku." },
+{ k:1, q:"Czym wyróżnia się wygląd Ananiasza?", a:["Nosi okulary","Ma rude włosy i piegi","Jest najwyższy w klasie","Nosi czapkę policjanta"], c:0,
+  e:"Okulary Ananiasza to jego znak rozpoznawczy — dzięki nim koledzy nie mogą go bić, ile razy chcą." },
+{ k:1, q:"Kto ma rude włosy, piegi i bardzo duże zęby?", a:["Dżodżo","Maksencjusz","Cyryl","Kleofas"], c:0,
+  e:"Tak wygląda Dżodżo — Alcest od razu zauważa, że takimi zębami można odgryzać ogromne kęsy." },
+{ k:1, q:"Który bohater jest nazywany „pieszczoszkiem” i boi się, że nowy uczeń zajmie jego miejsce?", a:["Ananiasz","Alcest","Rufus","Mikołajek"], c:0,
+  e:"Ananiasz patrzy na Dżodża „złym okiem”, bo zawsze boi się, że każdy nowy może zostać pierwszym uczniem i pieszczoszkiem pani." },
+{ k:1, q:"Jak Mikołajek opisuje wygląd Alcesta w stroju Indianina?", a:["Jak tłusty kurak","Jak straszydło","Jak dzielny wojownik","Jak kowboj"], c:0,
+  e:"Mikołajek mówi, że Alcest z pióropuszem i toporem „wyglądał jak tłusty kurak” — to jeden z jego typowych, dziecięcych opisów." },
+{ k:1, q:"Kto w klasie jest nazywany „ostatnim uczniem”?", a:["Kleofas","Cyryl","Joachim","Maksencjusz"], c:0,
+  e:"Kleofas jest ostatni w klasie — kiedy odpowiada, zawsze „z jego pauzy są nici”, więc często zostaje za karę w klasie." },
+/* ===== KLASTER 3: Wydarzenia ===== */
+{ k:2, q:"Po co do szkoły przychodzi fotograf w opowiadaniu „Najmilsza pamiątka”?", a:["Aby zrobić klasowe zdjęcie","Aby sfotografować dyrektora","Aby zrobić zdjęcie do gazety","Aby sprawdzić czystość sal"], c:0,
+  e:"Pani zapowiada, że zdjęcie klasowe „będzie najmilszą pamiątką na całe życie” — i dlatego każe przyjść porządnie ubranym." },
+{ k:2, q:"Kto w piwnicy włożył na głowę worek i udawał ducha?", a:["Rufus","Euzebiusz","Kleofas","Alcest"], c:0,
+  e:"Rufus włożył stary worek i krzyczał „Uuu... jestem duch!”, dopóki nie przyszła pani. Wszyscy wrócili z piwnicy umorusani." },
+{ k:2, q:"Dlaczego w „Najmilszej pamiątce” nie udaje się zrobić zdjęcia?", a:["Fotograf odchodzi, zanim klasa zdąży się ustawić","Psuł się aparat","Zabrakło błony","Pani zabroniła fotografowania"], c:0,
+  e:"Po wielu próbach i karach uczniowie wreszcie stoją uśmiechnięci — i okazuje się, że fotograf zdążył już odejść." },
+{ k:2, q:"Jaką karę od pani dostaje Euzebiusz podczas ustawiania do zdjęcia?", a:["Musi odmieniać zdanie o ustępowaniu miejsca koledze","Musi wyjść z klasy","Musi napisać sto linijek","Musi umyć podłogę"], c:0,
+  e:"Euzebiusz odmawia ustąpienia miejsca Alcestowi, więc pani każe mu odmieniać zdanie: „Nie powinienem odmawiać miejsca koledze…”." },
+{ k:2, q:"Gdzie zostaje przywiązany tata w „Zabawie w kowbojów”?", a:["Do drzewa, sznurem od bielizny","Do płotu, skakanką","Do huśtawki, paskiem","Do bramy, liną"], c:0,
+  e:"Tata zgadza się być jeńcem i zostaje przywiązany do drzewa sznurem od bielizny. Wieczorem wciąż tam stoi i się wykrzywia." },
+{ k:2, q:"Kim chce być pan Bledurt w zabawie w kowbojów?", a:["Czerwonoskórym Dzikim Bawołem","Szeryfem","Jeńcem","Dzielnym Joe"], c:0,
+  e:"Pan Bledurt przeskakuje przez płot i woła: „Ja też chcę się bawić, będę czerwonoskórym Dzikim Bawołem!”." },
+{ k:2, q:"Czym chłopcy zajmują się po podwieczorku podczas zabawy w kowbojów?", a:["Bawią się elektryczną kolejką w pokoju Mikołajka","Idą do kina","Grają w piłkę na placu","Uczą psa sztuczek"], c:0,
+  e:"Mama woła na podwieczorek, a potem chłopcy idą do pokoju bawić się elektryczną kolejką — tata zostaje przywiązany do drzewa." },
+{ k:2, q:"Dlaczego w opowiadaniu „Rosół” pani nie przychodzi do szkoły?", a:["Zachorowała","Pojechała na wycieczkę","Ma urlop","Jest na szkoleniu"], c:0,
+  e:"Wychowawca oznajmia: „Wasza pani zachorowała”, i sam musi zająć się klasą." },
+{ k:2, q:"Na czym polega „czatowanie” Joachima w opowiadaniu „Rosół”?", a:["Patrzy przez dziurkę od klucza i zasypia przy tym","Stoi na korytarzu i woła nauczycieli","Podsłuchuje pod dyrektorem","Liczy, ile razy wejdzie Rosół"], c:0,
+  e:"Joachim oferuje się pilnować drzwi, patrzy przez dziurkę od klucza, zasypia — i wtedy Rosół uderza go drzwiami w nos." },
+{ k:2, q:"Kto naprawdę krzyknął „To Rosół!”, gdy drzwi się uchylały?", a:["Rufus","Mikołajek","Ananiasz","Kleofas"], c:0,
+  e:"Krzyknął Rufus, ale Ananiasz oskarżył Mikołajka. Efekt: po lekcjach zostaje cała klasa, a Ananiasz dostaje czkawki." },
+{ k:2, q:"Kto ratuje sytuację w klasie na końcu opowiadania „Rosół”?", a:["Dyrektor, który wchodzi do sali","Inspektor","Mama Mikołajka","Pani, która wraca tego samego dnia"], c:0,
+  e:"Gdy wszyscy krzyczą i płaczą, wchodzi dyrektor. Nazajutrz wraca pani, ale to Rosół nie przychodzi do szkoły." },
+{ k:2, q:"Kto podarował Alcestowi nową piłkę przed meczem w opowiadaniu „Futbol”?", a:["Jego tata","Jego mama","Gotfryd","Pan Dubon"], c:0,
+  e:"Piłkę kupił Alcestowi tata. Chłopcy umawiają się na plac, ale piłka… zostaje w domu." },
+{ k:2, q:"Ilu chłopców stawiło się na meczu w opowiadaniu „Futbol”?", a:["Osiemnastu","Dwunastu","Dwudziestu dwóch","Sześciu"], c:0,
+  e:"Na placu spotyka się osiemnastu chłopców, co od razu rodzi problemy z podziałem na równe ekipy." },
+{ k:2, q:"Kto zostaje sędzią głównym meczu?", a:["Ananiasz","Rufus","Maksencjusz","Euzebiusz"], c:0,
+  e:"Sędzią zostaje Ananiasz — nie lubiany, ale nosi okulary i „nadaje się w sam raz na sędziego”, bo żadna ekipa go nie chce." },
+{ k:2, q:"Kto zostaje sędzią liniowym i czym macha zamiast chorągiewki?", a:["Maksencjusz — chusteczką","Rufus — czapką","Joachim — monetą","Kleofas — zeszytem"], c:0,
+  e:"Maksencjusz zgadza się być sędzią liniowym tylko do przerwy i zamiast chorągiewki powiewa brudną chusteczką." },
+{ k:2, q:"Kto zostaje kapitanem jednej z drużyn w meczu?", a:["Gotfryd","Rufus","Ananiasz","Maksencjusz"], c:0,
+  e:"Kapitanów wybrano losując słomkami — zostali nimi Gotfryd i Mikołajek. Gotfryd wybrał Euzebiusza." },
+{ k:2, q:"Dlaczego Joachim chce być prawym obrońcą w meczu?", a:["Aby szukać zgubionej monety w tym kącie placu","Bo tam stoi jego tata","Bo nie umie grać w ataku","Bo tak kazał sędzia"], c:0,
+  e:"Joachim pożyczył monetę do losowania i chce ją odnaleźć — dlatego prosi o pozycję w kącie, gdzie zginęła." },
+{ k:2, q:"Czym kończy się mecz w opowiadaniu „Futbol”?", a:["Okazuje się, że Alcest zapomniał przynieść piłkę","Klasa wygrywa 3:0","Mecz przerywa deszcz","Wygrywa drużyna Gotfryda"], c:0,
+  e:"Po wszystkich sporach, bójkach i gwizdkach Alcest przyznaje: „Przecież nie mamy piłki — zapomniałem ją przynieść z domu”." },
+{ k:2, q:"Kto rozlewa atrament podczas przygotowań do wizytacji?", a:["Ananiasz","Kleofas","Cyryl","Joachim"], c:0,
+  e:"Ananiasz nalewa atrament do kałamarzy, a gdy ktoś krzyknie „Pan inspektor!”, ze strachu oblewa całą pierwszą ławkę." },
+{ k:2, q:"Kto wymyślił kawał z okrzykiem „Pan inspektor!”?", a:["Kleofas","Rufus","Euzebiusz","Gotfryd"], c:0,
+  e:"To sprawka Kleofasa — pani od razu się domyśla i wysyła go do kąta, ale potem darowuje karę, bo inspektor naprawdę szedł przez podwórze." },
+{ k:2, q:"Jaką bajkę klasa przerabia podczas wizytacji?", a:["„Kruk i lis”","„Kot w butach”","„Czerwony Kapturek”","„Jaś i Małgosia”"], c:0,
+  e:"Pani mówi, że właśnie przerabiali bajkę „Kruk i lis”. Deklamować ma Ananiasz, ale inspektor wybiera Kleofasa, a potem Rufusa." },
+{ k:2, q:"O jaki ser kłócą się Rufus i Alcest podczas wizytacji?", a:["Roquefort i camembert","Oscypek i bryndza","Parmezan i gouda","Brie i ementaler"], c:0,
+  e:"Rufus twierdzi, że kruk trzymał roquefort, Alcest poprawia go na camembert. Kłótnia kończy się bójką i oblaniem inspektora atramentem." },
+{ k:2, q:"Jaką historyjkę opowiada inspektor, chcąc zaprzyjaźnić się z klasą?", a:["O dwóch głuchych","O mówiącym psie","O skąpym kupcu","O roztargnionym profesorze"], c:0,
+  e:"Inspektor opowiada kawał o dwóch głuchych i sam się z niego śmieje, a klasa musi milczeć, bo pani zabroniła śmiać się bez pozwolenia." },
+{ k:2, q:"Co inspektor mówi nauczycielce na pożegnanie?", a:["Że ma dla niej wiele podziwu i żeby nie rezygnowała z pracy","Że powinna zmienić szkołę","Że uczniów trzeba ukarać","Że wróci za tydzień"], c:0,
+  e:"Inspektor ściska jej rękę i mówi, że nigdy tak nie doceniał „wzniosłej służby” nauczyciela. Pani nagradza to… odsiadką dla całej klasy." },
+{ k:2, q:"Czym Mikołajek zwabił zbłąkanego psa?", a:["Połową bułeczki z czekoladą","Kawałkiem kiełbasy","Ciastkiem","Cukierkiem"], c:0,
+  e:"Pies nie ufał chłopcu, dopóki nie dostał połowy bułeczki z czekoladą. Wtedy zaczął machać ogonkiem i poszedł za nim." },
+{ k:2, q:"Gdzie rodzina postanawia trzymać Reksa?", a:["W ogrodzie, w nowej budzie","W kuchni","W salonie na fotelu","U pana Bledurta"], c:0,
+  e:"Pomysł Mikołajka ratuje sytuację: pies ma mieszkać w ogrodzie. Tata i syn zabierają się do budowy budy." },
+{ k:2, q:"Co Reks zjada w ogrodzie?", a:["Begonie","Jabłka z drzewa","Kwiaty z doniczek sąsiada","Trawę"], c:0,
+  e:"Reks zjada begonie, ale Mikołajek pociesza się: „mamy więcej begonii niż foteli”." },
+{ k:2, q:"Kto zgłasza się po psa i jak udowadnia, że to jego zwierzę?", a:["Pan Trempe — obrożą z nazwiskiem i adresem","Pan Bledurt — zdjęciem","Listonosz — dokumentami","Dyrektor — świadkami"], c:0,
+  e:"Właściciel, pan Julian Józef Trempe, wskazuje obrożę z nazwiskiem i adresem. Tata nie ma argumentu — pies odchodzi." },
+{ k:2, q:"Jak zachowuje się mama po oddaniu Reksa?", a:["Płacze, bo zdążyła się do niego przywiązać","Cieszy się, że pies zniknął","Zamyka się w pokoju","Krzyczy na Mikołajka"], c:0,
+  e:"Mama, która początkowo nie chciała psa, płacze po jego odejściu. Tata pociesza ją: „on na pewno znowu przyprowadzi jakiegoś psa”." },
+{ k:2, q:"Skąd pochodzi Dżodżo i dlaczego trafia do klasy?", a:["Z Anglii, by nauczyć się francuskiego","Z Ameryki, bo tata tu pracuje","Z Belgii, bo się przeprowadził","Z Kanady, bo zginął mu brat"], c:0,
+  e:"Pani przedstawia go jako cudzoziemca, którego rodzice oddali do szkoły, „żeby się nauczył francuskiego”." },
+{ k:2, q:"Jakie pierwsze francuskie słowa poznaje Dżodżo od kolegów?", a:["Bałwan, błazen, kłamczuch","Dzień dobry, dziękuję, proszę","Tablica, zeszyt, pióro","Rosół, dzienniczek, uwaga"], c:0,
+  e:"Chłopcy uczą go obraźliwych słów, a Dżodżo powtarza je z dumą — także nauczycielce przy pożegnaniu." },
+{ k:2, q:"Kto donosi nauczycielce, że koledzy uczą Dżodża brzydkich słów?", a:["Ananiasz","Kleofas","Maksencjusz","Alcest"], c:0,
+  e:"Ananiasz wstaje i mówi: „Proszę pani, oni go uczą brzydkich słów”. Klasa nazywa go podłym skarżypytą." },
+{ k:2, q:"Co dzieje się z Dżodżem po pierwszym dniu w nowej szkole?", a:["Nie przychodzi więcej do szkoły","Zostaje pierwszym uczniem","Zaprzyjaźnia się z Ananiaszem","Przenosi się do innej klasy"], c:0,
+  e:"Mikołajek kończy opowiadanie zdaniem, że Dżodżo „nie przyszedł więcej do szkoły”." },
+{ k:2, q:"Jaki prezent Mikołajek kupuje mamie w opowiadaniu „Fajny bukiet”?", a:["Kwiaty na urodziny","Perfumy","Książkę","Wazon"], c:0,
+  e:"Mikołajek opróżnia skarbonkę i kupuje mamie bukiet kwiatów do dużego niebieskiego wazonu w salonie." },
+{ k:2, q:"Jakiego kwiatu Mikołajek nie chce kupić?", a:["Begonii, bo mają ich pełno w ogrodzie","Róż, bo są drogie","Tulipanów, bo są żółte","Fiołków, bo brzydko pachną"], c:0,
+  e:"Prosi, żeby nie było begonii — w ogrodzie i tak jest ich pełno (i to one padają ofiarą Reksa)." },
+{ k:2, q:"Co kolejno niszczy bukiet Mikołajka?", a:["Bójka z Gotfrydem, bicie Kleofasa bukietem, kulki z Euzebiuszem, rzut w Joachima","Deszcz, wiatr i pies","Upadek z roweru","Zjedzenie przez Alcesta"], c:0,
+  e:"Bukiet przechodzi prawdziwą katastrofę: bójka, „walka” z Kleofasem, przysiad na bukiecie i rzut w twarz Joachimowi — kwiaty lądują na dachu samochodu." },
+{ k:2, q:"Ile kwiatów ostatecznie dostaje mama i co z nim robi?", a:["Jeden nadłamany — wstawia go do niebieskiego wazonu","Cały bukiet — wstawia do wazonu","Trzy kwiaty — suszy je","Nic — Mikołajek wraca bez kwiatów"], c:0,
+  e:"Joachim ratuje jeden nadłamany kwiat. Mama obejmuje syna i mówi, że nigdy nie dostała piękniejszego bukietu, po czym wstawia kwiat do dużego niebieskiego wazonu." },
+{ k:2, q:"Kto rozdaje uczniom dzienniczki w opowiadaniu „Dzienniczki”?", a:["Dyrektor","Wychowawca Rosół","Inspektor","Sama nauczycielka"], c:0,
+  e:"Dyrektor przychodzi do klasy z dzienniczkami pod pachą i odczytuje uwagi, nazywając uczniów „małymi nicponiami”." },
+{ k:2, q:"Jaką uwagę ma w dzienniczku Mikołajek?", a:["„Uczeń bardzo żywy, często roztargniony. Mógłby się uczyć lepiej”","„Uczeń niekarny, bije się z kolegami”","„Uczeń pilny, inteligentny. Wiele osiągnie!”","„Gdyby wkładał tyle energii w naukę, co w odżywianie się…”"], c:0,
+  e:"To jego własny wpis. Uwagi pozostałych bohaterów są inne — dlatego warto je rozróżniać." },
+{ k:2, q:"Który uczeń jako jedyny nie ma dopisku „mógłby uczyć się lepiej”?", a:["Ananiasz","Alcest","Rufus","Euzebiusz"], c:0,
+  e:"W dzienniczku Ananiasza jest: „Uczeń pilny, inteligentny. Wiele osiągnie!” — on jeden nie mógłby uczyć się lepiej." },
+{ k:2, q:"Co jest w dzienniczku Alcesta?", a:["Że gdyby wkładał tyle energii w naukę, co w odżywianie się, byłby pierwszy w klasie","Że bije się z kolegami","Że bawi się gwizdkiem na lekcjach","Że jest bardzo żywy i roztargniony"], c:0,
+  e:"Uwaga Alcesta dotyczy jedzenia — chłopcy od razu kojarzą ją z jego apetytem." },
+{ k:2, q:"Dlaczego dzienniczki są problemem dla chłopców?", a:["Muszą je podpisać rodzice","Trzeba je oddać dyrektorowi","Są płatne","Trzeba je przepisać na nowo"], c:0,
+  e:"Dzienniczki muszą podpisać tatusiowie, „a to nie zawsze jest przyjemne” — dlatego chłopcy wracają do domu bez zwykłego rozgardiaszu." },
+{ k:2, q:"Kim jest Ludeczka i co robi podczas wizyty?", a:["Córką koleżanki mamy — rozbija szybę piłką, a winę zrzuca się na Mikołajka","Koleżanką z klasy — psuje zeszyt","Siostrą Ananiasza — kradnie dzienniczek","Sąsiadką — zjada deser"], c:0,
+  e:"Ludeczka wybija szybę w garażu, a wina spada na Mikołajka, który nie dostaje przez to deseru." },
+{ k:2, q:"Kto ma przyjechać do szkoły w opowiadaniu „Witamy pana ministra”?", a:["Minister, absolwent tej szkoły","Prezydent","Inspektor","Dyrektor z innej szkoły"], c:0,
+  e:"Szkoła przygotowuje uroczyste przyjęcie dla ministra — absolwenta placówki. Dzieci mają odśpiewać hymn i wręczyć kwiaty." },
+{ k:2, q:"Gdzie chłopcy kończą podczas wizyty ministra?", a:["W pralni, zamknięci pod kluczem","W gabinecie dyrektora","W bibliotece","Na boisku szkolnym"], c:0,
+  e:"Zamiast uroczystego występu wychodzi bójka, a chłopcy trafiają do pralni zamkniętej na klucz." },
+{ k:2, q:"Co się dzieje, gdy Mikołajek i Alcest palą cygaro?", a:["Kaszlą i robi im się niedobrze","Nic — są z siebie dumni","Zostają przyłapani przez dyrektora","Zapalają się firanki"], c:0,
+  e:"Palenie kończy się kaszlem i mdłościami. Mama, widząc złe samopoczucie syna, obwinia dym z fajki taty." },
+{ k:2, q:"Jaką sztukę mają odegrać chłopcy na gali z okazji emerytury dyrektora?", a:["„Kota w butach”","„Kruka i lisa”","„Kopciuszka”","„Dżodża i smoka”"], c:0,
+  e:"Chłopcy mają wystawić „Kota w butach”, a Mikołajek ma być kotem. Próba jest kompletną klapą, więc nauczycielka rezygnuje." },
+{ k:2, q:"Co Mikołajek robi w opowiadaniu „Rower”?", a:["Dostaje rower za dobre stopnie z arytmetyki, ale ojciec psuje go podczas wyścigu","Kupuje rower za własne oszczędności","Pożycza rower od Joachima i gubi go","Uczy się jeździć na rowerze mamy"], c:0,
+  e:"Tata zgadza się na rower pod warunkiem dobrych stopni. Radość psuje wyścig z panem Bledurtem — rower ląduje w kublach na śmieci." },
+{ k:2, q:"Na co lekarz każe odpocząć w opowiadaniu „Zachorowałem”?", a:["Mamie Mikołajka, a nie choremu chłopcu","Tacie","Mikołajkowi na dwa tygodnie","Alcestowi"], c:0,
+  e:"Mikołajek, choć przejedzony słodyczami, w końcu wychodzi na zdrowego, ale swoim zachowaniem tak męczy mamę, że lekarz każe odpocząć właśnie jej." },
+{ k:2, q:"Co wynika z opowiadania „Świetnieśmy się bawili” o wagarach?", a:["Wolne od szkoły okazuje się męczące i mniej ciekawe, niż się wydawało","Wagary to najlepszy pomysł na dzień","Chłopcy zostają przyłapani przez policję","Alcest odmawia pójścia na wagary"], c:0,
+  e:"Chłopcy oglądają plakaty i wystawy, chowają się przed deszczem, a na koniec mama proponuje Mikołajkowi wolne — on jednak chce iść do szkoły." },
+{ k:2, q:"Co przerywa wizytę Mikołajka u Ananiasza?", a:["Wybuch butelki podczas odważnych zabaw","Kłótnia o oceny","Nagła wizyta dyrektora","Ulewa"], c:0,
+  e:"Zabawy chłopców kończą się wybuchem butelki — obie mamy szybko przerywają spotkanie." },
+{ k:2, q:"Co przydarza się panu Bordenave’owi podczas zabaw na dworze?", a:["Dostaje piłką w głowę, a potem wywraca się na bułce z dżemem","Gubi gwizdek","Zasypia na ławce","Zamyka się w szatni"], c:0,
+  e:"Mikołajek niechcący trafia go piłką w głowę, a później opiekun wywraca się na bułce z dżemem, którą zostawił Alcest." },
+{ k:2, q:"Dlaczego plan ucieczki z domu nie dochodzi do skutku?", a:["Wszystko zajmuje dużo czasu i Mikołajek spóźnia się na kolację","Zatrzymuje go policja","Mama zamyka go w pokoju","Alcest go zdradza"], c:0,
+  e:"Mikołajek szuka kompana (Alcest odmawia), chce pożyczyć rower od Kleofasa — i w efekcie spóźnia się na kolację. Ucieczkę odkłada na jutro." },
+{ k:2, q:"Dlaczego Mikołajek postanawia uciec z domu?", a:["Po naganie mamy","Bo nie dostał deseru","Bo zgubił dzienniczek","Bo koledzy go nie zaprosili"], c:0,
+  e:"Bezpośrednim powodem jest nagana mamy. Plan zakłada powrót „jak już będzie dorosły i bogaty”." },
+{ k:2, q:"Który z kolegów odmawia udziału w ucieczce z domu?", a:["Alcest","Kleofas","Euzebiusz","Gotfryd"], c:0,
+  e:"Mikołajek próbuje zwerbować Alcesta, ale bez skutku — potem próbuje jeszcze pożyczyć rower od Kleofasa." },
+
+{ k:2, q:"Co ma zrobić Ananiasz przed wizytacją inspektora?", a:["Nalać atramentu do kałamarzy","Umyć tablicę","Przynieść kwiaty","Sprawdzić czystość ławek"], c:0,
+  e:"Pani prosi go, by nalał atramentu do kałamarzy na wypadek dyktanda — i właśnie wtedy Ananiasz oblewa pierwszą ławkę." },
+{ k:2, q:"Który uczeń płacze, gdy inspektor chce, żeby zadeklamował bajkę?", a:["Kleofas","Ananiasz","Rufus","Alcest"], c:0,
+  e:"Inspektor wskazuje Kleofasa „tam z tyłu”, a ten otwiera usta i zaczyna płakać. Pani ratuje go, mówiąc, że jest bardzo nieśmiały." },
+{ k:2, q:"Co pani robi z zabrudzoną atramentem pierwszą ławką?", a:["Każe przenieść ją do ostatniego rzędu","Każe ją wyszorować","Zakrywa ją papierem","Wyrzuca ją z klasy"], c:0,
+  e:"Klasa przesuwa wszystkie ławki, żeby ukryć zabrudzoną — i właśnie na tym „przestawianiu” zastaje ich inspektor." },
+{ k:2, q:"Jak inspektor dowiaduje się, że to atrament poplamił mu ręce?", a:["Oparł się rękami o zabrudzoną ławkę Cyryla i Joachima","Wylał kałamarz na siebie","Uścisnął rękę Ananiaszowi","Dotknął tablicy"], c:0,
+  e:"Inspektor opiera ręce na ławce, a potem widzi, że są całe niebieskie — wtedy wyciera je chusteczką i jeszcze bardziej się brudzi." },
+{ k:2, q:"Gdzie Mikołajek spotyka zbłąkanego psa?", a:["W drodze ze szkoły do domu","Na placu zabaw","Przed kwiaciarnią","W ogrodzie za domem"], c:0,
+  e:"Pies idzie przed nim, sam, i wygląda na zabłąkanego. Mikołajek postanawia go złapać i nakarmić bułeczką z czekoladą." },
+{ k:2, q:"Co tata mówi o przyszłości po oddaniu Reksa?", a:["Że Mikołajek na pewno znowu przyprowadzi jakiegoś psa","Że już nigdy nie wezmą psa","Że kupią psa w sklepie","Że Reks wkrótce wróci"], c:0,
+  e:"Tata pociesza płaczącą mamę: „przecież ja na pewno znowu przyprowadzę jakiegoś psa, nie dziś, to jutro”." },
+{ k:2, q:"Kto w rodzinie jako pierwszy sprzeciwia się psu w domu?", a:["Mama","Tata","Mikołajek","Pan Bledurt"], c:0,
+  e:"Mama krzyczy: „Gdzieś ty znalazł to zwierzę?!”, przypomina zakaz i daje synowi minutę na wyprowadzenie psa z domu." },
+{ k:2, q:"Dlaczego Alcest wybiera się do ciastkarni w drodze po dzienniczki?", a:["Kupuje sześć bułeczek na zapas, bo wieczorem nie będzie deseru","Kupuje prezent dla mamy","Kupuje ciasto dla nauczycielki","Chce kupić piłkę"], c:0,
+  e:"Alcest mówi: „Muszę się zaopatrzyć, bo dziś wieczorem z deseru nici” — za karę nie dostanie słodkiego." },
+/* ===== KLASTER 4: Język, humor, przesłanie, cytaty ===== */
+{ k:3, q:"Skąd bierze się najważniejsze źródło humoru w lekturze?", a:["Z zestawienia poważnej narracji dziecka z tym, co widzi dorosły czytelnik","Z dorosłego komentarza autora","Z zagadek kryminalnych","Z rymów i rytmu"], c:0,
+  e:"Mikołajek traktuje wszystko bardzo poważnie i nie rozumie intencji dorosłych. Czytelnik wie więcej niż narrator — stąd ironia i komizm." },
+{ k:3, q:"Na czym polega „ograniczona wiedza” narratora?", a:["Wie tylko tyle, ile zobaczył i zrozumiał jako dziecko","Kłamie świadomie","Ma mało czasu na opowiadanie","Nie zna języka francuskiego"], c:0,
+  e:"Ograniczenie nie jest kłamstwem — wynika z wieku. Mikołajek szczerze relacjonuje to, co zrozumiał po swojemu." },
+{ k:3, q:"Czym jest puenta?", a:["Zaskakującym, dowcipnym zakończeniem opowiadania","Pierwszym zdaniem tekstu","Opisem ilustracji","Tytułem rozdziału"], c:0,
+  e:"Puenta to celny, często odwracający oczekiwania finał. Każde opowiadanie z tomu ma wyraźnie zaznaczone zakończenie." },
+{ k:3, q:"Który zestaw motywów najlepiej opisuje świat lektury?", a:["Szkoła, przyjaźń, codzienność i konflikt z dorosłymi","Wojna, podróż, zagłada","Dwór królewski, intrygi, magia","Morze, żegluga, skarb"], c:0,
+  e:"Powtarzają się: szkoła, przyjaźń, konflikt z dorosłymi, codzienność dziecka i marzenie o wolności bez obowiązków." },
+{ k:3, q:"Dlaczego dorośli w „Mikołajku” bywają śmieszni?", a:["Bo sami zachowują się dziecięco i tracą panowanie nad sobą","Bo mówią niezrozumiałym językiem","Bo noszą śmieszne kapelusze","Bo nie potrafią czytać"], c:0,
+  e:"Tata ściga się z sąsiadem, nauczycielka traci cierpliwość, a Rosół nie panuje nad klasą. Dorośli nie są idealnymi mędrcami." },
+{ k:3, q:"Jak nazwać sposób budowania bohaterów, z których każdy ma jedną dominującą cechę?", a:["Typy oparte na jednej wyrazistej cesze (karykatura)","Realizm psychologiczny","Bohater zbiorowy bez cech","Postacie historyczne"], c:0,
+  e:"Alcest = jedzenie, Ananiasz = pilność, Gotfryd = bogactwo, Euzebiusz = siła. Wyrazista cecha ułatwia rozpoznanie i buduje komizm." },
+{ k:3, q:"Jaką rolę pełnią ilustracje Sempégo?", a:["Uzupełniają tekst gestem, mimiką i szczegółem, pogłębiając komizm","Są tylko ozdobą","Zastępują tekst","Pokazują wyłącznie krajobrazy"], c:0,
+  e:"Rysunki Sempégo dopełniają opowieść: pokazują mimikę i chaos scen zbiorowych, których narrator nie opisuje." },
+{ k:3, q:"Czego o przyjaźni uczy paczka Mikołajka?", a:["Że kłótnie i bójki nie przekreślają więzi — dzieci szybko się godzą","Że przyjaźń wymaga idealnej zgody","Że przyjaźń w szkole jest niemożliwa","Że liczą się tylko bogaci koledzy"], c:0,
+  e:"Konflikty są gwałtowne, ale krótkie. Wspólna zabawa okazuje się ważniejsza niż urazy." },
+{ k:3, q:"Jaki obraz rodziny wyłania się z lektury?", a:["Rodziny opartej na uczuciu, w której mimo kłótni i kar więź nie zostaje zerwana","Rodziny bez żadnych konfliktów","Rodziny, w której rodzice są nieobecni","Rodziny, w której dziecko rządzi domem"], c:0,
+  e:"Rodzice kłócą się i denerwują, Mikołajek bywa karany, ale relacja pozostaje ciepła i trwała." },
+{ k:3, q:"Kto w lekturze mówi: „Spójrzcie mi w oczy”?", a:["Rosół (pan Dubon)","Dyrektor","Inspektor","Tata Mikołajka"], c:0,
+  e:"To popisowe powiedzenie wychowawcy — to od niego wzięło się przezwisko „Rosół”." },
+{ k:3, q:"Kto mówi: „Muszę się odżywiać”?", a:["Alcest","Euzebiusz","Kleofas","Mikołajek"], c:0,
+  e:"Alcest odpowiada tak fotografowi, gdy ten prosi, żeby przestał jeść przed zdjęciem." },
+{ k:3, q:"Kto woła: „Ja mam okulary, ja mam okulary!”?", a:["Ananiasz","Kleofas","Rufus","Joachim"], c:0,
+  e:"Ananiasz chroni się tym okrzykiem przed bójką — okulary są jego tarczą i powodem do płaczu." },
+{ k:3, q:"Kto mówi: „Mój tata kupi mi sto takich koszul”?", a:["Gotfryd","Rufus","Euzebiusz","Joachim"], c:0,
+  e:"Gotfryd odpowiada tak, gdy Mikołajek podczas bójki niszczy jego czerwoną, białą i niebieską koszulę sportową." },
+{ k:3, q:"Kto woła do taty: „Niech blada twarz poskromi swój język!”?", a:["Pan Bledurt","Pan Bordenave","Rosół","Dyrektor"], c:0,
+  e:"To pan Bledurt, który wciela się w indiańskiego Dzikiego Bawołu podczas zabawy w kowbojów." },
+{ k:3, q:"Kto powtarza słowa: „bałwan, błazen, kłamczuch”?", a:["Dżodżo","Ananiasz","Kleofas","Maksencjusz"], c:0,
+  e:"Dżodżo uczy się francuskiego od kolegów — niestety tylko obraźliwych słów, które potem powtarza z dumą." },
+{ k:3, q:"Kto krzyczy w piwnicy: „Uuu... jestem duch!”?", a:["Rufus","Euzebiusz","Alcest","Gotfryd"], c:0,
+  e:"Rufus zakłada na głowę stary worek i straszy kolegów. Pani zdejmuje mu worek, gdy wszyscy są już umorusani." },
+{ k:3, q:"Kto mówi: „Zrobimy mu wspaniałą budę, prawdziwy pałac”?", a:["Tata Mikołajka","Pan Bledurt","Dyrektor","Woźny"], c:0,
+  e:"Tata obiecuje synowi wspaniałą budę dla Reksa — zanim jeszcze okaże się, że pies ma innego właściciela." },
+{ k:3, q:"Kto się chwali: „Wiem, jak trzeba rozmawiać z dziećmi. Wszystko pójdzie jak z płatka”?", a:["Fotograf","Inspektor","Rosół","Dyrektor"], c:0,
+  e:"Fotograf zapewnia, że świetnie rozumie dzieci — i po wielu próbach po prostu odchodzi bez zdjęcia." },
+{ k:3, q:"Co oznacza zdanie Mikołajka: „pysznieśmy się bawili”?", a:["To dziecięce przekręcenie — chodzi o to, że świetnie się bawili","Że jedli coś pysznego","Że bawili się w kuchni","Że zabawa była zakazana"], c:0,
+  e:"Dziecięca składnia i neologizmy („pysznieśmy”, „najmilsza pamiątka”) budują język narratora i jego wiarygodność." },
+{ k:3, q:"Jakie znaczenie ma tytuł „Mikołajek”?", a:["To po prostu imię głównego bohatera i narratora","To nazwa szkoły","To przezwisko nauczycielki","To tytuł pierwszego opowiadania"], c:0,
+  e:"Tytuł wskazuje na głównego bohatera i narratora — cały świat przedstawiony oglądamy jego oczami." },
+{ k:3, q:"Dlaczego czytelnik rozumie reakcje dorosłych lepiej niż Mikołajek?", a:["Bo autor pokazał wcześniej szczegóły, których dziecko nie łączy w całość","Bo czytelnik widzi ilustracje","Bo tekst jest napisany w trzeciej osobie","Bo dorośli tłumaczą się na końcu"], c:0,
+  e:"Mikołajek opisuje zdarzenia bez dorosłego komentarza. Czytelnik łączy szczegóły i widzi przyczynę zdenerwowania, której chłopiec nie dostrzega." },
+{ k:3, q:"Jak narrator ocenia własne zachowanie?", a:["Usprawiedliwia je i uważa, że dorośli niesłusznie się złoszczą","Zawsze się obwinia","Nie opisuje własnych zachowań","Ocenia je jak dorosły"], c:0,
+  e:"Mikołajek jest szczery, ale stronniczy wobec siebie — to dodatkowe źródło humoru i realizmu narracji." },
+{ k:3, q:"Co jest najczęstszym schematem kompozycyjnym opowiadań?", a:["Zwykły pomysł przeradza się w chaos, a puenta odwraca oczekiwania","Zagadka zostaje rozwiązana przez detektywa","Bohater podróżuje po świecie","Sen zmienia rzeczywistość"], c:0,
+  e:"Prosty plan (zdjęcie, mecz, występ) → seria reakcji bohaterów → komiczna puenta. Ten mechanizm powtarza się w całym tomie." },
+{ k:3, q:"Jaką funkcję pełni w lekturze postać nauczycielki?", a:["Próbuje utrzymać porządek, często bezskutecznie, ale jest lubiana","Jest głównym antagonistą","W ogóle nie pojawia się w akcji","Uczy tylko arytmetyki"], c:0,
+  e:"Uczniowie ją lubią („jest strasznie miła, kiedy jej nie denerwujemy”), choć ciągle musi ich uciszać i karać." },
+{ k:3, q:"Który element świata przedstawionego jest w lekturze najbardziej „dorosły”, a jednocześnie ośmieszony?", a:["System uwag i kar szkolnych","Podróże pociągiem","Polityka","handel"], c:0,
+  e:"Uwagi, linijki, odsiadki i wizyta inspektora to powaga szkoły — którą dziecięca energia nieustannie rozbraja." },
+{ k:3, q:"Dlaczego historyjka o dwóch głuchych jest zabawna w kontekście całej sceny?", a:["Bo tylko inspektor się z niej śmieje, a klasa musi milczeć","Bo opowiada ją uczeń","Bo dotyczy ryb","Bo powtarza ją Alcest"], c:0,
+  e:"Komiczny jest kontrast: dorosły próbuje rozluźnić atmosferę, a dzieci nie mogą się śmiać bez pozwolenia." },
+{ k:3, q:"Co łączy postacie pana Bledurta i pana Bordenave’a?", a:["Obaj są dorosłymi, którzy mimowolnie stają się uczestnikami dziecięcych zabaw","Obaj są nauczycielami","Obaj są policjantami","Obaj pracują w szkole"], c:0,
+  e:"Sąsiad i opiekun boiska zostają wciągnięci w zabawy chłopców i ponoszą ich skutki — to typowy mechanizm komiczny lektury." },
+{ k:3, q:"Jaki obraz szkoły wyłania się z lektury?", a:["Miejsca pełnego energii, rywalizacji i drobnych buntów, ale też lubianego","Miejsca grozy i strachu","Miejsca zupełnie obojętnego bohaterom","Miejsca, gdzie nikt nie przestrzega żadnych zasad"], c:0,
+  e:"Szkoła to przestrzeń chaosu, ale też przyjaźni i codziennych rytuałów: lekcje, przerwy, uwagi, występy." },
+{ k:3, q:"Dlaczego autor oddaje narrację dziecku, a nie dorosłemu?", a:["Aby uzyskać humor i szczerość spojrzenia bez dorosłej oceny","Aby ułatwić czytanie młodszym","Aby ukryć autora","Aby uniknąć opisów"], c:0,
+  e:"Dziecięca narracja daje bezpośredniość i humor oparty na niedopowiedzeniu: czytelnik widzi więcej niż bohater." },
+{ k:3, q:"Co w lekturze jest źródłem komizmu sytuacyjnego?", a:["Drobne zdarzenia wymykające się spod kontroli (zdjęcie, mecz, wizyta ministra)","Zagadki kryminalne","Podróże w czasie","Piosenki"], c:0,
+  e:"Wystarczy zwykły pomysł i kilka wyrazistych charakterów, by sytuacja wymknęła się spod kontroli — to komizm sytuacyjny." },
+{ k:3, q:"Dlaczego Mikołajek uważa, że dorośli „bez powodu” się złoszczą?", a:["Bo nie rozumie ich perspektywy i nie łączy przyczyn ze skutkami","Bo dorośli ukrywają prawdę","Bo jest złośliwy","Bo nie zna języka"], c:0,
+  e:"To klasyczny efekt narratora-dziecka: czytelnik widzi przyczynę (np. zniszczony fotel), a bohater tylko zdziwienie dorosłego." },
+{ k:3, q:"Jaką rolę pełni w opowiadaniach powtarzalność (te same cechy bohaterów, te same miejsca)?", a:["Pozwala czytelnikowi przewidywać reakcje i śmiać się z ich zderzenia","Jest błędem kompozycyjnym","Świadczy o braku pomysłów","Służy tylko ilustratorowi"], c:0,
+  e:"Powtarzalność nie nudzi, bo zmieniają się szczegóły i kombinacje charakterów — to sprawdzony mechanizm serialu komediowego." },
+{ k:3, q:"Jakim porównaniem Mikołajek opisuje głowę Kleofasa po bójce bukietem?", a:["Jak sztuka mięsa z włoszczyzną","Jak kosz pełen owoców","Jak choinka","Jak wazon"], c:0,
+  e:"Głowa Kleofasa pokryta zielonymi liśćmi przypomina narratorowi „sztukę mięsa z włoszczyzną” — to komizm oparty na dziecięcym skojarzeniu." },
+{ k:3, q:"Jakie przezwiska tworzą bohaterowie lektury?", a:["Rosół, Dżodżo, Dżoachim — na podstawie skojarzeń i wymowy","Tylko przydomki zwierzęce","Przezwiska wymyślone przez nauczycielkę","Bohaterowie nie używają przezwisk"], c:0,
+  e:"Dziecięce przezwiska: Rosół (od „oka” w rosole), Dżodżo (od Dżordż), Dżoachim — pokazują językowe poczucie humoru klasy." },
+{ k:3, q:"Po co w opowieści pojawiają się krótkie, rzeczowe tytuły opowiadań?", a:["Zapowiadają główne zdarzenie, np. „Futbol”, „Rower”, „Reks”","Są cytatami z tekstu","Zawsze są dłuższe niż opowiadanie","Wskazują imię narratora"], c:0,
+  e:"Tytuły są sygnałem, czego dotyczy historia — ułatwiają zapamiętanie i pełnią funkcję porządkującą." },
+{ k:3, q:"Jakie emocje najczęściej towarzyszą Mikołajkowi?", a:["Radość, duma, wstyd, rozczarowanie i złość — bardzo intensywne","Tylko smutek","Obojętność","Wyłącznie strach"], c:0,
+  e:"Narrator przeżywa wszystko bardzo mocno: cieszy się z kowbojów, wstydzi się cygara, rozpacza nad bukietem — emocje są proporcjonalne do dziecięcej perspektywy." },
+{ k:3, q:"Dlaczego w lekturze można mówić o „komizmie języka”?", a:["Bo narrator używa neologizmów i przekręca słowa, np. „pysznieśmy się bawili”","Bo bohaterowie mówią po francusku","Bo tekst jest pisany wierszem","Bo występują archaizmy"], c:0,
+  e:"Dziecięca składnia, neologizmy i dosłowne rozumienie poleceń to źródło komizmu językowego." },
+{ k:3, q:"Jaką prawdę o dorosłych odkrywa czytelnik dzięki narracji dziecka?", a:["Że dorośli też bywają nieporadni, zmęczeni i emocjonalni","Że dorośli zawsze mają rację","Że dorośli nie interesują się dziećmi","Że dorośli nigdy się nie mylą"], c:0,
+  e:"Tata psuje rower, inspektor brudzi się atramentem, Rosół traci panowanie — dorosły świat nie jest doskonały, a to zbliża go do dzieci." },
+];
+
+/* =========================================================
+   LOGIKA TESTU
+   ========================================================= */
+const SET = [9, 9, 10, 7];            // ile pytań z każdego klastra na jeden test
+const TITLES = ["Autor, narrator i świat przedstawiony",
+                "Paczka Mikołajka – bohaterowie",
+                "Co się wydarzyło – opowiadania",
+                "Język, humor i przesłanie"];
+const HINTS = ["Metryczka lektury, narrator, czas i miejsce akcji, budowa tomu.",
+               "Bohaterowie i ich jedna, rozpoznawalna cecha.",
+               "Rozpoznawanie opowiadań po scenach, szczegółach i puentach.",
+               "Narracja, komizm, cytaty, motywy i sens lektury."];
+
+const LETTERS = ["A","B","C","D"];
+const SEEN_KEY = "mikolajek_seen_v2";
+const clustersEl = document.getElementById("clusters");
+const pbar = document.getElementById("pbar");
+const sDone = document.getElementById("sDone");
+const sPts = document.getElementById("sPts");
+const totQEl = document.getElementById("totQ");
+
+let questions = [];       // aktualny zestaw (z klastrem i przetasowanymi odpowiedziami)
+let answered = new Map(); // index pytania -> {correct}
+let totalQ = 0;
+
+const shuffle = arr => {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+const uniq = a => [...new Set(a)];
+
+function loadSeen(){
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "[]"); } catch(e){ return []; }
+}
+function saveSeen(list){
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(list.slice(-4000))); } catch(e){}
+}
+const idOf = p => p.k + "|" + p.q;
+
+function buildSet(){
+  const seen = loadSeen();
+  questions = [];
+  SET.forEach((n, k) => {
+    const pool = POOL.filter(p => p.k === k);
+    const fresh = pool.filter(p => !seen.includes(idOf(p)));
+    const old = pool.filter(p => seen.includes(idOf(p)));
+    // najpierw niewidziane, potem najdawniej widziane — zawsze losowo
+    const chosen = [...shuffle(fresh), ...shuffle(old)].slice(0, Math.min(n, pool.length));
+    chosen.forEach(p => {
+      const opts = shuffle(p.a.map((txt, i) => ({txt, ok: i === p.c})));
+      questions.push({k, q:p.q, opts, e:p.e, id:idOf(p)});
+    });
+  });
+  // zapisz jako widziane
+  saveSeen(uniq([...seen, ...questions.map(q => q.id)]));
+}
+
+let order = [];
+function render(){
+  clustersEl.innerHTML = "";
+  // losowa kolejność klastrów w zestawie (numery klastrów stałe, kolejność inna)
+  order = shuffle(SET.map((_, i) => i));
+  totalQ = questions.length;
+  totQEl.textContent = totalQ;
+  document.getElementById("mSet").textContent = "Zestaw: " + totalQ + " pytań";
+  document.getElementById("mPool").textContent = "Pula: " + POOL.length + " pytań";
+
+  let idx = 0;
+  order.forEach(k => {
+    const group = questions.filter(q => q.k === k);
+    if (!group.length) return;
+    const sec = document.createElement("section");
+    sec.className = "cluster";
+    sec.dataset.k = k;
+    sec.innerHTML = `<div class="cluster-head">
+        <div class="badge">${k+1}</div>
+        <div><h2>Klaster ${k+1}: ${TITLES[k]}</h2>
+        <p class="hint">${HINTS[k]} · ${group.length} pytań w tym zestawie</p></div>
+      </div>`;
+
+    group.forEach((item, qi) => {
+      const card = document.createElement("article");
+      card.className = "q";
+      const top = document.createElement("div");
+      top.className = "q-top";
+      top.innerHTML = `<span class="num">${qi+1}</span><p class="q-text">${item.q}</p>`;
+      card.appendChild(top);
+
+      const wrap = document.createElement("div");
+      wrap.className = "answers";
+
+      const fb = document.createElement("div");
+      fb.className = "fb";
+
+      const correctText = item.opts.find(o => o.ok).txt;
+
+      item.opts.forEach((opt, ai) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ans";
+        b.innerHTML = `<span class="letter">${LETTERS[ai]}</span><span>${opt.txt}</span>`;
+        b.addEventListener("click", () => {
+          if (answered.has(item.id + "#" + idx)) return;
+          answered.set(item.id + "#" + idx, opt.ok);
+          card.classList.add("done", opt.ok ? "correct" : "wrong");
+          wrap.querySelectorAll(".ans").forEach((el, ei) => {
+            el.disabled = true;
+            if (item.opts[ei].ok) el.classList.add("reveal");
+            else if (ei === ai) el.classList.add("chosen-bad");
+            else el.classList.add("faded");
+          });
+          if (opt.ok) { b.classList.remove("reveal"); b.classList.add("chosen-ok"); }
+          fb.classList.add("show");
+          if (!opt.ok) {
+            fb.classList.add("bad");
+            fb.querySelector("b").textContent = "Niepoprawnie — poprawna odpowiedź: " + correctText;
+          } else {
+            fb.querySelector("b").textContent = "Dobrze!";
+          }
+          update();
+        });
+        wrap.appendChild(b);
+      });
+
+      fb.innerHTML = "<b>Wyjaśnienie</b>" + item.e;
+      card.appendChild(wrap);
+      card.appendChild(fb);
+      sec.appendChild(card);
+      idx++;
+    });
+    clustersEl.appendChild(sec);
+  });
+}
+
+function update(){
+  let pts = 0;
+  answered.forEach(v => { if (v) pts++; });
+  const done = answered.size;
+  sDone.textContent = done;
+  sPts.textContent = pts;
+  pbar.style.width = (done / totalQ * 100) + "%";
+  document.getElementById("summary").hidden = done < totalQ;
+  if (done === totalQ) showSummary(pts);
+}
+
+function gradeFor(pct){
+  if (pct >= 95) return ["6","celująco"];
+  if (pct >= 85) return ["5","bardzo dobrze"];
+  if (pct >= 70) return ["4","dobrze"];
+  if (pct >= 50) return ["3","dostatecznie"];
+  if (pct >= 30) return ["2","dopuszczająco"];
+  return ["1","niedostatecznie"];
+}
+
+function showSummary(pts){
+  const pct = Math.round(pts / totalQ * 100);
+  document.getElementById("ring").style.setProperty("--p", pct);
+  document.getElementById("ringTxt").innerHTML = pts + "/" + totalQ + "<small>" + pct + "%</small>";
+  const [g, desc] = gradeFor(pct);
+  document.getElementById("gradeBox").innerHTML =
+    "Ocena orientacyjna: <b>" + g + "</b><span style='color:var(--muted);font-size:.9rem'>" + desc + " · " + pct + "%</span>";
+
+  const body = document.getElementById("perBody");
+  body.innerHTML = "";
+  const per = TITLES.map(() => ({d:0, p:0, n:0}));
+  questions.forEach(q => { per[q.k].n++; });
+  // policz punkty klaster po klastrze
+  answered.forEach((ok, key) => {
+    const idx = Number(key.split("#")[1]);
+    per[questions[idx].k].d++;
+    if (ok) per[questions[idx].k].p++;
+  });
+  per.forEach((v, k) => {
+    if (!v.n) return;
+    const p = Math.round(v.p / v.n * 100);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><strong>${k+1}. ${TITLES[k]}</strong></td>
+      <td><div class="mini"><i style="width:${p}%"></i></div></td>
+      <td>${v.p}/${v.n}</td>`;
+    body.appendChild(tr);
+  });
+
+  const weak = per.map((v,k)=>({k, pct: v.n ? v.p/v.n : 1})).sort((a,b)=>a.pct-b.pct)[0];
+  document.getElementById("summaryHint").textContent = weak.pct < 0.7
+    ? "Najwięcej do powtórzenia: „" + TITLES[weak.k] + "”. Przeczytaj jeszcze raz wyjaśnienia przy błędnych odpowiedziach."
+    : "Bardzo równy wynik we wszystkich klastrach — lekturę znasz solidnie.";
+}
+
+function startNew(){
+  answered = new Map();
+  document.getElementById("summary").hidden = true;
+  buildSet();
+  render();
+  update();
+}
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  startNew();
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+document.getElementById("againBtn").addEventListener("click", () => {
+  startNew();
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+
+startNew();
+</script>
+</body>
+</html>
