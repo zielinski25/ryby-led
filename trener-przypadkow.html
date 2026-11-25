@@ -249,6 +249,18 @@ table.t td{padding:10px;border-bottom:1px solid #f1f5f9;font-weight:700}
 table.t tr:last-child td{border-bottom:0}
 .tag{font-size:11px;font-weight:900;padding:3px 9px;border-radius:999px;background:#eef2ff;color:#3345c9}
 
+/* hard-mode: karta "jak w szkole" */
+.nudecard{display:grid;gap:12px;align-content:start}
+.casecell{background:linear-gradient(160deg,#f8fafc,#eef2f9);border:1.5px solid #e3e9f2;border-radius:14px;padding:13px 15px}
+.casecell .cap{font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)}
+.casecell .big{font-size:18px;font-weight:900;margin-top:3px}
+.casecell .sub{font-size:12px;color:var(--ink2);font-weight:700;margin-top:2px}
+.wformbox{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px}
+.wformbox input{flex:1;min-width:150px;font-size:20px;font-weight:800;padding:13px 15px}
+.nogap{color:#b45309;font-weight:800;font-size:12.5px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:7px 11px;margin-top:8px;display:inline-block}
+.lvlpill-easy{background:#dcfce7;color:#15803d}
+.lvlpill-hard{background:#fee2e2;color:#b91c1c}
+
 /* goal */
 .goalbox{display:grid;gap:10px}
 .goalopt{display:flex;align-items:center;gap:10px;border:2px solid var(--line);border-radius:14px;padding:11px 14px;cursor:pointer;background:#fff;font-weight:800;font-size:14px;transition:.12s}
@@ -312,6 +324,7 @@ table.t tr:last-child td{border-bottom:0}
         <span class="chip">🔥 Seria: <b id="chipStreak">0 dni</b></span>
         <span class="chip">⭐ Poziom <b id="chipLevel">1</b></span>
         <span class="chip">🎖️ <b id="chipBadges">0</b>/12</span>
+        <button class="chip" id="btnHardChip" title="Kliknij: trening zadań trudnych" style="cursor:pointer;border-color:rgba(255,255,255,.35)">🔥 Trudne: <b id="chipHard">—</b></button>
         <button class="chip" id="btnReport" style="cursor:pointer;border-color:rgba(255,255,255,.35)">📄 Raport</button>
       </div>
     </div>
@@ -395,6 +408,31 @@ table.t tr:last-child td{border-bottom:0}
     </div>
 
     <div class="sec-title">
+      <h2>Wybierz poziom</h2>
+      <span class="hint">łatwe = z podpowiedziami • trudne = tylko przypadek + liczba</span>
+    </div>
+    <div class="grid g2">
+      <div class="card" style="border:2px solid #bbf7d0">
+        <div class="row"><span class="ico" style="background:#f0fdf4;color:#15803d;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px">🙂</span>
+          <div style="flex:1"><div style="font-weight:900;font-size:16px">Poziom łatwy</div>
+          <div class="muted small">Z podpowiedziami: „komu? czemu?”, zdania, wybór formy</div></div></div>
+        <div class="row" style="margin-top:12px;gap:8px">
+          <span class="tag" id="easyPct">—</span><span class="muted small" id="easyInfo"></span>
+        </div>
+        <button class="btn green block" style="margin-top:12px" data-start-lvl="easy">▶ Ćwicz łatwe</button>
+      </div>
+      <div class="card" style="border:2px solid #fecaca">
+        <div class="row"><span class="ico" style="background:#fef2f2;color:#b91c1c;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px">🔥</span>
+          <div style="flex:1"><div style="font-weight:900;font-size:16px">Poziom trudny <span class="tag lvlpill-hard" style="font-size:10px">level wyżej</span></div>
+          <div class="muted small">Tylko „liczba pojedyncza, dopełniacz” → podaj formę. Zero podpowiedzi.</div></div></div>
+        <div class="row" style="margin-top:12px;gap:8px">
+          <span class="tag" id="hardPct">—</span><span class="muted small" id="hardInfo"></span>
+        </div>
+        <button class="btn block" style="margin-top:12px;background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;box-shadow:0 10px 24px rgba(239,68,68,.28)" data-start-lvl="hard">🔥 Ćwicz trudne</button>
+      </div>
+    </div>
+
+    <div class="sec-title">
       <h2>Plan na dziś</h2>
       <span class="hint">3 kroki — po kolei</span>
     </div>
@@ -448,7 +486,12 @@ table.t tr:last-child td{border-bottom:0}
             </div>
           </div>
           <div>
-            <label class="fld">Liczba pytań</label>
+            <label class="fld">Poziom trudności</label>
+            <div class="opts" id="lvlOpts" style="margin-top:0;grid-template-columns:1fr 1fr">
+              <button class="opt sel" data-lvl="easy">🙂 <span>Łatwy<small class="muted" style="display:block;font-weight:600">z podpowiedziami</small></span></button>
+              <button class="opt" data-lvl="hard">🔥 <span>Trudny<small class="muted" style="display:block;font-weight:600">bez podpowiedzi, na formę</small></span></button>
+            </div>
+            <label class="fld" style="margin-top:16px">Liczba pytań</label>
             <div class="opts" id="countOpts" style="margin-top:0;grid-template-columns:1fr 1fr">
               <button class="opt" data-count="10">10</button>
               <button class="opt sel" data-count="20">20</button>
@@ -491,6 +534,7 @@ table.t tr:last-child td{border-bottom:0}
           <span class="pill" id="qpNum">Pytanie 1/20</span>
           <span class="pill case" id="qpCase">mianownik</span>
           <span class="pill" id="qpType" style="background:#f5f3ff;color:#6d28d9">uzupełnij</span>
+          <span class="pill lvlpill-easy" id="qpLevel">🙂 łatwy</span>
           <span class="timer" id="qTimer">⏱ 0:00</span>
           <div class="spacer"></div>
           <button class="btn ghost sm" id="btnQuit">✕ Przerwij</button>
@@ -575,6 +619,24 @@ table.t tr:last-child td{border-bottom:0}
     <div class="sec-title"><h2>Szczegóły po przypadkach</h2><span class="hint">kliknij „trenuj”, aby ćwiczyć wybrany</span></div>
     <div class="card" style="overflow-x:auto">
       <table class="t" id="caseTable"></table>
+    </div>
+
+    <div class="sec-title"><h2>Poziom łatwy vs trudny</h2><span class="hint">trudne = bez podpowiedzi</span></div>
+    <div class="card">
+      <div class="grid g2">
+        <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:14px">
+          <div style="font-weight:900;font-size:15px">🙂 Łatwy</div>
+          <div style="font-size:30px;font-weight:900;margin:4px 0" id="lvlEasyBig">—</div>
+          <div class="muted small" id="lvlEasySub">brak danych</div>
+        </div>
+        <div style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:14px;padding:14px">
+          <div style="font-weight:900;font-size:15px">🔥 Trudny</div>
+          <div style="font-size:30px;font-weight:900;margin:4px 0" id="lvlHardBig">—</div>
+          <div class="muted small" id="lvlHardSub">brak danych</div>
+        </div>
+      </div>
+      <div id="lvlCompare" style="margin-top:14px"></div>
+      <div id="hardTypes" style="margin-top:14px"></div>
     </div>
 
     <div class="sec-title"><h2>Typy zadań</h2><span class="hint">gdzie tracisz punkty</span></div>
@@ -823,6 +885,7 @@ function blankState(){
     days:{},          // 'YYYY-MM-DD': liczba odpowiedzi
     sessions:[],      // {id,date,mode,items:[{caseId,type,num,ok}],correct,total,grade,secs}
     caseStat:{},      // 'M'|'D'... : {ok,bad}
+    levelStat:{easy:{ok:0,bad:0},hard:{ok:0,bad:0}},
     typeStat:{},      // typ zadania
     rewards:[
       {id:'r1',name:'Ulubiona przekąska 🍫',lvl:2,claimed:false},
@@ -964,10 +1027,41 @@ const TYPES = {
   question:{label:'pytanie', long:'Pytania pomocnicze'},
   decline:{label:'odmiana', long:'Odmiana w tabeli'},
   spelling:{label:'-ę/-e', long:'Pisownia -ę/-e'},
-  tf:{label:'prawda/fałsz', long:'Prawda czy fałsz'}
+  tf:{label:'prawda/fałsz', long:'Prawda czy fałsz'},
+  formfind:{label:'forma', long:'Podaj formę (przypadek + liczba)'},
+  naming:{label:'nazwa', long:'Nazwij przypadek i liczbę formy'},
+  blockfind:{label:'blok', long:'Cała odmiana (sam przypadki)'}
 };
+const HARD_TYPES = ['formfind','naming','blockfind'];
 
 function formOf(noun,num,ci){ return (num==='lp'?noun.lp:noun.lm)[ci]; }
+/* Ile razy dana forma występuje w całej odmianie (7 przypadków × 2 liczby).
+   Jeśli więcej niż raz — pytanie „jaki to przypadek?” byłoby niejednoznaczne. */
+function formOwners(noun, form){
+  const out=[];
+  CASES.forEach((c,i)=>{ ['lp','lm'].forEach(n=>{ if(formOf(noun,n,i)===form) out.push(i+'|'+n); }); });
+  return out;
+}
+function isUniqueForm(noun, form){ return formOwners(noun, form).length===1; }
+/* Szuka rzeczownika+przypadku+liczby, gdzie forma jest jednoznaczna (do pytań „nazwij przypadek”) */
+function pickUniqueTarget(used, minCi){
+  for(let t=0;t<120;t++){
+    const target = drawTarget('auto','all',used);
+    const noun = NOUNS[target.ni];
+    const f = formOf(noun,target.num,target.ci);
+    if(!isUniqueForm(noun,f)) continue;
+    if(minCi && target.ci===0 && target.num==='lp') continue; // mianownik lp = forma podstawowa
+    return target;
+  }
+  // awaryjnie: znajdź pierwszy jednoznaczny
+  for(const noun of shuffle(NOUNS)){
+    for(const num of ['lp','lm']) for(let ci=0;ci<7;ci++){
+      if(ci===0 && num==='lp') continue;
+      if(isUniqueForm(noun, formOf(noun,num,ci))) return {ni:NOUNS.indexOf(noun), num, ci};
+    }
+  }
+  return {ni:0,num:'lm',ci:2};
+}
 function sentFor(ci,num){ const b=SENT[CASES[ci].id]; return pick((b&&b[num])?b[num]:b.lp); }
 
 /* losuj rzeczownik+przypadek+liczbę, preferując słabe punkty w trybie auto */
@@ -1004,8 +1098,132 @@ function drawTarget(mode, scope, used){
   const t0 = pick(pool).t; return t0;
 }
 
+
+/* =========================================================================
+   POZIOM TRUDNY — tylko przypadek + liczba, bez pytań pomocniczych
+   ========================================================================= */
+function caseNoun(ci){ return ci===6?'wołacz':ci===0?'mianownik':CASES[ci].name; }
+function numNoun(num){ return num==='lp'?'liczba pojedyncza':'liczba mnoga'; }
+function caseNo(ci){ return 'przypadek '+(ci+1); }
+
+/* R1: „podaj formę: liczba pojedyncza, dopełniacz” */
+function hardFormFind(target){
+  if(target.ci===0 && target.num==='lp'){ target = {...target, num:'lm'}; }
+  const noun=NOUNS[target.ni], ci=target.ci, num=target.num;
+  const form = formOf(noun,num,ci);
+  const asks = [
+    'Podaj formę: <b>'+numNoun(num)+'</b>, <b>'+caseNoun(ci)+'</b>',
+    '<b>'+numNoun(num)+'</b>, <b>'+caseNoun(ci)+'</b> — jaka to forma?',
+    'Zapisz rzeczownik w liczbie <b>'+(num==='lp'?'pojedynczej':'mnogiej')+'</b> i przypadku <b>'+caseNoun(ci)+'</b>'
+  ];
+  return {
+    type:'formfind', ci, num, level:'hard', noun, caseName:caseNoun(ci),
+    text: pick(asks) + '<div class="casecell" style="margin-top:12px"><div class="cap">rzeczownik</div><div class="big">'+esc(noun.nom)+'</div>'
+      +'<div class="sub">odmień go: '+(num==='lp'?'liczba pojedyncza':'liczba mnoga')+' · '+caseNoun(ci)+'</div></div>',
+    hint:'', answer:form, mode:'text',
+    rule:'<b>'+esc(form)+'</b> — '+caseNoun(ci)+', '+numNoun(num)+'. Pytanie kontrolne: '+CASES[ci].q+' '+CASES[ci].help
+  };
+}
+
+/* R2: „liczba pojedyncza, dopełniacz = uczniowi — prawda czy fałsz?” */
+function hardNaming(target){
+  const noun=NOUNS[target.ni], ci=target.ci, num=target.num;
+  const real = formOf(noun,num,ci);
+  const otherNum = num==='lp'?'lm':'lp';
+  const fakeNum = formOf(noun, otherNum, ci);              // ta sama rola, zła liczba
+  const otherCases = shuffle([0,1,2,3,4,5,6].filter(i=>i!==ci));
+  const fakeCase = formOf(noun, num, otherCases[0]);       // ta sama liczba, inna rola
+  const wrongNum = otherCases.find(i=>formOf(noun,num,i)!==real)!=null;
+
+  // warianty fałszywe, które na pewno różnią się od poprawnej
+  const fakes = [];
+  if(fakeNum!==real) fakes.push({form:fakeNum, why:'Podana forma jest w liczbie <b>'+(otherNum==='lp'?'pojedynczej':'mnogiej')+'</b>, a pytanie było o '+(num==='lp'?'pojedynczą':'mnogą')+'.'});
+  for(const oc of otherCases){
+    const f = formOf(noun,num,oc);
+    if(f!==real && !fakes.some(x=>x.form===f)) fakes.push({form:f, why:'Podana forma jest w <b>'+caseNoun(oc)+'</b>, a pytanie było o <b>'+caseNoun(ci)+'</b>.'});
+  }
+  const makeTrue = Math.random()<0.5 || !fakes.length;
+  const pickFake = fakes.length? pick(fakes) : null;
+  const shown = makeTrue? real : pickFake.form;
+  const isTrue = shown===real;
+  const statement = numNoun(num)+', '+caseNoun(ci)+' = <b>'+esc(shown)+'</b>';
+  return {
+    type:'naming', ci, num, level:'hard', noun, caseName:caseNoun(ci),
+    text:'Prawda czy fałsz?<div class="casecell" style="margin-top:12px"><div class="cap">rzeczownik</div><div class="big">'+esc(noun.nom)+'</div>'
+      +'<div class="sub">'+numNoun(num)+' · '+caseNoun(ci)+'</div></div>'
+      +'<div style="margin-top:12px;font-size:18px">'+statement+'</div>',
+    hint:'', answer:isTrue?'P':'F', mode:'choice', options:['P','F'],
+    optLabels:{P:'P — prawda',F:'F — fałsz'},
+    rule:'Poprawna forma: <b>'+esc(real)+'</b> ('+caseNoun(ci)+', '+numNoun(num)+'). '
+      + (isTrue? 'Zdanie było prawdziwe.' : (pickFake? pickFake.why : 'Podana forma była niepoprawna.'))
+  };
+}
+
+/* R3: podano formę — nazwij przypadek i liczbę (bez pytań pomocniczych) */
+function hardCaseName(target){
+  const noun=NOUNS[target.ni], ci=target.ci, num=target.num;
+  const form=formOf(noun,num,ci);
+  if(!isUniqueForm(noun, form)){
+    // forma pasuje do dwóch przypadków (np. miejscownik = wołacz) — wybierz inną
+    const alt = pickUniqueTarget({}, true);
+    return hardCaseName(alt);
+  }
+  const correct = caseNoun(ci)+', '+numNoun(num);
+  const set=[correct], all=[];
+  CASES.forEach((c,i)=>['lp','lm'].forEach(n=>all.push(caseNoun(i)+', '+numNoun(n))));
+  shuffle(all).forEach(p=>{ if(set.length<3 && !set.includes(p)) set.push(p); });
+  return {
+    type:'naming', ci, num, level:'hard', noun, caseName:caseNoun(ci),
+    text:'Jaki to przypadek i liczba?<div class="casecell" style="margin-top:12px"><div class="cap">forma rzeczownika „'+esc(noun.nom)+'”</div><div class="big" style="font-size:24px">'+esc(form)+'</div></div>',
+    hint:'', answer:correct, mode:'choice', options:shuffle(set),
+    rule:'<b>'+esc(form)+'</b> to '+correct+' (pytanie kontrolne: '+CASES[ci].q+' '+CASES[ci].help+').'
+  };
+}
+
+/* R4: cała odmiana — podane przypadki, bez pytań pomocniczych */
+function hardBlock(target){
+  const noun=NOUNS[target.ni], num=target.num;
+  const forms = num==='lp'?noun.lp:noun.lm;
+  return {
+    type:'blockfind', ci:target.ci, num, level:'hard', noun, forms, caseName:'cała odmiana',
+    text:'Odmień rzeczownik <b>„'+esc(noun.nom)+'”</b> w liczbie <b>'+(num==='lp'?'pojedynczej':'mnogiej')+'</b>.<br><span class="muted small">Kolejność przypadków musisz znać sam — nie ma podpowiedzi.</span>',
+    hint:'', answer:forms.join('|'), mode:'decline',
+    declineNoHints:true,
+    rule:'Poprawnie: '+CASES.map((c,i)=>c.name+' → <b>'+esc(forms[i])+'</b>').join(', ')
+  };
+}
+
+function makeHardQuestion(mode, scope, used, forceType, forceCase){
+  let target;
+  if(forceCase!=null && forceCase>0){
+    // wymuszony przypadek — szukaj jednoznacznej formy w tym przypadku
+    target = null;
+    for(let t=0;t<80;t++){
+      const cand = drawTarget('auto', scope, used);
+      cand.ci = forceCase;
+      const f = formOf(NOUNS[cand.ni], cand.num, forceCase);
+      if(isUniqueForm(NOUNS[cand.ni], f)){ target = cand; break; }
+    }
+    if(!target){ target = drawTarget('auto', scope, used); target.ci = forceCase; }
+  } else {
+    target = pickUniqueTarget(used, true);
+  }
+  let type = forceType;
+  if(!type){
+    const pool = ['formfind','formfind','naming','naming','decline2','blockfind'];
+    type = pick(pool);
+  }
+  if(type==='decline2') return hardCaseName(target);   // nazwij przypadek i liczbę
+  if(type==='formfind') return hardFormFind(target);
+  if(type==='naming') return hardNaming(target);
+  if(type==='blockfind') return hardBlock(target);
+  return hardFormFind(target);
+}
+
 /* Buduje obiekt pytania */
-function makeQuestion(mode, scope, used, hintsOn, forceType, forceCase){
+function makeQuestion(mode, scope, used, hintsOn, forceType, forceCase, level){
+  level = level || 'easy';
+  if(level==='hard') return makeHardQuestion(mode, scope, used, forceType, forceCase);
   const target = drawTarget(mode, scope, used);
   if(forceCase!=null) target.ci = forceCase;
   const noun = NOUNS[target.ni], ci=target.ci, num=target.num;
@@ -1164,7 +1382,7 @@ const MODES = {
   weak:{label:'Słabe punkty', n:20},
   drill:{label:'Trening celowany', n:10}
 };
-let setup = {mode:'auto', count:20, scope:'all', hints:'on'};
+let setup = {mode:'auto', count:20, scope:'all', hints:'on', level:'easy'};
 
 function resetTrainSetup(){
   $('#trainSetup').classList.remove('hide');
@@ -1174,13 +1392,14 @@ function resetTrainSetup(){
   renderGoInfo();
 }
 function renderGoInfo(){
-  const weakCount = CASES.filter((c,i)=>{const m=statForCase(i); return m.p!==null && m.p<70 && m.n>=3;}).length;
-  $('#goInfo').innerHTML = MODES[setup.mode].label+' • '+setup.count+' pytań • '+
-    (setup.scope==='all'?'wszystkie przypadki':setup.scope==='hot'?'słabe punkty':setup.scope==='nom'?'M i W':'D, C, B, N, Ms');
+  $('#goInfo').innerHTML = MODES[setup.mode].label+' • '+setup.count+' pytań • '
+    + (setup.level==='hard'?'🔥 <b>poziom trudny</b>':'🙂 poziom łatwy') + ' • '
+    + (setup.scope==='all'?'wszystkie przypadki':setup.scope==='hot'?'słabe punkty':setup.scope==='nom'?'M i W':'D, C, B, N, Ms');
 }
 function renderAdvice(){
   const weak = [];
   CASES.forEach((c,i)=>{ const m=statForCase(i); if(m.n>=3 && m.p<75) weak.push({name:c.name,p:m.p}); });
+  weak.sort((a,b)=>a.p-b.p);
   const el=$('#adviceText');
   if(!weak.length){
     const tot=allAnswers();
@@ -1199,13 +1418,20 @@ $$('#modeOpts .opt').forEach(b=>b.onclick=()=>{
   if(setup.mode==='learn'){ setup.count=10; $$('#countOpts .opt').forEach(x=>x.classList.toggle('sel',x.dataset.count==='10')); }
   renderGoInfo();
 });
+$$('#lvlOpts .opt').forEach(b=>b.onclick=()=>{
+  $$('#lvlOpts .opt').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); setup.level=b.dataset.lvl;
+  // poziom trudny = bez podpowiedzi (wymuszone)
+  $('#hintSel').disabled = (setup.level==='hard');
+  renderGoInfo();
+});
 $$('#countOpts .opt').forEach(b=>b.onclick=()=>{
   $$('#countOpts .opt').forEach(x=>x.classList.remove('sel'));
   b.classList.add('sel'); setup.count=+b.dataset.count; renderGoInfo();
 });
 $('#scopeSel').onchange=e=>{ setup.scope=e.target.value; renderGoInfo(); };
 $('#hintSel').onchange=e=>{ setup.hints=e.target.value; renderGoInfo(); };
-$('#btnGo').onclick=()=>startQuiz(setup.mode, setup.count, setup.scope, setup.hints==='on');
+$('#btnGo').onclick=()=>startQuiz(setup.mode, setup.count, setup.scope, setup.level==='hard'?false:(setup.hints==='on'), setup.level);
 $('#btnStartRec').onclick=()=>{ go('train'); setTimeout(()=>startQuiz('auto',20,'all',true),150); };
 $('#btnDiag').onclick=()=>{ go('train'); setTimeout(()=>startQuiz('mix',30,'all',false),150); };
 $('#btnTrainWeak').onclick=()=>{
@@ -1214,11 +1440,12 @@ $('#btnTrainWeak').onclick=()=>{
   if(!weak){ toast('🎉','Nie ma słabych punktów — zrób sprawdzian!'); go('train'); return; }
   go('train'); setTimeout(()=>drillCase(weak.i,10),120); };
 
-function startCustom(questions, label, hintsOn){
+function startCustom(questions, label, hintsOn, level){
   if(!questions.length){ toast('⚠️','Nie udało się przygotować zadań'); return; }
   FINISHED = false;
-  QUIZ = {mode:'drill', scope:'all', hintsOn:!!hintsOn, questions, i:0, results:[], started:Date.now(), answered:false, label};
-  LASTQUIZ = {mode:'drill', n:questions.length, scope:'all', hintsOn:!!hintsOn, label};
+  level = level || (questions[0] && questions[0].level) || 'easy';
+  QUIZ = {mode:'drill', scope:'all', hintsOn:!!hintsOn, level, questions, i:0, results:[], started:Date.now(), answered:false, label};
+  LASTQUIZ = {mode:'drill', n:questions.length, scope:'all', hintsOn:!!hintsOn, label, level};
   $('#trainSetup').classList.add('hide');
   $('#trainResult').classList.add('hide');
   $('#trainQuiz').classList.remove('hide');
@@ -1226,39 +1453,47 @@ function startCustom(questions, label, hintsOn){
   renderQuestion();
   window.scrollTo({top:0,behavior:'smooth'});
 }
-function drillCase(ci, n){
+function drillCase(ci, n, level){
   const used={}, qs=[]; let guard=0;
+  level = level || 'easy';
   while(qs.length<(n||10) && guard<(n||10)*40){
     guard++;
-    qs.push(makeQuestion('drill','all',used,true,null,ci));
+    qs.push(makeQuestion('drill','all',used, level!=='hard', null, ci, level));
   }
-  startCustom(qs, 'Trening: '+CASES[ci].name, true);
+  startCustom(qs, 'Trening: '+CASES[ci].name+(level==='hard'?' 🔥':''), level!=='hard', level);
 }
-function drillType(type, n){
+function drillType(type, n, level){
   const used={}, qs=[]; let guard=0;
+  level = level || 'easy';
   while(qs.length<(n||10) && guard<(n||10)*40){
     guard++;
-    qs.push(makeQuestion('drill','all',used,true,type,null));
+    qs.push(makeQuestion('drill','all',used, level!=='hard', type, null, level));
   }
-  startCustom(qs, 'Trening: '+(TYPES[type]?TYPES[type].long:type), true);
+  startCustom(qs, 'Trening: '+(TYPES[type]?TYPES[type].long:type), level!=='hard', level);
 }
 function startExam(){
   const used={}, qs=[];
-  while(qs.length<20) qs.push(makeQuestion('exam','all',used,false));
-  startCustom(qs,'Sprawdzian na ocenę',false);
+  while(qs.length<20) qs.push(makeQuestion('exam','all',used,false,null,null,'easy'));
+  startCustom(qs,'Sprawdzian na ocenę',false,'easy');
 }
-function startQuiz(mode, count, scope, hintsOn){
+function startHardExam(){
+  const used={}, qs=[];
+  while(qs.length<20) qs.push(makeQuestion('hard','all',used,false,null,null,'hard'));
+  startCustom(qs,'🔥 Sprawdzian TRUDNY',false,'hard');
+}
+function startQuiz(mode, count, scope, hintsOn, level){
   FINISHED = false;
+  level = level || 'easy';
   const used={};
   const questions=[];
   const N = mode==='exam'?20:count;
   let guard=0;
   while(questions.length<N && guard<N*30){
     guard++;
-    const q = makeQuestion(mode, scope, used, hintsOn);
+    const q = makeQuestion(mode, scope, used, hintsOn, null, null, level);
     questions.push(q);
   }
-  QUIZ = {mode, scope, hintsOn, questions, i:0, results:[], started:Date.now(), answered:false};
+  QUIZ = {mode, scope, hintsOn, level, questions, i:0, results:[], started:Date.now(), answered:false};
   startTimer();
   $('#trainSetup').classList.add('hide');
   $('#trainResult').classList.add('hide');
@@ -1275,10 +1510,17 @@ function renderQuestion(){
   $('#qpCase').textContent = q.caseName;
   $('#qpCase').style.background = c.color;
   $('#qpType').textContent = TYPES[q.type]?TYPES[q.type].label:q.type;
+  const lvlPill = document.getElementById('qpLevel');
+  if(lvlPill){
+    lvlPill.textContent = (q.level==='hard')?'🔥 trudny':'🙂 łatwy';
+    lvlPill.className = 'pill '+((q.level==='hard')?'lvlpill-hard':'lvlpill-easy');
+  }
   $('#qProg').style.width = Math.round(QUIZ.i/QUIZ.questions.length*100)+'%';
   $('#qText').innerHTML = q.text;
   $('#qHint').innerHTML = q.hint||'';
-  $('#qHint').classList.toggle('hide', !q.hint);
+  $('#qHint').classList.toggle('hide', !q.hint || q.level==='hard');
+  // na poziomie trudnym karta ma wyglądać „jak w szkole” — bez podpowiedzi
+  $('#qHint').style.display = (q.level==='hard') ? 'none' : '';
   $('#qFb').innerHTML='';
 
   const body = $('#qBody');
@@ -1301,13 +1543,16 @@ function renderQuestion(){
       inp.focus(); inp.selectionStart=inp.selectionEnd=p+1;
     });
   } else if(q.mode==='decline'){
-    body.innerHTML = '<table class="t"><tr><th>Przypadek</th><th>Pytanie</th><th>Forma</th></tr>'
+    const noHints = !!q.declineNoHints;
+    body.innerHTML = '<table class="t"><tr><th>'+(noHints?'Lp.':'Przypadek')+'</th>'+(noHints?'':'<th>Pytanie</th>')+'<th>Forma</th></tr>'
       + CASES.map((cc,i)=>{
         const cell = i===0
           ? '<b>'+esc(q.forms[0])+'</b>'
           : '<input type="text" data-d="'+i+'" placeholder="…" autocomplete="off" style="padding:8px 10px">';
-        return '<tr><td><b>'+cc.name+'</b></td><td class="muted small">'+cc.q+'</td><td>'+cell+'</td></tr>';
+        const label = noHints? ('przypadek '+(i+1)) : ('<b>'+cc.name+'</b>');
+        return '<tr><td>'+label+'</td>'+(noHints?'':'<td class="muted small">'+cc.q+'</td>')+'<td>'+cell+'</td></tr>';
       }).join('')+'</table>'
+      + (noHints? '<p class="nogap">🔥 Bez podpowiedzi: pamiętaj kolejność M – D – C – B – N – Ms – W</p>' : '')
       +'<div class="fbbar" style="justify-content:flex-start"><button class="btn primary sm" id="btnDeclOk">Sprawdź odmianę</button></div>';
     $('#btnDeclOk').onclick=answerDecline;
     const first=body.querySelector('[data-d="1"]'); if(first) first.focus();
@@ -1335,6 +1580,7 @@ function record(ok, q){
   QUIZ.results.push({ci:q.ci, num:q.num, type:q.type, ok, caseName:q.caseName});
   if(q.ci>=0){ pushStat('c'+q.ci, ok); pushStat('n'+q.ci+q.num, ok); }
   pushStatType(q.type, ok);
+  pushStatLevel(q.level||'easy', ok);
 }
 function pushStat(key, ok){
   const o = S.caseStat[key] || (S.caseStat[key]={ok:0,bad:0});
@@ -1344,6 +1590,12 @@ function pushStatType(t, ok){
   const o = S.typeStat[t] || (S.typeStat[t]={ok:0,bad:0});
   if(ok) o.ok++; else o.bad++;
 }
+function pushStatLevel(lvl, ok){
+  if(!S.levelStat) S.levelStat={};
+  const o = S.levelStat[lvl] || (S.levelStat[lvl]={ok:0,bad:0});
+  if(ok) o.ok++; else o.bad++;
+}
+function statForLevel(lvl){ return mastery((S.levelStat||{})[lvl]||{}); }
 
 function answerChoice(val, btnEl){
   if(QUIZ.answered) return;
@@ -1402,17 +1654,19 @@ $('#btnAgain').onclick=()=>{
   const L=LASTQUIZ; if(!L) return;
   if(L.mode==='drill' && L.label && L.label.indexOf('Trening: ')!==0){ startCustom(buildDrillQuestions(L), L.label, L.hintsOn); return; }
   if(L.mode==='drill'){ startCustom(buildDrillQuestions(L), L.label, L.hintsOn); return; }
-  startQuiz(L.mode, L.n, L.scope, L.hintsOn);
+  startQuiz(L.mode, L.n, L.scope, L.hintsOn, L.level);
 };
 function buildDrillQuestions(L){
   // odtwórz podobny zestaw na podstawie etykiety
   const out=[]; const used={};
   const cname = (L.label||'').replace('Trening: ','');
-  const ci = CASES.findIndex(c=>c.name===cname);
-  if(ci>=0){ while(out.length<L.n) out.push(makeQuestion('drill','all',used,true,null,ci)); return out; }
-  const t = Object.keys(TYPES).find(k=>TYPES[k].long===cname);
-  if(t){ while(out.length<L.n) out.push(makeQuestion('drill','all',used,true,t,null)); return out; }
-  while(out.length<L.n) out.push(makeQuestion('exam','all',used,false));
+  const lvl = L.level || 'easy';
+  const base = cname.replace(' 🔥','');
+  const ci = CASES.findIndex(c=>c.name===base);
+  if(ci>=0){ while(out.length<L.n) out.push(makeQuestion('drill','all',used, lvl!=='hard', null, ci, lvl)); return out; }
+  const t = Object.keys(TYPES).find(k=>TYPES[k].long===base);
+  if(t){ while(out.length<L.n) out.push(makeQuestion('drill','all',used, lvl!=='hard', t, null, lvl)); return out; }
+  while(out.length<L.n) out.push(makeQuestion('exam','all',used,false,null,null,lvl));
   return out;
 }
 $('#btnToDash').onclick=()=>go('dash');
@@ -1436,7 +1690,7 @@ function finishQuiz(){
   LASTQUIZ = {mode:q.mode, n:q.questions.length, scope:q.scope, hintsOn:q.hintsOn};
   const session = {
     id:'s'+Date.now(), date:Date.now(), mode:q.mode,
-    correct, total, grade, secs,
+    correct, total, grade, secs, level:(q.level||'easy'),
     label: q.label || (MODES[q.mode]?MODES[q.mode].label:'Trening'),
     items:q.results
   };
@@ -1473,8 +1727,9 @@ function finishQuiz(){
   $('#rGrade').textContent=grade;
   const titles = {6:'Perfekcja! 🏆',5:'Bardzo dobrze! 🌟',4:'Dobra robota 👍',3:'Jest postęp 🙂',2:'Trzeba poćwiczyć 💪',1:'Od czegoś trzeba zacząć 🌱'};
   $('#rTitle').textContent = titles[grade];
-  $('#rSub').innerHTML = 'Poprawnych odpowiedzi: <b>'+correct+' z '+total+'</b> ('+pct(correct,total)+'%). '
-    + (grade>=4?'Tak trzymaj!':'Przejrzyj błędy poniżej — to najszybsza droga do lepszej oceny.');
+  const lvlBadge = q.level==='hard' ? ' <span class="tag lvlpill-hard" style="font-size:11px">🔥 poziom trudny</span>' : ' <span class="tag lvlpill-easy" style="font-size:11px">🙂 poziom łatwy</span>';
+  $('#rSub').innerHTML = 'Poprawnych odpowiedzi: <b>'+correct+' z '+total+'</b> ('+pct(correct,total)+'%). '+lvlBadge
+    + '<br>' + (grade>=4?'Tak trzymaj!':'Przejrzyj błędy poniżej — to najszybsza droga do lepszej oceny.');
   $('#rPts').textContent = '+'+xp+' XP';
   $('#rTime').textContent = '⏱ '+fmtTime(secs)
     + ' • średnio '+(total?(secs/total).toFixed(1):0)+' s na pytanie';
@@ -1558,6 +1813,11 @@ function renderChips(){
   $('#chipStreak').textContent = si.cur+' '+(si.cur===1?'dzień':'dni');
   $('#chipLevel').textContent = levelInfo(S.xp).lvl;
   $('#chipBadges').textContent = S.claimedBadges.length;
+  const hard = statForLevel('hard');
+  const ch = document.getElementById('chipHard');
+  if(ch) ch.textContent = (hard.p===null? '—' : hard.p+'%');
+  const bh=document.getElementById('btnHardChip');
+  if(bh && !bh._bound){ bh._bound=true; bh.onclick=()=>{ go('train'); setTimeout(()=>startQuiz('auto',20,'all',false,'hard'),120); }; }
 }
 
 function masteryRows(){
@@ -1597,6 +1857,7 @@ function renderDash(){
   $('#kTrendD').textContent = dir.desc;
 
   renderPlan();
+  renderLevelCards();
   $('#dashMastery').innerHTML = masteryRows();  $('#dashMastery').innerHTML = masteryRows();
 
   // mocne / słabe
@@ -1700,6 +1961,32 @@ function renderStats(){
   $('#caseTable').innerHTML='<tr><th>Przypadek</th><th>lp.</th><th>lm.</th><th>razem</th><th>status</th><th></th></tr>'+rows;
   $$('[data-train-case]').forEach(b=>b.onclick=()=>trainSingleCase(+b.dataset.trainCase));
 
+  // poziomy
+  const el=statForLevel('easy'), hl=statForLevel('hard');
+  $('#lvlEasyBig').textContent = el.p===null?'—':el.p+'%';
+  $('#lvlEasySub').textContent = el.n? (el.ok+'/'+el.n+' poprawnych • '+el.label) : 'jeszcze nie ćwiczone';
+  $('#lvlHardBig').textContent = hl.p===null?'—':hl.p+'%';
+  $('#lvlHardSub').textContent = hl.n? (hl.ok+'/'+hl.n+' poprawnych • '+hl.label) : 'jeszcze nie ćwiczone';
+  let cmp='';
+  if(el.p!==null && hl.p!==null){
+    const d=hl.p-el.p;
+    cmp = '<div class="small" style="font-weight:700">Różnica łatwy → trudny: <b style="color:'+(d<-15?'#b91c1c':'#15803d')+'">'+(d>0?'+':'')+d+' pkt proc.</b> '
+      + (d<-15? 'To normalne — zadania trudne są o level wyżej. Ćwicz je osobno, aż różnica zmaleje.'
+         : d>15? 'Na trudnych idzie Ci nawet lepiej niż na łatwych — super!'
+         : 'Podobny poziom na obu — spróbuj trudniejszych bez podpowiedzi.')+'</div>';
+  } else {
+    cmp = '<div class="small muted" style="font-weight:700">Zrób po jednej sesji na każdym poziomie, żeby porównać wyniki.</div>';
+  }
+  $('#lvlCompare').innerHTML=cmp;
+  $('#hardTypes').innerHTML = HARD_TYPES.map(t=>{
+    const m=statForType(t); const p=m.p===null?0:m.p;
+    return '<div class="mrow mrw"><span class="nm">🔥 '+TYPES[t].long+'</span>'
+      +'<span class="track"><span class="fill" style="width:'+p+'%;background:'+(m.p===null?'#cbd5e1':p>=80?'#16a34a':p>=50?'#f59e0b':'#ef4444')+'"></span></span>'
+      +'<span class="pc">'+(m.p===null?'—':p+'%')+'</span>'
+      +'<button class="btn ghost sm" data-type-train="'+t+'">ćwicz</button></div>';
+  }).join('');
+  $$('[data-type-train]').forEach(b=>b.onclick=()=>{ go('train'); setTimeout(()=>drillType(b.dataset.typeTrain,10,'hard'),120); });
+
   // typy zadań
   $('#typeMastery').innerHTML = Object.keys(TYPES).map(t=>{
     const m=statForType(t);
@@ -1709,18 +1996,21 @@ function renderStats(){
       +'<span class="pc">'+(m.p===null?'—':p+'%')+'</span>'
       +'<button class="btn ghost sm" data-type-train="'+t+'">ćwicz</button></div>';
   }).join('');
-  $$('[data-type-train]').forEach(b=>b.onclick=()=>{ go('train'); setTimeout(()=>drillType(b.dataset.typeTrain,10),120); });
+  $$('#typeMastery [data-type-train]').forEach(b=>b.onclick=()=>{
+    go('train'); setTimeout(()=>drillType(b.dataset.typeTrain,10, HARD_TYPES.includes(b.dataset.typeTrain)?'hard':'easy'),120);
+  });
 
   // historia sesji
   const ss = S.sessions.slice().reverse().slice(0,30);
   $('#sessTable').innerHTML = ss.length
-    ? '<tr><th>#</th><th>Data</th><th>Tryb</th><th>Wynik</th><th>%</th><th>Ocena</th><th>Czas</th></tr>'
+    ? '<tr><th>#</th><th>Data</th><th>Tryb</th><th>Wynik</th><th>%</th><th>Ocena</th><th>Poziom</th><th>Czas</th></tr>'
       + ss.map((s,ix)=>'<tr><td>'+(S.sessions.length-ix)+'</td>'
         +'<td>'+new Date(s.date).toLocaleDateString('pl-PL')+'</td>'
         +'<td>'+esc(s.label || (MODES[s.mode]?MODES[s.mode].label:'Trening'))+'</td>'
         +'<td>'+s.correct+'/'+s.total+'</td>'
         +'<td>'+pct(s.correct,s.total)+'%</td>'
         +'<td><b style="color:'+gradeHex(s.grade)+'">'+s.grade+'</b></td>'
+        +'<td>'+(s.level==='hard'?'<span class="tag lvlpill-hard">🔥 trudny</span>':'<span class="tag lvlpill-easy">🙂 łatwy</span>')+'</td>'
         +'<td class="muted">'+fmtTime(s.secs||0)+'</td></tr>').join('')
     : '<tr><td class="muted">Brak sesji.</td></tr>';
 }
@@ -2020,9 +2310,13 @@ function todaysPlan(){
     steps.push({icon:'🧪', title:'Test diagnostyczny', desc:'20 pytań — sprawdzimy start', btn:'Zrób test', act:'diag', tag:'start'});
   }
   // najsłabszy przypadek
+  // priorytet: realne słabe punkty (<80%), potem niećwiczone
   const weak = CASES.map((c,i)=>({c,i,m:statForCase(i)}))
     .filter(x=>x.m.p===null || x.m.p<80)
-    .sort((a,b)=>(a.m.p===null?-1:a.m.p)-(b.m.p===null?-1:b.m.p));
+    .sort((a,b)=>{
+      const av = a.m.p===null?101:a.m.p, bv = b.m.p===null?101:b.m.p;
+      return av-bv;
+    });
   if(weak[0]){
     const w=weak[0];
     steps.push({icon:'🎯', title:'Doszlifuj: '+w.c.name, desc: w.m.p===null?'jeszcze nie ćwiczone':'skuteczność '+w.m.p+'%', btn:'Trenuj 10', act:'case:'+w.i, tag:'słaby punkt'});
@@ -2035,6 +2329,11 @@ function todaysPlan(){
   }else if(weak[1]){
     const w=weak[1];
     steps.push({icon:'🎯', title:'Doszlifuj: '+w.c.name, desc: w.m.p===null?'jeszcze nie ćwiczone':'skuteczność '+w.m.p+'%', btn:'Trenuj 10', act:'case:'+w.i, tag:'słaby punkt'});
+  }
+  // jeśli łatwe idzie dobrze — krok na poziom wyżej
+  const elv=statForLevel('easy'), hlv=statForLevel('hard');
+  if(elv.p!==null && elv.p>=75 && hlv.n<10){
+    steps.push({icon:'🔥', title:'Wejdź na poziom wyżej', desc:'łatwe ≥75% — czas na trudne', btn:'Trudne 20', act:'hard', tag:'level wyżej'});
   }
   // sprawdzian kontrolny
   if(answered>=20){
@@ -2059,6 +2358,29 @@ function planCardHTML(){
         +'</div>').join('')
     +'</div>';
 }
+function renderLevelCards(){
+  const e=statForLevel('easy'), h=statForLevel('hard');
+  const ep=document.getElementById('easyPct'), ei=document.getElementById('easyInfo');
+  const hp=document.getElementById('hardPct'), hi=document.getElementById('hardInfo');
+  if(!ep) return;
+  ep.textContent = e.p===null? 'brak danych' : e.p+'%';
+  ep.className = 'tag '+(e.p===null?'':e.p>=80?'lvlpill-easy':'');
+  ei.textContent = e.n? ('('+e.ok+'/'+e.n+' poprawnych)') : 'zacznij od tego poziomu';
+  hp.textContent = h.p===null? 'brak danych' : h.p+'%';
+  hp.className = 'tag '+(h.p!==null&&h.p>=80?'lvlpill-easy':'lvlpill-hard');
+  hi.textContent = h.n? ('('+h.ok+'/'+h.n+' poprawnych)') : 'wymaga znajomości przypadków na pamięć';
+  $$('[data-start-lvl]').forEach(b=>b.onclick=()=>{
+    const lvl=b.dataset.startLvl;
+    go('train');
+    setTimeout(()=>{
+      setup.level=lvl;
+      $$('#lvlOpts .opt').forEach(x=>x.classList.toggle('sel',x.dataset.lvl===lvl));
+      $('#hintSel').disabled=(lvl==='hard');
+      renderGoInfo();
+      startQuiz('auto', 20, 'all', lvl!=='hard', lvl);
+    },120);
+  });
+}
 function renderPlan(){
   const html = planCardHTML();
   const a=$('#planBox'); if(a) a.innerHTML=html;
@@ -2076,6 +2398,7 @@ function runPlan(act){
   if(act==='diag'){ go('train'); setTimeout(()=>startCustom(buildDiag(20),'Test diagnostyczny',false),120); return; }
   if(act==='exam'){ go('train'); setTimeout(startExam,120); return; }
   if(act==='theory'){ go('theory'); return; }
+  if(act==='hard'){ go('train'); setTimeout(()=>startQuiz('auto',20,'all',false,'hard'),120); return; }
   if(act.indexOf('case:')===0){ go('train'); setTimeout(()=>drillCase(+act.split(':')[1],10),120); return; }
   if(act.indexOf('type:')===0){ go('train'); setTimeout(()=>drillType(act.split(':')[1],10),120); return; }
 }
@@ -2156,6 +2479,15 @@ function buildReport(){
       +'<div><b>'+S.sessions.length+'</b><span>sesji</span></div>'
       +'<div><b>'+si.cur+'</b><span>dni z rzędu</span></div>'
     +'</div>'
+    +'<h3 style="font-size:14px;margin:16px 0 6px">Poziom zadań</h3>'
+    +'<table class="t"><tr><th>Poziom</th><th>Skuteczność</th><th>Poprawne</th><th>Opis</th></tr>'
+      +'<tr><td><b>🙂 Łatwy</b></td><td><b>'+(statForLevel('easy').p===null?'—':statForLevel('easy').p+'%')+'</b></td>'
+      +'<td class="muted">'+(statForLevel('easy').n?statForLevel('easy').ok+'/'+statForLevel('easy').n:'—')+'</td>'
+      +'<td class="muted">z podpowiedziami</td></tr>'
+      +'<tr><td><b>🔥 Trudny</b></td><td><b>'+(statForLevel('hard').p===null?'—':statForLevel('hard').p+'%')+'</b></td>'
+      +'<td class="muted">'+(statForLevel('hard').n?statForLevel('hard').ok+'/'+statForLevel('hard').n:'—')+'</td>'
+      +'<td class="muted">tylko przypadek + liczba, bez podpowiedzi</td></tr>'
+      +'</table>'
     +'<h3 style="font-size:14px;margin:16px 0 6px">Opanowanie przypadków</h3>'
     +'<table class="t"><tr><th>Przypadek</th><th>Pytanie</th><th>Skuteczność</th><th>Poprawne</th><th>Status</th></tr>'+rows+'</table>'
     +'<h3 style="font-size:14px;margin:16px 0 6px">Wnioski</h3>'
@@ -2163,6 +2495,8 @@ function buildReport(){
       +'<li><b>Mocne strony:</b> '+(CASES.map((c,i)=>({c,m:statForCase(i)})).filter(x=>x.m.n>=3&&x.m.p>=80).map(x=>x.c.name).join(', ')||'jeszcze się kształtują')+'</li>'
       +'<li><b>Do powtórki:</b> '+blocker+'</li>'
       +'<li><b>Cel:</b> ocena '+pl.target+' (wymaga '+pl.need+'% poprawnych). '+(pl.reached?'Cel osiągnięty.':'Brakuje ok. '+pl.gap+' pkt proc.')+'</li>'
+      +'<li><b>Zaangażowanie:</b> poziom '+li.lvl+', '+S.claimedBadges.length+' odznak, '+Math.round(S.sessions.reduce((n,s)=>n+(s.secs||0),0)/60)+' min nauki.</li>'
+      +'<li><b>Zadania trudne:</b> '+(statForLevel('hard').p===null?'jeszcze nie ćwiczony — warto zacząć':statForLevel('hard').p+'% poprawnych ('+statForLevel('hard').ok+'/'+statForLevel('hard').n+')')+'</li>'
       +'<li><b>Zaangażowanie:</b> poziom '+li.lvl+', '+S.claimedBadges.length+' odznak, '+Math.round(S.sessions.reduce((n,s)=>n+(s.secs||0),0)/60)+' min nauki.</li>'
     +'</ul>'
     +'<h3 style="font-size:14px;margin:16px 0 6px">Ostatnie sesje</h3>'
