@@ -699,9 +699,9 @@ void CardReader::release() {
  * Enqueues M23 and M24 commands to initiate a media print.
  */
 void CardReader::openAndPrintFile(const char *name) {
-  // v28: Szybki start - ZAWSZE mierzy miejsce druku, ale tylko 4 punkty (narożniki obszaru modelu).
-  // G29 P1 C pobadzuje tylko te 4 punkty - błyskawicznie (~8-10s zamiast 40-70s przy 25 punktach).
-  // Skanowanie pliku usunięte - nie rozwiązuje głównego problemu (opóźnienie to G28+G29, nie skanowanie).
+  // v29: Szybki start - ZAWSZE mierzy miejsce druku (wszystkie punkty siatki w obszarze modelu).
+  // G29 P1 C pobadzuje wszystkie punkty w obszarze modelu - nie tylko 4 narożniki (v28 błąd).
+  // Skanowanie pliku usunięte - główne opóźnienie to G28+homing + G29, nie skanowanie pliku.
   float minX = 9999.0, maxX = -9999.0, minY = 9999.0, maxY = -9999.0;
   bool have_bbox = false;
   float hdr_minX = 9999.0, hdr_maxX = -9999.0, hdr_minY = 9999.0, hdr_maxY = -9999.0;
@@ -766,48 +766,24 @@ void CardReader::openAndPrintFile(const char *name) {
     bool partial = false;
     uint8_t marked = 0;
     if (minX < maxX) {
-      // v28: Oznacz TYLKO 4 narożniki obszaru modelu zamiast wszystkich punktów siatki.
-      // G29 P1 C pobadzuje tylko te 4 punkty - błyskawicznie (~8-10s zamiast 40-70s przy 25 punktach).
+      // v29: Oznacz WSZYSTKIE punkty siatki w obszarze modelu (jak v26, ale bez skanowania pliku).
+      // G29 P1 C pobadzuje tylko te punkty - obiekt w każdym miejscu będzie mierzony.
       const float marginX = MESH_X_DIST * 0.5f;
       const float marginY = MESH_Y_DIST * 0.5f;
 
-      // 4 narożniki obszaru modelu (z marginesem)
-      struct { float x, y; } corners[4] = {
-        {minX - marginX, minY - marginY},
-        {maxX + marginX, minY - marginY},
-        {minX - marginX, maxY + marginY},
-        {maxX + marginX, maxY + marginY}
-      };
-
-      for (uint8_t ci = 0; ci < 4; ci++) {
-        // Znajdź najbliższy punkt siatki do każdego narożnika
-        uint8_t best_ix = 0, best_iy = 0;
-        float best_dx = 9999, best_dy = 9999;
-
+      for (uint8_t iy = 0; iy < GRID_MAX_POINTS_Y; iy++) {
+        const float gy = MESH_MIN_Y + static_cast<float>(iy) * MESH_Y_DIST;
+        if (gy < minY - marginY || gy > maxY + marginY) continue;
         for (uint8_t ix = 0; ix < GRID_MAX_POINTS_X; ix++) {
-          float gx = MESH_MIN_X + static_cast<float>(ix) * MESH_X_DIST;
-          float d = fabs(gx - corners[ci].x);
-          if (d < best_dx) { best_dx = d; best_ix = ix; }
-        }
-        for (uint8_t iy = 0; iy < GRID_MAX_POINTS_Y; iy++) {
-          float gy = MESH_MIN_Y + static_cast<float>(iy) * MESH_Y_DIST;
-          float d = fabs(gy - corners[ci].y);
-          if (d < best_dy) { best_dy = d; best_iy = iy; }
-        }
-
-        // Sprawdź czy punkt jest w granicach meshu i nie został już oznaczony
-        float gx = MESH_MIN_X + static_cast<float>(best_ix) * MESH_X_DIST;
-        float gy = MESH_MIN_Y + static_cast<float>(best_iy) * MESH_Y_DIST;
-        if (gx >= MESH_MIN_X && gx <= MESH_MAX_X && gy >= MESH_MIN_Y && gy <= MESH_MAX_Y) {
-          if (isnan(bedlevel.z_values[best_ix][best_iy])) continue; // już oznaczony
-          bedlevel.z_values[best_ix][best_iy] = NAN;
-          partial = true;
-          marked++;
+          const float gx = MESH_MIN_X + static_cast<float>(ix) * MESH_X_DIST;
+          if (gx < minX - marginX || gx > maxX + marginX) continue;
+          bedlevel.z_values[ix][iy] = NAN;
+          partial = true; marked++;
         }
       }
     }
     if (partial) {
-      SERIAL_ECHOLNPGM("SD print: czesciowy pomiar - zaznaczono ", marked, " pkt (4 narożniki modelu)");
+      SERIAL_ECHOLNPGM("SD print: czesciowy pomiar - zaznaczono ", marked, " pkt (cały obszar modelu)");
       queue.inject_P(PSTR("G28\nG29 P1 C\nM420 S1\n"));
     } else {
       SERIAL_ECHOLNPGM("SD print scan: brak zakresu - pomiar calej siatki");
