@@ -751,75 +751,84 @@ void CardReader::openAndPrintFile(const char *name) {
     }
     myfile.seekSet(0); // powrot na poczatek dla ewentualnego pelnego skanu
 
-    // v20/v22/v26: Szybkie skanowanie blokami (512 B) zamiast znak-po-znaku.
-    // Stary kod czytal myfile.read() znak po znaku - na duzych plikach (np. obudowa)
-    // trwalo to ponad minute i wygladalo jak zawieszenie. Bloki sa ~50x szybsze.
-    // Dodatkowo limit 8 MB - wieksze pliki i tak maja granice w pierwszej czesci.
-    char line[128];
-    uint16_t idx = 0;
-    bool in_model = false;
-    bool done = false;
+    // v27: Jesli mamy bounding box z naglowka slicera, POMIJAMY skanowanie calego pliku.
+    // Skanowanie blokami 512B do 8MB na duzym pliku moze trwac 10-20s i jest zbędne
+    // gdy slicer juz podał wymiary modelu w komentarzu nagłówka (np. ; Min X: ... Max X: ...).
+    // Skanowanie wykonujemy tylko gdy nie ma bounding boxa w nagłówku (fallback).
+    if (!have_hdr_bbox) {
+      // v20/v22/v26: Szybkie skanowanie blokami (512 B) zamiast znak-po-znaku.
+      // Stary kod czytal myfile.read() znak po znaku - na duzych plikach (np. obudowa)
+      // trwalo to ponad minute i wygladalo jak zawieszenie. Bloki sa ~50x szybsze.
+      // Dodatkowo limit 8 MB - wieksze pliki i tak maja granice w pierwszej czesci.
+      char line[128];
+      uint16_t idx = 0;
+      bool in_model = false;
+      bool done = false;
 
-    static char block[512];
-    uint32_t scanned = 0;
-    const uint32_t SCAN_LIMIT = 8UL * 1024UL * 1024UL; // 8 MB max
+      static char block[512];
+      uint32_t scanned = 0;
+      const uint32_t SCAN_LIMIT = 8UL * 1024UL * 1024UL; // 8 MB max
 
-    while (!done) {
-      const int32_t n = myfile.read(block, sizeof(block));
-      if (n <= 0) break;
-      scanned += (uint32_t)n;
-      if (scanned > SCAN_LIMIT) break;
+      while (!done) {
+        const int32_t n = myfile.read(block, sizeof(block));
+        if (n <= 0) break;
+        scanned += (uint32_t)n;
+        if (scanned > SCAN_LIMIT) break;
 
-      for (int32_t bi = 0; bi < n && !done; bi++) {
-        const char c = block[bi];
-        if (c == '\n' || c == '\r') {
-          if (idx > 0) {
-            line[idx] = '\0';
+        for (int32_t bi = 0; bi < n && !done; bi++) {
+          const char c = block[bi];
+          if (c == '\n' || c == '\r') {
+            if (idx > 0) {
+              line[idx] = '\0';
 
-            // 1. Zakończ skanowanie, gdy napotkasz sekcję zakończenia druku (End G-code)
-            // Dzięki temu ruchy końcowe (np. odsuwanie stołu na X=5, Y=176) nie powiększają obszaru!
-            if (in_model && (strstr(line, "end gcode") || strstr(line, "END G-CODE") || strstr(line, "End of Gcode") || strstr(line, "EXECUTABLE_BLOCK_END") || strstr(line, "M84"))) {
-              done = true;
-              break;
-            }
+              // 1. Zakończ skanowanie, gdy napotkasz sekcję zakończenia druku (End G-code)
+              // Dzięki temu ruchy końcowe (np. odsuwanie stołu na X=5, Y=176) nie powiększają obszaru!
+              if (in_model && (strstr(line, "end gcode") || strstr(line, "END G-CODE") || strstr(line, "End of Gcode") || strstr(line, "EXECUTABLE_BLOCK_END") || strstr(line, "M84"))) {
+                done = true;
+                break;
+              }
 
-            // 2. Wykryj początek właściwego modelu (pomijając start G-code i linię czyszczącą):
-            // OrcaSlicer / PrusaSlicer: ;LAYER_CHANGE
-            // Cura: ;LAYER:0
-            if (!in_model && (strstr(line, "LAYER_CHANGE") || strstr(line, "LAYER:0") || strstr(line, "LAYER: 0"))) {
-              in_model = true;
-            }
+              // 2. Wykryj początek właściwego modelu (pomijając start G-code i linię czyszczącą):
+              // OrcaSlicer / PrusaSlicer: ;LAYER_CHANGE
+              // Cura: ;LAYER:0
+              if (!in_model && (strstr(line, "LAYER_CHANGE") || strstr(line, "LAYER:0") || strstr(line, "LAYER: 0"))) {
+                in_model = true;
+              }
 
-            // 3. Szukaj G1 lub G0 ze współrzędnymi X i Y
-            if ((strstr(line, "G1 ") || strstr(line, "G0 "))) {
-              char *px = strstr(line, " X");
-              char *py = strstr(line, " Y");
-              if (px && py) {
-                float x = atof(px + 2);
-                float y = atof(py + 2);
+              // 3. Szukaj G1 lub G0 ze współrzędnymi X i Y
+              if ((strstr(line, "G1 ") || strstr(line, "G0 "))) {
+                char *px = strstr(line, " X");
+                char *py = strstr(line, " Y");
+                if (px && py) {
+                  float x = atof(px + 2);
+                  float y = atof(py + 2);
 
-                if (x < raw_minX) raw_minX = x;
-                if (x > raw_maxX) raw_maxX = x;
-                if (y < raw_minY) raw_minY = y;
-                if (y > raw_maxY) raw_maxY = y;
+                  if (x < raw_minX) raw_minX = x;
+                  if (x > raw_maxX) raw_maxX = x;
+                  if (y < raw_minY) raw_minY = y;
+                  if (y > raw_maxY) raw_maxY = y;
 
-                // Ruchy modelu (tylko po rozpoczęciu warstwy i z dala od krawędzi czyszczącej X <= 4.0)
-                if (in_model && x > 4.0) {
-                  if (x < minX) minX = x;
-                  if (x > maxX) maxX = x;
-                  if (y < minY) minY = y;
-                  if (y > maxY) maxY = y;
+                  // Ruchy modelu (tylko po rozpoczęciu warstwie i z dala od krawędzi czyszczącej X <= 4.0)
+                  if (in_model && x > 4.0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                  }
                 }
               }
+              idx = 0;
             }
-            idx = 0;
+          } else if (idx < sizeof(line) - 1) {
+            line[idx++] = c;
           }
-        } else if (idx < sizeof(line) - 1) {
-          line[idx++] = c;
         }
       }
+      myfile.close();
+    } else {
+      myfile.close();
+      SERIAL_ECHOLNPGM("SD print scan: pominięto skanowanie pliku - bounding box z naglowka");
     }
-    myfile.close();
 
     // Jeśli slicer zapisał bounding box w nagłówku, użyj go (błyskawiczne).
     // W przeciwnym razie użyj wyniku skanowania G1/G0.
