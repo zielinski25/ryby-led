@@ -699,6 +699,12 @@ void CardReader::release() {
  * Enqueues M23 and M24 commands to initiate a media print.
  */
 void CardReader::openAndPrintFile(const char *name) {
+#if ENABLED(FAST_SD_START)
+  // v25: Ultra-szybki start - pomija skanowanie pliku i G29 (oszczedza 15-40s).
+  // Robi tylko homing (G28) i wczytuje zapisany mesh z EEPROM (M420 S1).
+  // Jesli ruszysz stol lub zmienisz powierzchnie, zrob G29 recznie z menu.
+  queue.inject_P(PSTR("G28\nM420 S1\n"));
+#else
   // Skanuj plik G-code przed drukiem, aby znaleźć obszar wydruku samego modelu
   float minX = 9999.0, maxX = -9999.0, minY = 9999.0, maxY = -9999.0;
   float raw_minX = 9999.0, raw_maxX = -9999.0, raw_minY = 9999.0, raw_maxY = -9999.0;
@@ -872,6 +878,7 @@ void CardReader::openAndPrintFile(const char *name) {
   #else
     queue.inject_P(PSTR("G28\nM420 S1\n"));
   #endif
+#endif
 
   char cmd[4 + strlen(name) + 1 + 3 + 1];
   sprintf_P(cmd, M23_STR, name);
