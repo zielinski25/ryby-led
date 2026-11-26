@@ -2789,9 +2789,9 @@
  * Use CRC checks and retries on the SD communication.
  */
 #if ENABLED(SDSUPPORT)
-  // v27: Zawsze mierzy miejsce druku (G29 P1 C) w obszarze modelu - bez skanowania calego pliku gdy bounding box jest w naglowku.
-  // Skanowanie pliku G-code pomijane gdy slicer zapisal wymiary w naglowku (oszczedza 10-20s na duzych plikach).
-  // Gdy brak naglowka - fallback na skanowanie blokami 512B + czesciowy pomiar siatki (G29 P1 C) tylko w obszarze modelu.
+  // v28: Zawsze mierzy miejsce druku (G29 P1 C) - ale tylko 4 narożniki obszaru modelu, nie wszystkie punkty siatki.
+  // Skanowanie pliku G-code usunięte - główne opóźnienie to G28+homing + G29 sondowanie, nie skanowanie pliku.
+  // 4 punkty pomiaru = ~8-10s zamiast 40-70s przy 25 punktach. Zawsze w dobrym miejscu.
   //#define SD_CHECK_AND_RETRY
   ////#define BINARY_FILE_TRANSFER    // Enable binary file transfer for remote firmware upgrade via USB
 #endif

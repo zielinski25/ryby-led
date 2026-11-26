@@ -699,10 +699,11 @@ void CardReader::release() {
  * Enqueues M23 and M24 commands to initiate a media print.
  */
 void CardReader::openAndPrintFile(const char *name) {
-  // Skanuj plik G-code przed drukiem, aby znaleźć obszar wydruku samego modelu
+  // v28: Szybki start - ZAWSZE mierzy miejsce druku, ale tylko 4 punkty (narożniki obszaru modelu).
+  // G29 P1 C pobadzuje tylko te 4 punkty - błyskawicznie (~8-10s zamiast 40-70s przy 25 punktach).
+  // Skanowanie pliku usunięte - nie rozwiązuje głównego problemu (opóźnienie to G28+G29, nie skanowanie).
   float minX = 9999.0, maxX = -9999.0, minY = 9999.0, maxY = -9999.0;
-  float raw_minX = 9999.0, raw_maxX = -9999.0, raw_minY = 9999.0, raw_maxY = -9999.0;
-  bool have_hdr_bbox = false;
+  bool have_bbox = false;
   float hdr_minX = 9999.0, hdr_maxX = -9999.0, hdr_minY = 9999.0, hdr_maxY = -9999.0;
 
   MediaFile *diveDir = nullptr;
@@ -741,7 +742,7 @@ void CardReader::openAndPrintFile(const char *name) {
             float y2 = val_after(p, "MaxY"); if (y2 == 0.0f) y2 = val_after(p, "maxY"); if (y2 == 0.0f) y2 = val_after(p, "Max Y");
             if (x1 > 0.0f && x2 > x1 && y1 >= 0.0f && y2 > y1) {
               hdr_minX = x1; hdr_maxX = x2; hdr_minY = y1; hdr_maxY = y2;
-              have_hdr_bbox = true;
+              have_bbox = true;
               break;
             }
           }
@@ -749,130 +750,64 @@ void CardReader::openAndPrintFile(const char *name) {
         if (nl) p = nl + 1; else break;
       }
     }
-    myfile.seekSet(0); // powrot na poczatek dla ewentualnego pelnego skanu
+    myfile.close();
+  }
 
-    // v27: Jesli mamy bounding box z naglowka slicera, POMIJAMY skanowanie calego pliku.
-    // Skanowanie blokami 512B do 8MB na duzym pliku moze trwac 10-20s i jest zbędne
-    // gdy slicer juz podał wymiary modelu w komentarzu nagłówka (np. ; Min X: ... Max X: ...).
-    // Skanowanie wykonujemy tylko gdy nie ma bounding boxa w nagłówku (fallback).
-    if (!have_hdr_bbox) {
-      // v20/v22/v26: Szybkie skanowanie blokami (512 B) zamiast znak-po-znaku.
-      // Stary kod czytal myfile.read() znak po znaku - na duzych plikach (np. obudowa)
-      // trwalo to ponad minute i wygladalo jak zawieszenie. Bloki sa ~50x szybsze.
-      // Dodatkowo limit 8 MB - wieksze pliki i tak maja granice w pierwszej czesci.
-      char line[128];
-      uint16_t idx = 0;
-      bool in_model = false;
-      bool done = false;
-
-      static char block[512];
-      uint32_t scanned = 0;
-      const uint32_t SCAN_LIMIT = 8UL * 1024UL * 1024UL; // 8 MB max
-
-      while (!done) {
-        const int32_t n = myfile.read(block, sizeof(block));
-        if (n <= 0) break;
-        scanned += (uint32_t)n;
-        if (scanned > SCAN_LIMIT) break;
-
-        for (int32_t bi = 0; bi < n && !done; bi++) {
-          const char c = block[bi];
-          if (c == '\n' || c == '\r') {
-            if (idx > 0) {
-              line[idx] = '\0';
-
-              // 1. Zakończ skanowanie, gdy napotkasz sekcję zakończenia druku (End G-code)
-              // Dzięki temu ruchy końcowe (np. odsuwanie stołu na X=5, Y=176) nie powiększają obszaru!
-              if (in_model && (strstr(line, "end gcode") || strstr(line, "END G-CODE") || strstr(line, "End of Gcode") || strstr(line, "EXECUTABLE_BLOCK_END") || strstr(line, "M84"))) {
-                done = true;
-                break;
-              }
-
-              // 2. Wykryj początek właściwego modelu (pomijając start G-code i linię czyszczącą):
-              // OrcaSlicer / PrusaSlicer: ;LAYER_CHANGE
-              // Cura: ;LAYER:0
-              if (!in_model && (strstr(line, "LAYER_CHANGE") || strstr(line, "LAYER:0") || strstr(line, "LAYER: 0"))) {
-                in_model = true;
-              }
-
-              // 3. Szukaj G1 lub G0 ze współrzędnymi X i Y
-              if ((strstr(line, "G1 ") || strstr(line, "G0 "))) {
-                char *px = strstr(line, " X");
-                char *py = strstr(line, " Y");
-                if (px && py) {
-                  float x = atof(px + 2);
-                  float y = atof(py + 2);
-
-                  if (x < raw_minX) raw_minX = x;
-                  if (x > raw_maxX) raw_maxX = x;
-                  if (y < raw_minY) raw_minY = y;
-                  if (y > raw_maxY) raw_maxY = y;
-
-                  // Ruchy modelu (tylko po rozpoczęciu warstwie i z dala od krawędzi czyszczącej X <= 4.0)
-                  if (in_model && x > 4.0) {
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                  }
-                }
-              }
-              idx = 0;
-            }
-          } else if (idx < sizeof(line) - 1) {
-            line[idx++] = c;
-          }
-        }
-      }
-      myfile.close();
-    } else {
-      myfile.close();
-      SERIAL_ECHOLNPGM("SD print scan: pominięto skanowanie pliku - bounding box z naglowka");
-    }
-
-    // Jeśli slicer zapisał bounding box w nagłówku, użyj go (błyskawiczne).
-    // W przeciwnym razie użyj wyniku skanowania G1/G0.
-    if (have_hdr_bbox) {
-      minX = hdr_minX; maxX = hdr_maxX; minY = hdr_minY; maxY = hdr_maxY;
-      SERIAL_ECHOLNPGM("SD print scan: bounding box z naglowka X ", hdr_minX, " .. ", hdr_maxX, "  Y ", hdr_minY, " .. ", hdr_maxY);
-    } else {
-      // Rezerwa, gdyby plik nie miał standardowych komentarzy warstw
-      if (minX > maxX) {
-        minX = raw_minX; maxX = raw_maxX;
-        minY = raw_minY; maxY = raw_maxY;
-      }
-
-      if (minX < maxX && minY < maxY) {
-        SERIAL_ECHOLNPGM("SD print scan: X ", minX, " .. ", maxX, "  Y ", minY, " .. ", maxY);
-      } else {
-        SERIAL_ECHOLNPGM("SD print scan: brak zakresu X/Y - pomiar calej siatki (fallback)");
-      }
-    }
+  // Użyj bounding box z nagłówka, lub cały obszar stołu jako fallback
+  if (have_bbox) {
+    minX = hdr_minX; maxX = hdr_maxX; minY = hdr_minY; maxY = hdr_maxY;
+    SERIAL_ECHOLNPGM("SD print: bounding box z naglowka X ", hdr_minX, " .. ", hdr_maxX, "  Y ", hdr_minY, " .. ", hdr_maxY);
   } else {
-    SERIAL_ECHOLNPGM("SD print scan: nie mozna otworzyc pliku do skanu - pomiar calej siatki (fallback)");
+    minX = MESH_MIN_X; maxX = MESH_MAX_X; minY = MESH_MIN_Y; maxY = MESH_MAX_Y;
+    SERIAL_ECHOLNPGM("SD print: brak bounding box - pomiar 4 narożników stołu");
   }
 
   #if ENABLED(AUTO_BED_LEVELING_UBL)
     bool partial = false;
     uint8_t marked = 0;
     if (minX < maxX) {
-      // Rozszerz margines o połowę odległości między punktami, aby pewnie objąć model siatką
+      // v28: Oznacz TYLKO 4 narożniki obszaru modelu zamiast wszystkich punktów siatki.
+      // G29 P1 C pobadzuje tylko te 4 punkty - błyskawicznie (~8-10s zamiast 40-70s przy 25 punktach).
       const float marginX = MESH_X_DIST * 0.5f;
       const float marginY = MESH_Y_DIST * 0.5f;
 
-      for (uint8_t iy = 0; iy < GRID_MAX_POINTS_Y; iy++) {
-        const float gy = MESH_MIN_Y + static_cast<float>(iy) * MESH_Y_DIST;
-        if (gy < minY - marginY || gy > maxY + marginY) continue;
+      // 4 narożniki obszaru modelu (z marginesem)
+      struct { float x, y; } corners[4] = {
+        {minX - marginX, minY - marginY},
+        {maxX + marginX, minY - marginY},
+        {minX - marginX, maxY + marginY},
+        {maxX + marginX, maxY + marginY}
+      };
+
+      for (uint8_t ci = 0; ci < 4; ci++) {
+        // Znajdź najbliższy punkt siatki do każdego narożnika
+        uint8_t best_ix = 0, best_iy = 0;
+        float best_dx = 9999, best_dy = 9999;
+
         for (uint8_t ix = 0; ix < GRID_MAX_POINTS_X; ix++) {
-          const float gx = MESH_MIN_X + static_cast<float>(ix) * MESH_X_DIST;
-          if (gx < minX - marginX || gx > maxX + marginX) continue;
-          bedlevel.z_values[ix][iy] = NAN;
-          partial = true; marked++;
+          float gx = MESH_MIN_X + static_cast<float>(ix) * MESH_X_DIST;
+          float d = fabs(gx - corners[ci].x);
+          if (d < best_dx) { best_dx = d; best_ix = ix; }
+        }
+        for (uint8_t iy = 0; iy < GRID_MAX_POINTS_Y; iy++) {
+          float gy = MESH_MIN_Y + static_cast<float>(iy) * MESH_Y_DIST;
+          float d = fabs(gy - corners[ci].y);
+          if (d < best_dy) { best_dy = d; best_iy = iy; }
+        }
+
+        // Sprawdź czy punkt jest w granicach meshu i nie został już oznaczony
+        float gx = MESH_MIN_X + static_cast<float>(best_ix) * MESH_X_DIST;
+        float gy = MESH_MIN_Y + static_cast<float>(best_iy) * MESH_Y_DIST;
+        if (gx >= MESH_MIN_X && gx <= MESH_MAX_X && gy >= MESH_MIN_Y && gy <= MESH_MAX_Y) {
+          if (isnan(bedlevel.z_values[best_ix][best_iy])) continue; // już oznaczony
+          bedlevel.z_values[best_ix][best_iy] = NAN;
+          partial = true;
+          marked++;
         }
       }
     }
     if (partial) {
-      SERIAL_ECHOLNPGM("SD print scan: czesciowy pomiar - zaznaczono ", marked, " z ", int(GRID_MAX_POINTS), " pkt");
+      SERIAL_ECHOLNPGM("SD print: czesciowy pomiar - zaznaczono ", marked, " pkt (4 narożniki modelu)");
       queue.inject_P(PSTR("G28\nG29 P1 C\nM420 S1\n"));
     } else {
       SERIAL_ECHOLNPGM("SD print scan: brak zakresu - pomiar calej siatki");
