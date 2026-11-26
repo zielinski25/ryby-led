@@ -699,8 +699,8 @@ void CardReader::release() {
  * Enqueues M23 and M24 commands to initiate a media print.
  */
 void CardReader::openAndPrintFile(const char *name) {
-  // v29: Szybki start - ZAWSZE mierzy miejsce druku (wszystkie punkty siatki w obszarze modelu).
-  // G29 P1 C pobadzuje wszystkie punkty w obszarze modelu - nie tylko 4 narożniki (v28 błąd).
+  // v30: Szybki start - ZAWSZE mierzy miejsce druku (wszystkie punkty siatki w obszarze modelu).
+  // G29 P1 C + G29 S0 (zapis do EEPROM) + M420 S1 - bez tego M420 S1 wczytuje stary mesh z EEPROM i wynik G29 jest tracony!
   // Skanowanie pliku usunięte - główne opóźnienie to G28+homing + G29, nie skanowanie pliku.
   float minX = 9999.0, maxX = -9999.0, minY = 9999.0, maxY = -9999.0;
   bool have_bbox = false;
@@ -784,10 +784,11 @@ void CardReader::openAndPrintFile(const char *name) {
     }
     if (partial) {
       SERIAL_ECHOLNPGM("SD print: czesciowy pomiar - zaznaczono ", marked, " pkt (cały obszar modelu)");
-      queue.inject_P(PSTR("G28\nG29 P1 C\nM420 S1\n"));
+      // v30: G29 S0 zapisuje zmierzony mesh do EEPROM przed M420 S1 (bez tego M420 S1 wczytuje stary mesh z EEPROM i wynik G29 jest tracony!)
+      queue.inject_P(PSTR("G28\nG29 P1 C\nG29 S0\nM420 S1\n"));
     } else {
       SERIAL_ECHOLNPGM("SD print scan: brak zakresu - pomiar calej siatki");
-      queue.inject_P(PSTR("G28\nG29 P1\nM420 S1\n"));
+      queue.inject_P(PSTR("G28\nG29 P1\nG29 S0\nM420 S1\n"));
     }
   #else
     queue.inject_P(PSTR("G28\nM420 S1\n"));

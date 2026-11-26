@@ -2789,7 +2789,8 @@
  * Use CRC checks and retries on the SD communication.
  */
 #if ENABLED(SDSUPPORT)
-  // v29: Zawsze mierzy miejsce druku (G29 P1 C) - WSZYSTKIE punkty siatki w obszarze modelu (naprawa v28: tylko 4 narożniki).
+  // v30: Zawsze mierzy miejsce druku (G29 P1 C + G29 S0 + M420 S1) - WSZYSTKIE punkty siatki w obszarze modelu.
+  // G29 S0 zapisuje zmierzony mesh do EEPROM przed M420 S1 (bez tego wynik G29 jest tracony!).
   // Skanowanie pliku G-code usunięte - główne opóźnienie to G28+homing + G29, nie skanowanie pliku.
   // Wszystkie punkty w obszarze modelu = poprawny mesh dla dużych obiektów. Zawsze w dobrym miejscu.
   //#define SD_CHECK_AND_RETRY
