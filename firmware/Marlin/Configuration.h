@@ -2789,7 +2789,8 @@
  * Use CRC checks and retries on the SD communication.
  */
 #if ENABLED(SDSUPPORT)
-  #define FAST_SD_START 1 // v25: Ultra-szybki start - pomija skanowanie pliku i G29. Robi tylko G28 + M420 S1 (wczytuje zapisany mesh). Start natychmiast po kliknieciu pliku. Jesli ruszysz stol, zrob G29 recznie z menu.
+  // v26: Zawsze mierzy miejsce druku - skanowanie pliku + czesciowy pomiar siatki (G29 P1 C) tylko w obszarze modelu.
+  // Szybkie skanowanie blokami 512B + pomiar tylko miejsca druku = szybko i zawsze w dobrym miejscu.
   //#define SD_CHECK_AND_RETRY
   ////#define BINARY_FILE_TRANSFER    // Enable binary file transfer for remote firmware upgrade via USB
 #endif
