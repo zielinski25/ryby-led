@@ -1,0 +1,5 @@
+# Lokalne artefakty sesji — NIE commitować (zawierają/stąd pochodzą dane konfiguracyjne dekodera)
+google_drive/
+OSCam_*.md
+*.bak
+*.bak.*
